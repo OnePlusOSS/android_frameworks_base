@@ -438,6 +438,8 @@ public final class SystemServer {
         EntropyMixer entropyMixer = null;
         CameraService cameraService = null;
 
+        OemExService mOemExService = null;
+
         boolean disableStorage = SystemProperties.getBoolean("config.disable_storage", false);
         boolean disableBluetooth = SystemProperties.getBoolean("config.disable_bluetooth", false);
         boolean disableLocation = SystemProperties.getBoolean("config.disable_location", false);
@@ -956,6 +958,9 @@ public final class SystemServer {
                         new GraphicsStatsService(context));
             }
 
+            mOemExService = new OemExService(context);
+            ServiceManager.addService("OEMExService", mOemExService);
+
             if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_PRINTING)) {
                 mSystemServiceManager.startService(PRINT_MANAGER_SERVICE_CLASS);
             }
@@ -1096,6 +1101,7 @@ public final class SystemServer {
         final MediaRouterService mediaRouterF = mediaRouter;
         final AudioService audioServiceF = audioService;
         final MmsServiceBroker mmsServiceF = mmsService;
+        final OemExService mOemExServiceF = mOemExService;
 
         // We now tell the activity manager it is okay to run third party
         // code.  It will call back into us once it has gotten to the state
@@ -1224,6 +1230,14 @@ public final class SystemServer {
                     if (mmsServiceF != null) mmsServiceF.systemRunning();
                 } catch (Throwable e) {
                     reportWtf("Notifying MmsService running", e);
+                }
+
+                try {
+                    if (mOemExServiceF != null) {
+                        mOemExServiceF.systemRunning();
+                    }
+                } catch (Throwable e) {
+                    reportWtf("Notifying mOemExService running", e);
                 }
             }
         });
