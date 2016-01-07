@@ -790,6 +790,9 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                 // This is required because telephony doesn't return to "READY" after
                 // these state transitions. See bug 7197471.
                 state = IccCardConstants.State.READY;
+            } else if (IccCardConstants.INTENT_VALUE_ICC_NOT_READY.equals(stateExtra)
+                    && TelephonyManager.getDefault().isMultiSimEnabled()) {
+                state = IccCardConstants.State.NOT_READY;
             } else {
                 state = IccCardConstants.State.UNKNOWN;
             }

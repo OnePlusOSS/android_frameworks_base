@@ -28,4 +28,7 @@
 
     <!-- Threshold in micro amperes above which a charger is rated as "fast" -->
     <integer name="config_chargingFastThreshold">1500000</integer>
+
+    <!-- Guide user to wipe data after fail to unlock for the max times -->
+    <integer name="config_max_unlock_countdown_times">0</integer>
 </resources>

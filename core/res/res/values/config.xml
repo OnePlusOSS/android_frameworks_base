@@ -2435,4 +2435,46 @@
      <!-- Keypress Optimization -->
     <bool name="config_enableKeypressOptimization">false</bool>
     <integer-array name="keypress_param_value"/>
+
+    <bool name="config_enableDataSwitch">false</bool>
+
+    <!-- Whether to use TMO MCC MNC roaming setting -->
+    <bool name="config_regional_mcc_mnc_roaming_setting">false</bool>
+
+    <!-- Whether to use TMO LTE singnal strength threshold -->
+    <bool name="config_regional_lte_singnal_threshold">false</bool>
+    <!-- Whether to use TMO UMTS singnal strength threshold -->
+    <bool name="config_regional_umts_singnal_threshold">false</bool>
+
+    <integer-array name="umts_signal_strength_threshold">
+        <item>-140</item>
+        <item>-113</item>
+        <item>-103</item>
+        <item>-97</item>
+        <item>-89</item>
+        <item>-44</item>
+    </integer-array>
+    <integer-array name="lte_signal_strength_threshold">
+        <item>-140</item>
+        <item>-120</item>
+        <item>-115</item>
+        <item>-110</item>
+        <item>-100</item>
+        <item>-44</item>
+    </integer-array>
+
+    <!-- Enables the feature that can show/hide the operator name in statusbar.
+        When true, the user can select to show/hide operator name through a
+        checkbox in Settings. When false, there is no option to show operator
+        name (no checkbox in Settings). -->
+    <bool name="config_showOperatorNameInStatusBar">false</bool>
+    <bool name="config_regional_hotspot_show_maximum_connection_enable">false</bool>
+    <bool name="config_regional_hotspot_show_broadcast_ssid_checkbox">false</bool>
+    <bool name="config_regional_hotspot_show_notification_when_turn_on">false</bool>
+    <!-- Zero Balance redirect URL config -->
+    <string name="operator_config_url" translatable="false"></string>
+    <!-- Zero Balance ping URL config -->
+    <string name="operator_ping_url" translatable="false"></string>
+    <!-- Zero Balance feature enable config -->
+    <bool name="config_zero_balance_operator">false</bool>
 </resources>
