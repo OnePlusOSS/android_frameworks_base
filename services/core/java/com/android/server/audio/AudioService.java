@@ -1191,6 +1191,22 @@ public class AudioService extends IAudioService.Stub {
         } else {
             streamType = getActiveStreamType(suggestedStreamType);
         }
+        int volumeType = mStreamVolumeAlias[streamType];
+        VolumeStreamState volumeState = mStreamStates[volumeType];
+        int state = getDeviceForStream(volumeType);
+        int index = volumeState.getIndex(state);
+        int ringerMode = getRingerModeInternal();
+        if ((volumeType == AudioSystem.STREAM_RING)
+                && (direction == AudioManager.ADJUST_LOWER)
+                && (index == 0)) {
+            direction = AudioManager.ADJUST_SAME;
+        }
+        if ((ringerMode == AudioManager.RINGER_MODE_SILENT)
+                && (direction == AudioManager.ADJUST_RAISE
+                && volumeType != AudioSystem.STREAM_MUSIC
+                && volumeType != AudioSystem.STREAM_ALARM)) {
+            direction = AudioManager.ADJUST_SAME;
+        }
         ensureValidStreamType(streamType);
         final int resolvedStream = mStreamVolumeAlias[streamType];
 
