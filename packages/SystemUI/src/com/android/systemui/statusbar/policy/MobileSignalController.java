@@ -751,6 +751,10 @@ public class MobileSignalController extends SignalController<
 
         mCurrentState.dataNetType = getDataNetworkType();
 
+        if (getDataRegState() != mCurrentState.dataRegState){
+            mCurrentState.dataRegState = getDataRegState();
+        }
+
         notifyListenersIfNecessary();
     }
 
@@ -1008,6 +1012,16 @@ public class MobileSignalController extends SignalController<
         }
     }
 
+    private int getDataRegState() {
+        if (mServiceState == null) {
+            if (DEBUG) {
+                Log.d(mTag, "getDataRegState dataRegState:STATE_OUT_OF_SERVICE");
+            }
+            return ServiceState.STATE_OUT_OF_SERVICE;
+        }
+        return mServiceState.getDataRegState();
+    }
+
     @VisibleForTesting
     void setActivity(int activity) {
         mCurrentState.activityIn = activity == TelephonyManager.DATA_ACTIVITY_INOUT
@@ -1196,6 +1210,7 @@ public class MobileSignalController extends SignalController<
         int voiceLevel;
         int imsRadioTechnology;
         int dataNetType;
+        int dataRegState;
 
         @Override
         public void copyFrom(State s) {
@@ -1215,6 +1230,7 @@ public class MobileSignalController extends SignalController<
             voiceLevel = state.voiceLevel;
             imsRadioTechnology = state.imsRadioTechnology;
             dataNetType = state.dataNetType;
+            dataRegState = state.dataRegState;
         }
 
         @Override
@@ -1236,6 +1252,7 @@ public class MobileSignalController extends SignalController<
             builder.append("carrierNetworkChangeMode=").append(carrierNetworkChangeMode);
             builder.append("imsRadioTechnology=").append(imsRadioTechnology);
             builder.append("dataNetType=").append(dataNetType);
+            builder.append("dataRegState=").append(dataRegState);
         }
 
         @Override
@@ -1253,7 +1270,8 @@ public class MobileSignalController extends SignalController<
                     && ((MobileState) o).voiceLevel == voiceLevel
                     && ((MobileState) o).isDefault == isDefault
                     && ((MobileState) o).imsRadioTechnology == imsRadioTechnology
-                    && ((MobileState) o).dataNetType == dataNetType;
+                    && ((MobileState) o).dataNetType == dataNetType
+                    && ((MobileState) o).dataRegState == dataRegState;
         }
     }
 
