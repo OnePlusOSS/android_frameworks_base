@@ -62,7 +62,7 @@ public class VolumeDialogComponent implements VolumeComponent {
             }
         };
         mZenModeController = zen;
-        mDialog = new VolumeDialog(context, WindowManager.LayoutParams.TYPE_VOLUME_OVERLAY,
+        mDialog = new VolumeDialog(sysui, context, WindowManager.LayoutParams.TYPE_VOLUME_OVERLAY,
                 mController, zen, mVolumeDialogCallback);
         applyConfiguration();
     }

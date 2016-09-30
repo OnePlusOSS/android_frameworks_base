@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ * Copyright (c) 2015, The OnePlus Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+*/
+-->
+<resources>
+
+    <!-- Edit mode user hint text view height. -->
+    <dimen name="qs_edit_mode_user_hint_height">55dp</dimen>
+    <!-- How far the items from detail view appear from left edge -->
+    <dimen name="detail_view_item_left_padding">14dp</dimen>
+    <!-- How far the text from hotspot detail view appears from top edge -->
+    <dimen name="detail_view_hotspot_top_padding">6dp</dimen>
+    <!-- Hotspot detail view text size (small) -->
+    <dimen name="qs_hotspot_detail_text_size">14sp</dimen>
+    <!-- Hotspot detail view text size (medium) -->
+    <dimen name="qs_hotspot_detail_text_size_medium">18sp</dimen>
+    <!-- Hotspot detail view text size (large) -->
+    <dimen name="qs_hotspot_detail_text_size_large">24sp</dimen>
+
+    <!-- Explicit width of the zen toast window -->
+    <dimen name="zen_toast_width">224dp</dimen>
+
+    <!-- Zen toast z depth -->
+    <dimen name="zen_toast_z">3dp</dimen>
+</resources>
