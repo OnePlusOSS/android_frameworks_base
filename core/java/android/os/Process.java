@@ -142,7 +142,14 @@ public class Process {
      * @hide
      */
     public static final int SHARED_RELRO_UID = 1037;
-
+    //#ifdef VENDOR_EDIT
+	//ruanbanmao add for 15801 nfc eSE.
+    /**
+    * Defines the UID/GID for the SPI service process.
+    * @hide
+    */
+    public static final int SPI_UID = 1038;
+    //#endif
     /**
      * Defines the start of a range of UIDs (and GIDs), going from this
      * number to {@link #LAST_APPLICATION_UID} that are reserved for assigning

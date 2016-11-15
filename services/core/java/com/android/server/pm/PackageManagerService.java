@@ -309,6 +309,10 @@ public class PackageManagerService extends IPackageManager.Stub {
     private static final int RADIO_UID = Process.PHONE_UID;
     private static final int LOG_UID = Process.LOG_UID;
     private static final int NFC_UID = Process.NFC_UID;
+    //#ifdef VENDOR_EDIT
+	//ruanbanmao add for 15801 eSE of NFC. 2015-12-25
+    private static final int SPI_UID = Process.SPI_UID;
+    //#endif
     private static final int BLUETOOTH_UID = Process.BLUETOOTH_UID;
     private static final int SHELL_UID = Process.SHELL_UID;
 
@@ -1829,6 +1833,11 @@ public class PackageManagerService extends IPackageManager.Stub {
                 ApplicationInfo.FLAG_SYSTEM, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
         mSettings.addSharedUserLPw("android.uid.nfc", NFC_UID,
                 ApplicationInfo.FLAG_SYSTEM, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
+        //#ifdef VENDOR_EDIT
+        //ruanbanmao add for 15801 eSE of NFC. 2015-12-25
+        mSettings.addSharedUserLPw("android.uid.spi", SPI_UID,
+                ApplicationInfo.FLAG_SYSTEM, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
+         //#endif
         mSettings.addSharedUserLPw("android.uid.bluetooth", BLUETOOTH_UID,
                 ApplicationInfo.FLAG_SYSTEM, ApplicationInfo.PRIVATE_FLAG_PRIVILEGED);
         mSettings.addSharedUserLPw("android.uid.shell", SHELL_UID,

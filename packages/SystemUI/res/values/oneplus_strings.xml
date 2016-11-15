@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ /**
+ * Copyright (C) 2015 OnePlus Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+ -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+
+    <string name="ellipsis" translatable="false">&#8230;</string>
+
+    <!-- Edit mode hint -->
+    <string name="edit_mode_hint">Drag tiles to re-arrange, tap to show or hide</string>
+
+    <!-- Hotspot tile ssid -->
+    <string name="quick_settings_hotspot_ssid">SSID</string>
+
+    <!-- Hotspot tile password -->
+    <string name="quick_settings_hotspot_password">Password</string>
+
+    <!-- Hotspot tile no password -->
+    <string name="quick_settings_hotspot_no_password">Open network</string>
+
+    <!-- Hotspot tile secure lock -->
+    <string name="quick_settings_hotspot_secure_lock">Unlock device to show password</string>
+
+    <!-- Zen interruptions -->
+    <string name="zen_interruption_level_all">All notifications</string>
+    <string name="zen_no_interruptions">No interruptions</string>
+    <string name="zen_important_interruptions">Priority interruptions only</string>
+
+</resources>

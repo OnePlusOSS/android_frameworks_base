@@ -99,6 +99,10 @@ import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
 import android.renderscript.RenderScriptCacheDir;
 import android.security.keystore.AndroidKeyStoreProvider;
+//add for wechat
+import android.security.keystore.SoterKeyStoreProvider;
+import java.security.Security;
+//add end
 
 import com.android.internal.app.IVoiceInteractor;
 import com.android.internal.content.ReferrerIntent;
@@ -5391,6 +5395,11 @@ public final class ActivityThread {
         EventLogger.setReporter(new EventLoggingReporter());
 
         AndroidKeyStoreProvider.install();
+
+        //add for wechat
+        //add Soter provider
+        SoterKeyStoreProvider.install();
+        //add end
 
         // Make sure TrustedCertificateStore looks in the right place for CA certificates
         final File configDir = Environment.getUserConfigDirectory(UserHandle.myUserId());

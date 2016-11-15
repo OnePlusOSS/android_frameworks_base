@@ -1603,4 +1603,49 @@ public final class NfcAdapter {
             return mContext.getApplicationInfo().targetSdkVersion;
         }
     }
+    /**
+     * set nfc default route
+     * @hide
+     */
+    public boolean oemsetDefaultRoute(int defaultRouteEntry, int defaultProtoRouteEntry, int defaultTechRouteEntry) {
+        try {
+            return sService.oemsetDefaultRoute(defaultRouteEntry,defaultProtoRouteEntry,defaultTechRouteEntry);
+        } catch (RemoteException e) {
+            return false;
+        }
+    }
+    /**
+     * get nfc is support uicc or not
+     * @hide
+     */
+    public boolean getNfcSupportUICC() {
+        try {
+            return sService.getNfcSupportUICC();
+        } catch (RemoteException e) {
+            return false;
+        }
+    }
+
+    /**
+     * set current route
+     * @hide
+     */
+    public boolean setCurrentRoute( int currentRoute) {
+        try {
+            return sService.setCurrentRoute(currentRoute);
+        } catch (RemoteException e) {
+            return false;
+        }
+    }
+    /**
+     * get current route
+     * @hide
+     */
+    public int getCurrentRoute() {
+        try {
+            return sService.getCurrentRoute();
+        } catch (RemoteException e) {
+            return 0;
+        }
+    }
 }

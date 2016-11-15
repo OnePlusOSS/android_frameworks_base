@@ -2511,6 +2511,7 @@ public abstract class Context {
             MEDIA_PROJECTION_SERVICE,
             MIDI_SERVICE,
             RADIO_SERVICE,
+            THREEKEY_SERVICE,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ServiceName {}
@@ -3374,6 +3375,12 @@ public abstract class Context {
      */
     public static final String RADIO_SERVICE = "radio";
 
+    /**
+     * add support for threekey manager
+     *
+     * @hide
+     */
+    public static final String THREEKEY_SERVICE = "threekey";
     /**
      * Determine whether the given permission is allowed for a particular
      * process and user ID running in the system.

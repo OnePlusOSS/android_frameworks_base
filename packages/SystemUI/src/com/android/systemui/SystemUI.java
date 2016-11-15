@@ -26,6 +26,7 @@ import java.util.Map;
 public abstract class SystemUI {
     public Context mContext;
     public Map<Class<?>, Object> mComponents;
+    public boolean mBootCompleted;
 
     public abstract void start();
 

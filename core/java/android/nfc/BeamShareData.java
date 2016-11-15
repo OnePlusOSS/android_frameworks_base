@@ -15,8 +15,8 @@ import android.os.UserHandle;
 public final class BeamShareData implements Parcelable {
     public final NdefMessage ndefMessage;
     public final Uri[] uris;
-    public final UserHandle userHandle;
     public final int flags;
+    public final UserHandle userHandle;
 
     public BeamShareData(NdefMessage msg, Uri[] uris, UserHandle userHandle, int flags) {
         this.ndefMessage = msg;
