@@ -131,12 +131,26 @@ final class NativeDaemonConnector implements Runnable, Handler.Callback, Watchdo
     public void run() {
         mCallbackHandler = new Handler(mLooper, this);
 
+        long startTime = 0;
         while (true) {
             try {
                 listenToSocket();
             } catch (Exception e) {
-                loge("Error in NativeDaemonConnector: " + e);
-                SystemClock.sleep(5000);
+                /*
+                 * logcat only at 5 seconds interval.
+                 */
+                long currentTime = SystemClock.uptimeMillis();
+                long elapsedTime = currentTime - startTime;
+
+                if (elapsedTime >= 5000 && startTime > 0) {
+                    loge("Error in NativeDaemonConnector: " + e);
+                    startTime = 0;
+                }
+
+                if (startTime == 0)
+                    startTime = currentTime;
+
+                SystemClock.sleep(100);
             }
         }
     }
@@ -267,7 +281,6 @@ final class NativeDaemonConnector implements Runnable, Handler.Callback, Watchdo
                 }
             }
         } catch (IOException ex) {
-            loge("Communications error: " + ex);
             throw ex;
         } finally {
             synchronized (mDaemonLock) {
