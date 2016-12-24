@@ -128,6 +128,7 @@ import android.view.accessibility.CaptioningManager;
 import android.view.inputmethod.InputMethodManager;
 import android.view.textservice.TextServicesManager;
 
+import com.oem.os.ThreeKeyManager;
 import java.util.HashMap;
 
 /**
@@ -732,6 +733,12 @@ final class SystemServiceRegistry {
                 return new RadioManager(ctx);
             }});
 
+        registerService(Context.THREEKEY_SERVICE,ThreeKeyManager.class,
+                new CachedServiceFetcher<ThreeKeyManager>() {
+            @Override
+            public ThreeKeyManager createService(ContextImpl ctx) {
+                return new ThreeKeyManager(ctx);
+            }});
         registerService(Context.HARDWARE_PROPERTIES_SERVICE, HardwarePropertiesManager.class,
                 new CachedServiceFetcher<HardwarePropertiesManager>() {
             @Override

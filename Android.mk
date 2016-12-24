@@ -465,6 +465,11 @@ LOCAL_SRC_FILES += \
 	packages/services/Proxy/com/android/net/IProxyPortListener.aidl \
 	core/java/android/service/quicksettings/IQSService.aidl \
 	core/java/android/service/quicksettings/IQSTileService.aidl \
+	core/java/com/oem/os/IOemExInputCallBack.aidl \
+	core/java/com/oem/os/IOemUeventCallback.aidl \
+	core/java/com/oem/os/IOemExService.aidl \
+	core/java/com/oem/os/IOemService.aidl \
+        core/java/com/oem/os/IThreeKeyPolicy.aidl \
 
 # The following are native binders that need to go with the native component
 # at system/update_engine/binder_bindings/. Use relative path to refer to them.
