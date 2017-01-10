@@ -25,6 +25,7 @@ import android.os.Message;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import com.android.internal.logging.MetricsLogger;
@@ -50,6 +51,7 @@ import java.util.Collection;
 public class QSPanel extends LinearLayout implements Tunable, Callback {
 
     public static final String QS_SHOW_BRIGHTNESS = "qs_show_brightness";
+    public static final String QS_SHOW_SIMSWICHER = "qs_show_simswicher";
 
     protected final Context mContext;
     protected final ArrayList<TileRecord> mRecords = new ArrayList<TileRecord>();
@@ -76,6 +78,7 @@ public class QSPanel extends LinearLayout implements Tunable, Callback {
     private Record mDetailRecord;
 
     private BrightnessMirrorController mBrightnessMirrorController;
+    public boolean mIsCarrierOneSupported = false;
 
     public QSPanel(Context context) {
         this(context, null);
@@ -86,8 +89,8 @@ public class QSPanel extends LinearLayout implements Tunable, Callback {
         mContext = context;
 
         setOrientation(VERTICAL);
-
-        if(MobileSignalController.isCarrierOneSupported()) {
+        mIsCarrierOneSupported = MobileSignalController.isCarrierOneSupported();
+        if(mIsCarrierOneSupported) {
             mSimSwitcherView = LayoutInflater.from(context).inflate(
                 R.layout.sim_switcher, this, false);
             addView(mSimSwitcherView);
@@ -107,8 +110,8 @@ public class QSPanel extends LinearLayout implements Tunable, Callback {
 
         mBrightnessController = new BrightnessController(getContext(),
                 (ImageView) findViewById(R.id.brightness_icon),
-                (ToggleSlider) findViewById(R.id.brightness_slider));
-
+                (ToggleSlider) findViewById(R.id.brightness_slider),
+                (CheckBox) findViewById(R.id.brightness_auto));
     }
 
     protected void setupTileLayout() {
@@ -116,6 +119,9 @@ public class QSPanel extends LinearLayout implements Tunable, Callback {
                 R.layout.qs_paged_tile_layout, this, false);
         mTileLayout.setListening(mListening);
         addView((View) mTileLayout);
+        if (getResources().getBoolean(R.bool.config_show_auto_brightness)) {
+            ((CheckBox) findViewById(R.id.brightness_auto)).setVisibility(View.VISIBLE);
+        }
     }
 
     public boolean isShowingCustomize() {
@@ -126,6 +132,9 @@ public class QSPanel extends LinearLayout implements Tunable, Callback {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         TunerService.get(mContext).addTunable(this, QS_SHOW_BRIGHTNESS);
+        if(mIsCarrierOneSupported){
+            TunerService.get(mContext).addTunable(this, QS_SHOW_SIMSWICHER);
+        }
         if (mHost != null) {
             setTiles(mHost.getTiles());
         }
@@ -150,6 +159,10 @@ public class QSPanel extends LinearLayout implements Tunable, Callback {
     public void onTuningChanged(String key, String newValue) {
         if (QS_SHOW_BRIGHTNESS.equals(key)) {
             mBrightnessView.setVisibility(newValue == null || Integer.parseInt(newValue) != 0
+                    ? VISIBLE : GONE);
+        }
+        if(mIsCarrierOneSupported && QS_SHOW_SIMSWICHER.equals(key)){
+            mSimSwitcherView.setVisibility(newValue == null || Integer.parseInt(newValue) != 0
                     ? VISIBLE : GONE);
         }
     }

@@ -114,11 +114,16 @@ public abstract class AndroidKeyStoreKeyPairGeneratorSpi extends KeyPairGenerato
     private static final int RSA_DEFAULT_KEY_SIZE = 2048;
     private static final int RSA_MIN_KEY_SIZE = 512;
     private static final int RSA_MAX_KEY_SIZE = 8192;
+    private static final int SP_RSA_MIN_KEY_SIZE = 2048;
+    private static final int SP_RSA_MAX_KEY_SIZE = 2048;
 
     private static final Map<String, Integer> SUPPORTED_EC_NIST_CURVE_NAME_TO_SIZE =
             new HashMap<String, Integer>();
+    private static final Map<String, Integer> SUPPORTED_SP_EC_NIST_CURVE_NAME_TO_SIZE =
+            new HashMap<String, Integer>();
     private static final List<String> SUPPORTED_EC_NIST_CURVE_NAMES = new ArrayList<String>();
     private static final List<Integer> SUPPORTED_EC_NIST_CURVE_SIZES = new ArrayList<Integer>();
+    private static final List<Integer> SUPPORTED_SP_EC_NIST_CURVE_SIZES = new ArrayList<Integer>();
     static {
         // Aliases for NIST P-224
         SUPPORTED_EC_NIST_CURVE_NAME_TO_SIZE.put("p-224", 224);
@@ -129,6 +134,11 @@ public abstract class AndroidKeyStoreKeyPairGeneratorSpi extends KeyPairGenerato
         SUPPORTED_EC_NIST_CURVE_NAME_TO_SIZE.put("p-256", 256);
         SUPPORTED_EC_NIST_CURVE_NAME_TO_SIZE.put("secp256r1", 256);
         SUPPORTED_EC_NIST_CURVE_NAME_TO_SIZE.put("prime256v1", 256);
+
+        // Aliases for NIST P-256
+        SUPPORTED_SP_EC_NIST_CURVE_NAME_TO_SIZE.put("p-256", 256);
+        SUPPORTED_SP_EC_NIST_CURVE_NAME_TO_SIZE.put("secp256r1", 256);
+        SUPPORTED_SP_EC_NIST_CURVE_NAME_TO_SIZE.put("prime256v1", 256);
 
         // Aliases for NIST P-384
         SUPPORTED_EC_NIST_CURVE_NAME_TO_SIZE.put("p-384", 384);
@@ -144,6 +154,10 @@ public abstract class AndroidKeyStoreKeyPairGeneratorSpi extends KeyPairGenerato
         SUPPORTED_EC_NIST_CURVE_SIZES.addAll(
                 new HashSet<Integer>(SUPPORTED_EC_NIST_CURVE_NAME_TO_SIZE.values()));
         Collections.sort(SUPPORTED_EC_NIST_CURVE_SIZES);
+
+        SUPPORTED_SP_EC_NIST_CURVE_SIZES.addAll(
+                new HashSet<Integer>(SUPPORTED_SP_EC_NIST_CURVE_NAME_TO_SIZE.values()));
+        Collections.sort(SUPPORTED_SP_EC_NIST_CURVE_SIZES);
     }
 
     private final int mOriginalKeymasterAlgorithm;
@@ -302,6 +316,9 @@ public abstract class AndroidKeyStoreKeyPairGeneratorSpi extends KeyPairGenerato
                 mKeySizeBits = getDefaultKeySize(keymasterAlgorithm);
             }
             checkValidKeySize(keymasterAlgorithm, mKeySizeBits);
+            if(spec.isUseSecureProcessor()) {
+                checkSecureProcessorValidKeySize(keymasterAlgorithm, mKeySizeBits);
+            }
 
             if (spec.getKeystoreAlias() == null) {
                 throw new InvalidAlgorithmParameterException("KeyStore entry alias not provided");
@@ -544,6 +561,9 @@ public abstract class AndroidKeyStoreKeyPairGeneratorSpi extends KeyPairGenerato
         if (mSpec.isUniqueIdIncluded())
             args.addBoolean(KeymasterDefs.KM_TAG_INCLUDE_UNIQUE_ID);
 
+        if(mSpec.isUseSecureProcessor())
+            args.addBoolean(KeymasterDefs.KM_TAG_USE_SECURE_PROCESSOR);
+
         return args;
     }
 
@@ -729,6 +749,26 @@ public abstract class AndroidKeyStoreKeyPairGeneratorSpi extends KeyPairGenerato
                 if (keySize < RSA_MIN_KEY_SIZE || keySize > RSA_MAX_KEY_SIZE) {
                     throw new InvalidAlgorithmParameterException("RSA key size must be >= "
                             + RSA_MIN_KEY_SIZE + " and <= " + RSA_MAX_KEY_SIZE);
+                }
+                break;
+            default:
+                throw new ProviderException("Unsupported algorithm: " + keymasterAlgorithm);
+        }
+    }
+
+    private static void checkSecureProcessorValidKeySize(int keymasterAlgorithm, int keySize)
+            throws InvalidAlgorithmParameterException {
+        switch (keymasterAlgorithm) {
+            case KeymasterDefs.KM_ALGORITHM_EC:
+                if (!SUPPORTED_SP_EC_NIST_CURVE_SIZES.contains(keySize)) {
+                    throw new InvalidAlgorithmParameterException("Unsupported EC key size: "
+                            + keySize + " bits. Supported: " + SUPPORTED_SP_EC_NIST_CURVE_SIZES);
+                }
+                break;
+            case KeymasterDefs.KM_ALGORITHM_RSA:
+                if (keySize < SP_RSA_MIN_KEY_SIZE || keySize > SP_RSA_MAX_KEY_SIZE) {
+                    throw new InvalidAlgorithmParameterException("RSA key size must be >= "
+                            + SP_RSA_MIN_KEY_SIZE + " and <= " + SP_RSA_MAX_KEY_SIZE);
                 }
                 break;
             default:

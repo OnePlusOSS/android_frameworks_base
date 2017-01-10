@@ -271,6 +271,10 @@ public abstract class AndroidKeyStoreKeyGeneratorSpi extends KeyGeneratorSpi {
         args.addEnums(KeymasterDefs.KM_TAG_BLOCK_MODE, mKeymasterBlockModes);
         args.addEnums(KeymasterDefs.KM_TAG_PADDING, mKeymasterPaddings);
         args.addEnums(KeymasterDefs.KM_TAG_DIGEST, mKeymasterDigests);
+
+        if(spec.isUseSecureProcessor())
+            args.addBoolean(KeymasterDefs.KM_TAG_USE_SECURE_PROCESSOR);
+
         KeymasterUtils.addUserAuthArgs(args,
                 spec.isUserAuthenticationRequired(),
                 spec.getUserAuthenticationValidityDurationSeconds(),

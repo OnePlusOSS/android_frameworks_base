@@ -30,6 +30,7 @@ import com.android.settingslib.wifi.AccessPoint;
 import com.android.settingslib.wifi.WifiTracker;
 import com.android.settingslib.wifi.WifiTracker.WifiListener;
 import com.android.systemui.R;
+import android.net.wifi.WifiManager;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -103,7 +104,7 @@ public class AccessPointControllerImpl
 
     @Override
     public int getIcon(AccessPoint ap) {
-        int level = ap.getLevel();
+        int level = WifiManager.calculateSignalLevel(ap.getRssi(), WifiManager.RSSI_LEVELS);
         return ICONS[level >= 0 ? level : 0];
     }
 

@@ -717,9 +717,10 @@ public class AccessPoint implements Comparable<AccessPoint> {
 
             int oldLevel = getLevel();
             int oldRssi = getRssi();
+            int newRssi = result.level;
             mSeen = getSeen();
-            mRssi = (getRssi() + oldRssi)/2;
-            int newLevel = getLevel();
+            mRssi = (newRssi + oldRssi)/2;
+            int newLevel = WifiManager.calculateSignalLevel(mRssi, SIGNAL_LEVELS);
 
             if (newLevel > 0 && newLevel != oldLevel && mAccessPointListener != null) {
                 mAccessPointListener.onLevelChanged(this);

@@ -89,6 +89,8 @@ public final class KeymasterDefs {
     public static final int KM_TAG_AUTH_TOKEN = KM_BYTES | 1002;
     public static final int KM_TAG_MAC_LENGTH = KM_UINT | 1003;
 
+    public static final int KM_TAG_USE_SECURE_PROCESSOR = KM_BOOL | 15000;
+
     // Algorithm values.
     public static final int KM_ALGORITHM_RSA = 1;
     public static final int KM_ALGORITHM_EC = 3;

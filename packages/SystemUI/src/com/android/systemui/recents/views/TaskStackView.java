@@ -685,6 +685,10 @@ public class TaskStackView extends FrameLayout implements TaskStack.TaskStackCal
             }
 
             int taskIndex = mStack.indexOfStackTask(task);
+
+            if(taskIndex < 0 || taskIndex >= mCurrentTaskTransforms.size())
+                continue;
+
             TaskViewTransform transform = mCurrentTaskTransforms.get(taskIndex);
             if (animationOverrides != null && animationOverrides.containsKey(task)) {
                 animation = animationOverrides.get(task);
