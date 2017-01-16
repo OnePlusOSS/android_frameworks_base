@@ -45,6 +45,8 @@ public class TetherInterfaceStateMachine extends StateMachine {
     private static final int USB_PREFIX_LENGTH = 24;
     private static final String WIFI_HOST_IFACE_ADDR = "192.168.43.1";
     private static final int WIFI_HOST_IFACE_PREFIX_LENGTH = 24;
+    private static final String WIGIG_HOST_IFACE_ADDR = "192.168.50.1";
+    private static final int WIGIG_HOST_IFACE_PREFIX_LENGTH = 24;
 
     private final static String TAG = "TetherInterfaceSM";
     private final static boolean DBG = false;
@@ -138,6 +140,9 @@ public class TetherInterfaceStateMachine extends StateMachine {
         } else if (mInterfaceType == ConnectivityManager.TETHERING_WIFI) {
             ipAsString = WIFI_HOST_IFACE_ADDR;
             prefixLen = WIFI_HOST_IFACE_PREFIX_LENGTH;
+        } else if (mInterfaceType == ConnectivityManager.TETHERING_WIGIG) {
+            ipAsString = WIGIG_HOST_IFACE_ADDR;
+            prefixLen = WIGIG_HOST_IFACE_PREFIX_LENGTH;
         } else {
             // Nothing to do, BT does this elsewhere.
             return true;

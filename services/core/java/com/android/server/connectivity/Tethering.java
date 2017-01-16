@@ -369,6 +369,10 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
 
     private int ifaceNameToType(String iface) {
         if (isWifi(iface)) {
+            String wigigIface = SystemProperties.get("wigig.interface", "wigig0");
+            if (wigigIface.equals(iface)) {
+                return ConnectivityManager.TETHERING_WIGIG;
+            }
             return ConnectivityManager.TETHERING_WIFI;
         } else if (isUsb(iface)) {
             return ConnectivityManager.TETHERING_USB;
