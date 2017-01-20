@@ -38,6 +38,8 @@ import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.PrintWriter;
 
+
+
 /**
  * @hide
  */
@@ -141,6 +143,7 @@ public final class NfcFServiceInfo implements Parcelable {
                             com.android.internal.R.styleable.SystemCodeFilter);
                     systemCode = a.getString(
                             com.android.internal.R.styleable.SystemCodeFilter_name).toUpperCase();
+                    Log.d(TAG, "systemCode: " + systemCode);
                     if (!NfcFCardEmulation.isValidSystemCode(systemCode) &&
                             !systemCode.equalsIgnoreCase("NULL")) {
                         Log.e(TAG, "Invalid System Code: " + systemCode);
@@ -179,7 +182,7 @@ public final class NfcFServiceInfo implements Parcelable {
     }
 
     public String getSystemCode() {
-        return (mDynamicSystemCode == null ? mSystemCode : mDynamicSystemCode);
+         return (mDynamicSystemCode == null ? mSystemCode : mDynamicSystemCode);
     }
 
     public void setOrReplaceDynamicSystemCode(String systemCode) {
