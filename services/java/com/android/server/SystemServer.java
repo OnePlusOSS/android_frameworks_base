@@ -1223,11 +1223,13 @@ public final class SystemServer {
 
         if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH)) {
             //#Fixme:mSystemServiceManager.startService(WEAR_BLUETOOTH_SERVICE_CLASS);
+            /* #These Wear Services are part of google.clockwork project
+               #and actually these are not present in the code
             mSystemServiceManager.startService(WEAR_BLUETOOTH_SERVICE_CLASS);
             mSystemServiceManager.startService(WEAR_WIFI_MEDIATOR_SERVICE_CLASS);
           if (!disableNonCoreServices) {
               mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
-          }
+          }*/
         }
 
         // Before things start rolling, be sure we have decided whether

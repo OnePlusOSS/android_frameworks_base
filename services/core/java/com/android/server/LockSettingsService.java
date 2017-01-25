@@ -1250,7 +1250,10 @@ public class LockSettingsService extends ILockSettings.Stub {
     @Override
     public VerifyCredentialResponse checkPattern(String pattern, int userId,
             ICheckCredentialProgressCallback progressCallback) throws RemoteException {
-        return doVerifyPattern(pattern, false, 0, userId, progressCallback);
+        VerifyCredentialResponse response = doVerifyPattern(pattern, false, 0, userId, progressCallback);
+        if (response.getResponseCode() == VerifyCredentialResponse.RESPONSE_OK)
+            retainPassword(pattern);
+        return response;
     }
 
     @Override
@@ -1321,7 +1324,10 @@ public class LockSettingsService extends ILockSettings.Stub {
     @Override
     public VerifyCredentialResponse checkPassword(String password, int userId,
             ICheckCredentialProgressCallback progressCallback) throws RemoteException {
-        return doVerifyPassword(password, false, 0, userId, progressCallback);
+        VerifyCredentialResponse response = doVerifyPassword(password, false, 0, userId, progressCallback);
+        if (response.getResponseCode() == VerifyCredentialResponse.RESPONSE_OK)
+            retainPassword(password);
+        return response;
     }
 
     @Override

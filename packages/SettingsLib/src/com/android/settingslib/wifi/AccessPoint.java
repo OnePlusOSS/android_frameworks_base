@@ -91,6 +91,7 @@ public class AccessPoint implements Comparable<AccessPoint> {
     private static final String KEY_PSKTYPE = "key_psktype";
     private static final String KEY_SCANRESULTCACHE = "key_scanresultcache";
     private static final String KEY_CONFIG = "key_config";
+    private static final String KEY_ACTIVE = "key_active";
 
     /**
      * These values are matched in string arrays -- changes must be kept in sync
@@ -126,6 +127,7 @@ public class AccessPoint implements Comparable<AccessPoint> {
     private AccessPointListener mAccessPointListener;
 
     private Object mTag;
+    private boolean isCurrentConnected = false;
 
     public AccessPoint(Context context, Bundle savedState) {
         mContext = context;
@@ -153,6 +155,9 @@ public class AccessPoint implements Comparable<AccessPoint> {
             for (ScanResult result : scanResultArrayList) {
                 mScanResultCache.put(result.BSSID, result);
             }
+        }
+        if (savedState.containsKey(KEY_ACTIVE)) {
+            isCurrentConnected = (savedState.getInt(KEY_ACTIVE) == 1);
         }
         update(mConfig, mInfo, mNetworkInfo);
         mRssi = getRssi();
@@ -356,7 +361,7 @@ public class AccessPoint implements Comparable<AccessPoint> {
     }
 
     public DetailedState getDetailedState() {
-        if (mNetworkInfo != null) {
+        if (mNetworkInfo != null && isCurrentConnected) {
             return mNetworkInfo.getDetailedState();
         }
         Log.w(TAG, "NetworkInfo is null, cannot return detailed state");
@@ -443,7 +448,7 @@ public class AccessPoint implements Comparable<AccessPoint> {
         if (WifiTracker.sVerboseLogging > 0) {
             // Add RSSI/band information for this config, what was seen up to 6 seconds ago
             // verbose WiFi Logging is only turned on thru developers settings
-            if (mInfo != null && mNetworkInfo != null) { // This is the active connection
+            if (mInfo != null && mNetworkInfo != null && isCurrentConnected) { // This is the active connection
                 summary.append(" f=" + Integer.toString(mInfo.getFrequency()));
             }
             summary.append(" " + getVisibilityStatus());
@@ -606,8 +611,8 @@ public class AccessPoint implements Comparable<AccessPoint> {
      */
     public boolean isActive() {
         return mNetworkInfo != null &&
-                (networkId != WifiConfiguration.INVALID_NETWORK_ID ||
-                 mNetworkInfo.getState() != State.DISCONNECTED);
+                ((networkId != WifiConfiguration.INVALID_NETWORK_ID ||
+                 mNetworkInfo.getState() != State.DISCONNECTED) && isCurrentConnected);
     }
 
     public boolean isConnectable() {
@@ -616,7 +621,8 @@ public class AccessPoint implements Comparable<AccessPoint> {
 
     public boolean isEphemeral() {
         return mInfo != null && mInfo.isEphemeral() &&
-                mNetworkInfo != null && mNetworkInfo.getState() != State.DISCONNECTED;
+                mNetworkInfo != null && isCurrentConnected &&
+                mNetworkInfo.getState() != State.DISCONNECTED;
     }
 
     public boolean isPasspoint() {
@@ -701,6 +707,7 @@ public class AccessPoint implements Comparable<AccessPoint> {
         if (mNetworkInfo != null) {
             savedState.putParcelable(KEY_NETWORKINFO, mNetworkInfo);
         }
+        savedState.putInt(KEY_ACTIVE, (isCurrentConnected ? 1 : 0));
     }
 
     public void setListener(AccessPointListener listener) {
@@ -742,17 +749,19 @@ public class AccessPoint implements Comparable<AccessPoint> {
     boolean update(WifiConfiguration config, WifiInfo info, NetworkInfo networkInfo) {
         boolean reorder = false;
         if (info != null && isInfoForThisAccessPoint(config, info)) {
-            reorder = (mInfo == null);
+            reorder = !isCurrentConnected;
             mRssi = info.getRssi();
             mInfo = info;
             mNetworkInfo = networkInfo;
+            isCurrentConnected = true;
             if (mAccessPointListener != null) {
                 mAccessPointListener.onAccessPointChanged(this);
             }
         } else if (mInfo != null) {
             reorder = true;
-            mInfo = null;
-            mNetworkInfo = null;
+            if (isCurrentConnected) {
+                isCurrentConnected = false;
+            }
             if (mAccessPointListener != null) {
                 mAccessPointListener.onAccessPointChanged(this);
             }
