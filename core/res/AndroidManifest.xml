@@ -1096,7 +1096,7 @@
 
     <!-- Allows an application to authorize outgoing SMS messages.
          @hide -->
-    <permission android:name="android.permission.AUTHORIZE_OUTGOING_SMS"
+    <permission android:name="com.qti.permission.AUTHORIZE_OUTGOING_SMS"
                 android:protectionLevel="signature" />
 
     <!-- =============================================================== -->
