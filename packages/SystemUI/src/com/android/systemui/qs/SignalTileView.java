@@ -41,6 +41,7 @@ public final class SignalTileView extends QSIconView {
     private ImageView mRoaming;
 
     private int mWideOverlayIconStartPadding;
+    private int mIconLayoutHeight;
 
     public SignalTileView(Context context) {
         super(context);
@@ -66,6 +67,9 @@ public final class SignalTileView extends QSIconView {
         mSignal = new ImageView(mContext);
         mIconFrame.addView(mSignal);
         mOverlay = new ImageView(mContext);
+        mIconLayoutHeight = getContext().getResources().getDimensionPixelSize(
+                R.dimen.wide_type_icon_height_qs);
+
         if (getContext().getResources().getBoolean(R.bool.show_roaming_and_network_icons)
                 || mStyle == STATUS_BAR_STYLE_EXTENDED) {
             mRoaming = new ImageView(mContext);
@@ -79,7 +83,7 @@ public final class SignalTileView extends QSIconView {
                 iconLayout.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
                 iconLayout.addView(mRoaming, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
             }
-            mIconFrame.addView(iconLayout, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+            mIconFrame.addView(iconLayout, LayoutParams.WRAP_CONTENT, mIconLayoutHeight);
         } else {
             mIconFrame.addView(mOverlay, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         }

@@ -180,6 +180,9 @@ class NavigationView {
 
         @Override
         public DocumentInfo getItem(int position) {
+            if((mState.stack.size() - position - 1) < 0) {
+                return null;
+            }
             return mState.stack.get(mState.stack.size() - position - 1);
         }
 
@@ -202,7 +205,9 @@ class NavigationView {
                 final RootInfo root = mEnv.getCurrentRoot();
                 title.setText(root.title);
             } else {
-                title.setText(doc.displayName);
+                if (doc != null) {
+                    title.setText(doc.displayName);
+                }
             }
 
             return convertView;

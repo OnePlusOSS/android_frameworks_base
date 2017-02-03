@@ -223,11 +223,12 @@ public class CarrierText extends TextView {
         for (int i = 0; i < N; i++) {
             CharSequence networkClass = "";
             int subId = subs.get(i).getSubscriptionId();
+            int phoneId = SubscriptionManager.getPhoneId(subId);
             State simState = mKeyguardUpdateMonitor.getSimState(subId);
             boolean showRat = SubscriptionManager.getResourcesForSubId(mContext,
                     subId).getBoolean(com.android.internal.R.bool.config_display_rat);
             if (showRat) {
-                ServiceState ss = mKeyguardUpdateMonitor.mServiceStates.get(subId);
+                ServiceState ss = mKeyguardUpdateMonitor.mServiceStates.get(phoneId);
                 if (ss != null && (ss.getDataRegState() == ServiceState.STATE_IN_SERVICE
                         || ss.getVoiceRegState() == ServiceState.STATE_IN_SERVICE)) {
                     int networkType = TelephonyManager.NETWORK_TYPE_UNKNOWN;
@@ -243,7 +244,7 @@ public class CarrierText extends TextView {
                 }
             }
             CharSequence carrierName = subs.get(i).getCarrierName();
-            if (showLocale || showRat) {
+            if ((showLocale || showRat) && !TextUtils.isEmpty(carrierName)) {
                 String[] names = carrierName.toString().split(mSeparator.toString(), 2);
                 StringBuilder newCarrierName = new StringBuilder();
                 for (int j = 0; j < names.length; j++) {
@@ -275,7 +276,7 @@ public class CarrierText extends TextView {
                 displayText = concatenate(displayText, carrierTextForSimState);
             }
             if (simState == IccCardConstants.State.READY) {
-                ServiceState ss = mKeyguardUpdateMonitor.mServiceStates.get(subId);
+                ServiceState ss = mKeyguardUpdateMonitor.mServiceStates.get(phoneId);
                 if (ss != null && ss.getDataRegState() == ServiceState.STATE_IN_SERVICE) {
                     // hack for WFC (IWLAN) not turning off immediately once
                     // Wi-Fi is disassociated or disabled

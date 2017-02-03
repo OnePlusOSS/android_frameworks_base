@@ -492,7 +492,7 @@ class TelephonyIcons {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_HP;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             dataTypeArray[type], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_H;
+                    mSelectedQSDataTypeIcon[slot] = QS_DATA_H_PLUS;
                     mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_HP;
                 } else {

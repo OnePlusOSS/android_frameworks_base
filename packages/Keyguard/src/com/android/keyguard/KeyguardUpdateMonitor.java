@@ -281,7 +281,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                     handleAirplaneModeChanged();
                     break;
                 case MSG_SERVICE_STATE_CHANGE:
-                    handleServiceStateChange(msg.arg1, (ServiceState) msg.obj);
+                    handleServiceStateChange(msg.arg1, msg.arg2, (ServiceState) msg.obj);
                     break;
                 case MSG_SCREEN_TURNED_ON:
                     handleScreenTurnedOn();
@@ -730,12 +730,13 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
                 ServiceState serviceState = ServiceState.newFromBundle(intent.getExtras());
                 int subId = intent.getIntExtra(PhoneConstants.SUBSCRIPTION_KEY,
                         SubscriptionManager.INVALID_SUBSCRIPTION_ID);
+                int phoneId = intent.getIntExtra(PhoneConstants.SLOT_KEY, 0);
                 if (DEBUG) {
                     Log.v(TAG, "action " + action + " serviceState=" + serviceState + " subId="
-                            + subId);
+                            + subId + " phoneId=" + phoneId);
                 }
-                mHandler.sendMessage(
-                        mHandler.obtainMessage(MSG_SERVICE_STATE_CHANGE, subId, 0, serviceState));
+                mHandler.sendMessage(mHandler.obtainMessage(
+                        MSG_SERVICE_STATE_CHANGE, subId, phoneId, serviceState));
             } else if (Intent.ACTION_LOCALE_CHANGED.equals(action)) {
                 mHandler.sendEmptyMessage(MSG_LOCALE_CHANGED);
             }
@@ -1483,18 +1484,23 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     /**
      * Handle {@link #MSG_SERVICE_STATE_CHANGE}
      */
-    private void handleServiceStateChange(int subId, ServiceState serviceState) {
+    private void handleServiceStateChange(int subId, int phoneId, ServiceState serviceState) {
         if (DEBUG) {
             Log.d(TAG,
-                    "handleServiceStateChange(subId=" + subId + ", serviceState=" + serviceState);
+                    "handleServiceStateChange(subId=" + subId + ", phoneId=" + phoneId
+                    + ", serviceState=" + serviceState);
         }
 
         if (!SubscriptionManager.isValidSubscriptionId(subId)) {
             Log.w(TAG, "invalid subId in handleServiceStateChange()");
             return;
         }
+        if (!SubscriptionManager.isValidPhoneId(phoneId)) {
+            Log.w(TAG, "invalid phoneId in handleServiceStateChange()");
+            return;
+        }
 
-        mServiceStates.put(subId, serviceState);
+        mServiceStates.put(phoneId, serviceState);
 
         for (int j = 0; j < mCallbacks.size(); j++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(j).get();
@@ -1747,27 +1753,24 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         int phoneCount = TelephonyManager.getDefault().getPhoneCount();
 
         for (int phoneId = 0; phoneId < phoneCount; phoneId++) {
-            int[] subId = SubscriptionManager.getSubId(phoneId);
-            if (subId != null && subId.length >= 1) {
-                if (DEBUG) Log.d(TAG, "slot id:" + phoneId + " subId:" + subId[0]);
-                ServiceState state = mServiceStates.get(subId[0]);
-                if (state != null) {
-                    if (state.isEmergencyOnly())
-                        ret = false;
-                    if ((state.getVoiceRegState() != ServiceState.STATE_OUT_OF_SERVICE)
-                            && (state.getVoiceRegState() != ServiceState.STATE_POWER_OFF))
-                        ret = false;
+            ServiceState state = mServiceStates.get(phoneId);
+            if (state != null) {
+                if (state.isEmergencyOnly())
+                    ret = false;
+                if ((state.getVoiceRegState() != ServiceState.STATE_OUT_OF_SERVICE)
+                        && (state.getVoiceRegState() != ServiceState.STATE_POWER_OFF))
+                    ret = false;
                     if (DEBUG) {
-                        Log.d(TAG, "is emergency: " + state.isEmergencyOnly());
-                        Log.d(TAG, "voice state: " + state.getVoiceRegState());
+                        Log.d(TAG, "phoneId: " + phoneId + ", is emergency: "
+                                + state.isEmergencyOnly() + ", voice state: "
+                                + state.getVoiceRegState());
                     }
-                } else {
-                    if (DEBUG) Log.d(TAG, "state is NULL");
-                }
+            } else {
+                if (DEBUG) Log.d(TAG, "phoneId: " + phoneId + ", state is NULL");
             }
         }
 
-        if (DEBUG) Log.d(TAG, "is Emergency supported: " + ret);
+        if (DEBUG) Log.d(TAG, "is Emergency supported: " + !ret);
         return ret;
     }
 
@@ -1906,8 +1909,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
             }
         }
         pw.println("  Service states:");
-        for (int subId : mServiceStates.keySet()) {
-            pw.println("    " + subId + "=" + mServiceStates.get(subId));
+        for (int phoneId : mServiceStates.keySet()) {
+            pw.println("    " + phoneId + "=" + mServiceStates.get(phoneId));
         }
         if (mFpm != null && mFpm.isHardwareDetected()) {
             final int userId = ActivityManager.getCurrentUser();
