@@ -1107,7 +1107,8 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
         if (ifaces != null) {
             for (String iface : ifaces) {
                 if (ifaceNameToType(iface) == interfaceType) {
-                    if (wifiManager.getWifiStaSapConcurrency()) {
+                    if ((interfaceType == ConnectivityManager.TETHERING_WIFI) &&
+                           wifiManager.getWifiStaSapConcurrency()) {
                         if (!iface.matches(SOFTAP_CONCURRENCY_INTERFACE)) {
                             if (DBG) {
                                 Log.d(TAG, "For STA + SoftAp concurrency skip tethering on " + iface);

@@ -453,9 +453,6 @@ public class AudioService extends IAudioService.Stub {
     private final ArrayMap<String, DeviceListSpec> mConnectedDevices = new ArrayMap<>();
 
     private String mA2dpConnectedDevice = ""; //Used for BT a2dp connection
-    //Add connected A2dp devices in this list
-    private ArrayList<BluetoothDevice> mConnectedBTDevicesList =
-            new ArrayList<BluetoothDevice>();
 
     // Forced device usage for communications
     private int mForcedUseForComm;
@@ -3261,11 +3258,6 @@ public class AudioService extends IAudioService.Stub {
                 synchronized (mConnectedDevices) {
                     synchronized (mA2dpAvrcpLock) {
                         mA2dp = (BluetoothA2dp) proxy;
-                        if (mConnectedBTDevicesList.size() > 0) {
-                            Log.d(TAG,"A2dp connection list not empty, purge it, size " +
-                                    mConnectedBTDevicesList.size());
-                            mConnectedBTDevicesList.clear();
-                        }
                         //In Dual A2dp, we can have two devices connected
                         deviceList = mA2dp.getConnectedDevices();
                         Log.d(TAG, "onServiceConnected: A2dp Service connected: " +
@@ -3395,10 +3387,6 @@ public class AudioService extends IAudioService.Stub {
         synchronized (mConnectedDevices) {
             synchronized (mA2dpAvrcpLock) {
                 ArraySet<String> toRemove = null;
-                Log.d(TAG,"mConnectedBTDevicesList size " + mConnectedBTDevicesList.size());
-                if (mConnectedBTDevicesList.size() > 0) {
-                    mConnectedBTDevicesList.clear();
-                }
                 // Disconnect ALL DEVICE_OUT_BLUETOOTH_A2DP devices
                 for (int i = 0; i < mConnectedDevices.size(); i++) {
                     DeviceListSpec deviceSpec = mConnectedDevices.valueAt(i);
@@ -3965,28 +3953,55 @@ public class AudioService extends IAudioService.Stub {
             Log.d(TAG, "Device is still connecting ");
             return delay;
         }
-        if ((mConnectedBTDevicesList.contains(device) &&
-            (state == BluetoothA2dp.STATE_CONNECTED))) {
+        String key = makeDeviceListKey(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP,
+                                       device.getAddress());
+        DeviceListSpec deviceSpec = mConnectedDevices.get(key);
+        boolean isDeviceAdded = deviceSpec != null;
+        if (isDeviceAdded && (state == BluetoothA2dp.STATE_CONNECTED)) {
             Log.d(TAG, "Device conn is updated again, ignore ");
             return delay;
         }
-        if (!mConnectedBTDevicesList.contains(device) &&
-            (state == BluetoothA2dp.STATE_CONNECTED)) {
+        if (!isDeviceAdded && (state == BluetoothA2dp.STATE_CONNECTED)) {
             /*add the device in the list*/
             Log.d(TAG, "Add new connected device in the list: " + device);
-            mConnectedBTDevicesList.add(device);
-            if (mConnectedBTDevicesList.size() > 1) {
-                Log.d(TAG, "Second device connected, add new device ");
-                return delay;
+            boolean deviceexist = false;
+            synchronized (mConnectedDevices) {
+                for (int i = 0; i < mConnectedDevices.size(); i++) {
+                    DeviceListSpec devSpec = mConnectedDevices.valueAt(i);
+                    if (devSpec.mDeviceType == AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP) {
+                        Log.d(TAG, "Second device connected, add new device to list");
+                        mConnectedDevices.put(
+                        makeDeviceListKey(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP, device.getAddress()),
+                        new DeviceListSpec(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP, device.getName(),
+                                           device.getAddress()));
+                        deviceexist = true;
+                    }
+                }
             }
+            if (deviceexist)
+                return delay;
         } else if ((state == BluetoothA2dp.STATE_DISCONNECTED) ||
             (state == BluetoothA2dp.STATE_DISCONNECTING)) {
             Log.d(TAG, "Device is getting disconnected: " + device);
-            if (mConnectedBTDevicesList.contains(device)) {
-                Log.d(TAG, "Remove the BT device ");
-                mConnectedBTDevicesList.remove(device);
+            int BTdeviceList = 0;
+            synchronized (mConnectedDevices) {
+                for (int i = 0; i < mConnectedDevices.size(); i++) {
+                     DeviceListSpec devSpec = mConnectedDevices.valueAt(i);
+                     if (devSpec.mDeviceType == AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP) {
+                         BTdeviceList++;
+                     }
+                }
             }
-            if (mConnectedBTDevicesList.size() > 0) {
+            if (BTdeviceList > 1 && isDeviceAdded) {
+                Log.d(TAG, "Remove device from mConnectedDevices list ");
+                synchronized (mConnectedDevices) {
+                    mConnectedDevices.remove(
+                    makeDeviceListKey(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP, device.getAddress()));
+                }
+                Log.d(TAG, "Not all are disconnected ");
+                return delay;
+            }else if (!isDeviceAdded) {
+                Log.d(TAG,"Disconnect state updated again, device already removed");
                 Log.d(TAG, "Not all are disconnected ");
                 return delay;
             }
@@ -5051,9 +5066,8 @@ public class AudioService extends IAudioService.Stub {
             DeviceListSpec deviceSpec = mConnectedDevices.get(key);
             boolean isConnected = deviceSpec != null;
 
-            if ((isConnected && state != BluetoothProfile.STATE_CONNECTED) ||
-                ((mConnectedBTDevicesList.size() == 0) &&
-                 (state == BluetoothProfile.STATE_DISCONNECTED))) {
+            Log.d(TAG, "onSetA2dpSinkConnectionState isConnected = "+isConnected+"state="+state);
+            if (isConnected && state != BluetoothProfile.STATE_CONNECTED) {
                 if (btDevice.isBluetoothDock()) {
                     if (state == BluetoothProfile.STATE_DISCONNECTED) {
                         // introduction of a delay for transient disconnections of docks when
@@ -5192,11 +5206,6 @@ public class AudioService extends IAudioService.Stub {
     // Called synchronized on mConnectedDevices
     private int checkSendBecomingNoisyIntent(int device, int state) {
         int delay = 0;
-        if (mConnectedBTDevicesList.size() > 1) {
-            Log.d(TAG, "checkSendBecomingNoisyIntent on state: " + state);
-            return delay;
-        }
-
         if ((state == 0) && ((device & mBecomingNoisyIntentDevices) != 0)) {
             int devices = 0;
             Log.d(TAG, "checkSendBecomingNoisyIntent update the noise");

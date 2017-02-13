@@ -2840,10 +2840,12 @@ public class NotificationManagerService extends SystemService {
         boolean smsRingtone =  false;
         if (mCarrierConfig == null) {
             mCarrierConfig = mConfigManager.getConfig();
-        } else {
+        }
+        if (mCarrierConfig != null) {
             smsRingtone = mCarrierConfig.getBoolean(
                 CarrierConfigManager.KEY_CONFIG_SMS_RINGTONE_INCALL);
         }
+
         if ((disableEffects == null || (smsRingtone && mInCall))
                 && (record.getUserId() == UserHandle.USER_ALL ||
                     record.getUserId() == currentUser ||

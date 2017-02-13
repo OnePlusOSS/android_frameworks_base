@@ -2993,9 +2993,11 @@ public final class ActivityManagerService extends ActivityManagerNative
 
     @Override
     public void batterySendBroadcast(Intent intent) {
-        broadcastIntentLocked(null, null, intent, null, null, 0, null, null, null,
-                AppOpsManager.OP_NONE, null, false, false,
-                -1, Process.SYSTEM_UID, UserHandle.USER_ALL);
+        synchronized (this) {
+            broadcastIntentLocked(null, null, intent, null, null, 0, null, null, null,
+                    AppOpsManager.OP_NONE, null, false, false,
+                    -1, Process.SYSTEM_UID, UserHandle.USER_ALL);
+        }
     }
 
     /**
@@ -11772,7 +11774,8 @@ public final class ActivityManagerService extends ActivityManagerNative
     }
 
     boolean isSleepingLocked() {
-        return mSleeping;
+        return mSleeping && (mWakefulness == PowerManagerInternal.WAKEFULNESS_ASLEEP
+                              || mWakefulness == PowerManagerInternal.WAKEFULNESS_DOZING);
     }
 
     void onWakefulnessChanged(int wakefulness) {

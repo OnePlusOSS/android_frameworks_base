@@ -30,6 +30,7 @@ import android.os.PowerManager;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.os.WorkSource;
@@ -2075,7 +2076,10 @@ final class WindowState implements WindowManagerPolicy.WindowState {
             return false;
         }
 
-        if (DEBUG_DISABLE_SAVING_SURFACES) {
+        boolean disableSaveSurface = SystemProperties
+                                       .getBoolean("persist.sys.disableSaveSurface", false);
+
+        if (DEBUG_DISABLE_SAVING_SURFACES || disableSaveSurface) {
             return false;
         }
 

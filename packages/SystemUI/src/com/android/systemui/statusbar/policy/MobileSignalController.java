@@ -489,6 +489,15 @@ public class MobileSignalController extends SignalController<
             switch (mServiceState.getVoiceRegState()) {
                 case ServiceState.STATE_POWER_OFF:
                     return false;
+                case ServiceState.STATE_IN_SERVICE:
+                    if (mServiceState.getVoiceNetworkType() == TelephonyManager.NETWORK_TYPE_IWLAN
+                            && (mServiceState.getDataNetworkType() ==
+                            TelephonyManager.NETWORK_TYPE_IWLAN ||
+                            mServiceState.getDataRegState() != ServiceState.STATE_IN_SERVICE)) {
+                        return false;
+                    } else {
+                        return true;
+                    }
                 case ServiceState.STATE_OUT_OF_SERVICE:
                 case ServiceState.STATE_EMERGENCY_ONLY:
                     if (mContext.getResources().getBoolean(R.bool.config_showSignalForIWlan)) {
@@ -765,7 +774,7 @@ public class MobileSignalController extends SignalController<
         final boolean dataConnected = mCurrentState.dataConnected;
         final boolean roaming = isRoaming();
         final int voiceType = getVoiceNetworkType();
-        final int dataType =  getDataNetworkType();
+        final int dataType =  mDataNetType;
         int[][] sbIcons = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH;
         int[][] qsIcons = TelephonyIcons.QS_TELEPHONY_SIGNAL_STRENGTH;
         int[] contentDesc = AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH;

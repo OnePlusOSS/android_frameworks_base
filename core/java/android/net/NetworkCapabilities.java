@@ -20,7 +20,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.TextUtils;
 import java.lang.IllegalArgumentException;
-
+import android.telephony.SubscriptionManager;
 /**
  * This class represents the capabilities of a network.  This is used both to specify
  * needs to {@link ConnectivityManager} and when inspecting a network.
@@ -623,8 +623,9 @@ public final class NetworkCapabilities implements Parcelable {
         setNetworkSpecifier(otherSpecifier);
     }
     private boolean satisfiedBySpecifier(NetworkCapabilities nc) {
-        return (TextUtils.isEmpty(mNetworkSpecifier) ||
-                mNetworkSpecifier.equals(nc.mNetworkSpecifier) ||
+        return (satisfiesMultiNetworkDataCheck(nc) ||
+                (!TextUtils.isEmpty(mNetworkSpecifier) &&
+                mNetworkSpecifier.equals(nc.mNetworkSpecifier)) ||
                 MATCH_ALL_REQUESTS_NETWORK_SPECIFIER.equals(nc.mNetworkSpecifier));
     }
     private boolean equalsSpecifier(NetworkCapabilities nc) {
@@ -893,5 +894,25 @@ public final class NetworkCapabilities implements Parcelable {
             if (++i < types.length) transports += "|";
         }
         return transports;
+    }
+
+    private boolean satisfiesMultiNetworkDataCheck(NetworkCapabilities nc) {
+        if (nc.hasTransport(TRANSPORT_CELLULAR) && isValidSub(nc)) {
+            int sid = Integer.parseInt(nc.mNetworkSpecifier);
+            return (TextUtils.isEmpty(mNetworkSpecifier)
+                    && Integer.parseInt(nc.mNetworkSpecifier) ==
+                    SubscriptionManager.getDefaultDataSubscriptionId());
+        } else {
+            return (TextUtils.isEmpty(mNetworkSpecifier));
+        }
+    }
+
+    private boolean isValidSub(NetworkCapabilities nc) {
+        if (MATCH_ALL_REQUESTS_NETWORK_SPECIFIER.equals(nc.mNetworkSpecifier)) {
+            return false;
+        } else {
+            int subscriptionId = Integer.parseInt(nc.mNetworkSpecifier);
+            return (subscriptionId > -1 && subscriptionId < (Integer.MAX_VALUE - 5));
+        }
     }
 }
