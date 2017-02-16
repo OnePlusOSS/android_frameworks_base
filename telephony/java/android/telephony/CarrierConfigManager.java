@@ -320,6 +320,18 @@ public class CarrierConfigManager {
             "carrier_default_wfc_ims_roaming_enabled_bool";
 
     /**
+     * Carrier supports Cellular-preferred mode only, in home network:
+     *         true In home network, wifi calling mode preference is always
+     *              set to Cellular-preferred.
+     *         false Wifi calling mode preference set as per user preference or other
+     *               wifi calling mode related configs.
+     *
+     * @hide
+     */
+    public static final String KEY_CARRIER_WFC_ONLY_CELL_PREF_IN_HOME_NET_BOOL =
+            "carrier_wfc_only_cell_pref_in_home_net_bool";
+
+    /**
      * Flag indicating whether failed calls due to no service should prompt the user to enable
      * WIFI calling.  When {@code true}, if the user attempts to establish a call when there is no
      * service available, they are connected to WIFI, and WIFI calling is disabled, a different
@@ -1039,6 +1051,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_DEFAULT_WFC_IMS_ENABLED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_DEFAULT_WFC_IMS_ROAMING_ENABLED_BOOL, false);
+        sDefaults.putBoolean(KEY_CARRIER_WFC_ONLY_CELL_PREF_IN_HOME_NET_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_PROMOTE_WFC_ON_CALL_FAIL_BOOL, false);
         sDefaults.putInt(KEY_CARRIER_DEFAULT_WFC_IMS_MODE_INT, 2);
         sDefaults.putInt(KEY_CARRIER_DEFAULT_WFC_IMS_ROAMING_MODE_INT, 2);
