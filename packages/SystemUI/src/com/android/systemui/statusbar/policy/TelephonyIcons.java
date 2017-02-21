@@ -548,6 +548,7 @@ class TelephonyIcons {
                 break;
             case TelephonyManager.NETWORK_TYPE_LTE:
             case TelephonyManager.NETWORK_TYPE_LTE_CA:
+            case TelephonyManager.NETWORK_TYPE_IWLAN:
                 if (!show4GforLte || MobileSignalController.isCarrierOneSupported()) {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_LTE;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(

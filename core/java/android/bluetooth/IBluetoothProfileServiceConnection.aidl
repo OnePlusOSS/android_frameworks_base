@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2014 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,17 @@
  * limitations under the License.
  */
 
-package android.util;
+package android.bluetooth;
 
-import android.util.MemoryIntArray;
+import android.content.ComponentName;
+import android.os.IBinder;
 
-interface IRemoteMemoryIntArray {
-    MemoryIntArray peekInstance();
-    void create(int size);
-    boolean isWritable();
-    int get(int index);
-    void set(int index, int value);
-    int size();
-    void close();
-    boolean isClosed();
-    void accessLastElementInRemoteProcess(in MemoryIntArray array);
+/**
+ * Callback for bluetooth profile connections.
+ *
+ * {@hide}
+ */
+interface IBluetoothProfileServiceConnection {
+    void onServiceConnected(in ComponentName comp, in IBinder service);
+    void onServiceDisconnected(in ComponentName comp);
 }

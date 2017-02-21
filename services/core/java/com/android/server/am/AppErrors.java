@@ -885,17 +885,6 @@ class AppErrors {
         synchronized (mService) {
             mService.mBatteryStatsService.noteProcessAnr(app.processName, app.uid);
 
-            if (isSilentANR) {
-                app.kill("bg anr", true);
-                return;
-            }
-
-            // Set the app's notResponding state, and look up the errorReportReceiver
-            makeAppNotRespondingLocked(app,
-                    activity != null ? activity.shortComponentName : null,
-                    annotation != null ? "ANR " + annotation : "ANR",
-                    info.toString());
-
             boolean enableTraceRename = SystemProperties.getBoolean("persist.sys.enableTraceRename", false);
             //Set the trace file name to app name + current date format to avoid overrinding trace file based on debug flag
             if(enableTraceRename) {
@@ -913,6 +902,19 @@ class AppErrors {
                     SystemClock.sleep(1000);
                 }
             }
+
+            if (isSilentANR) {
+                app.kill("bg anr", true);
+                return;
+            }
+
+            // Set the app's notResponding state, and look up the errorReportReceiver
+            makeAppNotRespondingLocked(app,
+                    activity != null ? activity.shortComponentName : null,
+                    annotation != null ? "ANR " + annotation : "ANR",
+                    info.toString());
+
+
             // Bring up the infamous App Not Responding dialog
             Message msg = Message.obtain();
             HashMap<String, Object> map = new HashMap<String, Object>();
