@@ -128,6 +128,7 @@ public class BatteryMeterDrawable extends Drawable implements
         }
         levels.recycle();
         colors.recycle();
+        mBatteryPct = context.getResources().getBoolean(R.bool.config_showBatteryPercentage);
         updateShowPercent();
         mWarningString = context.getString(R.string.battery_meter_very_low_overlay_symbol);
         mCriticalLevel = mContext.getResources().getInteger(
@@ -179,8 +180,6 @@ public class BatteryMeterDrawable extends Drawable implements
 
         mIntrinsicWidth = context.getResources().getDimensionPixelSize(R.dimen.battery_width);
         mIntrinsicHeight = context.getResources().getDimensionPixelSize(R.dimen.battery_height);
-
-        mBatteryPct = context.getResources().getBoolean(R.bool.config_showBatteryPercentage);
     }
 
     @Override
