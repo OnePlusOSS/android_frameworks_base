@@ -61,6 +61,7 @@ public abstract class Conference extends Conferenceable {
         public void onStatusHintsChanged(Conference conference, StatusHints statusHints) {}
         public void onExtrasChanged(Conference c, Bundle extras) {}
         public void onExtrasRemoved(Conference c, List<String> keys) {}
+        public void onConferenceMergeFailed(Conference conference) {}
     }
 
     private final Set<Listener> mListeners = new CopyOnWriteArraySet<>();
@@ -800,6 +801,16 @@ public abstract class Conference extends Conferenceable {
         Bundle newExtras = new Bundle();
         newExtras.putString(key, value);
         putExtras(newExtras);
+    }
+
+    /**
+     * Update conference merge failure {@link Conference}.
+     * @hide
+     */
+    public final void updateMergeConferenceFailed() {
+        for (Listener l : mListeners) {
+            l.onConferenceMergeFailed(this);
+        }
     }
 
     /**
