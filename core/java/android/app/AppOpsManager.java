@@ -348,6 +348,9 @@ public class AppOpsManager {
     /** @hide BLUETOOTH_ADMIN . */
     public static final String OPSTR_BLUETOOTH_ADMIN
             = "android:bluetooth_admin";
+    /** @hide PROCESS_OUTGOING_CALLS. */
+    public static final String OPSTR_PROCESS_OUTGOING_CALLS
+            = "android:process_outgoing_calls";
 
     private static final int[] RUNTIME_PERMISSIONS_OPS = {
             // Contacts
@@ -522,7 +525,7 @@ public class AppOpsManager {
             OPSTR_READ_PHONE_STATE,
             OPSTR_ADD_VOICEMAIL,
             OPSTR_USE_SIP,
-            null,
+            OPSTR_PROCESS_OUTGOING_CALLS,
             OPSTR_USE_FINGERPRINT,
             OPSTR_BODY_SENSORS,
             OPSTR_READ_CELL_BROADCASTS,
