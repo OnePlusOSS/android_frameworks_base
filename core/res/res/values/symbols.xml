@@ -2739,6 +2739,10 @@
   <java-symbol type="bool" name="config_enableCpuBoostForPanelViewFling" />
   <java-symbol type="array" name="panelview_flingboost_param_value" />
 
+  <!-- system boost for MTP file copy -->
+  <java-symbol type="bool" name="config_enableBoostForMtp" />
+  <java-symbol type="array" name="mtpboost_param_value" />
+
   <!-- SIM contact batch operation -->
   <java-symbol type="bool" name="config_sim_phonebook_batch_operation" />
   <!-- config 2G/3G/4G RAT strings for carriers -->
