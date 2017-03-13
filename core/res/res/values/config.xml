@@ -2584,6 +2584,10 @@
     <bool name="config_enableCpuBoostForPanelViewFling">false</bool>
     <integer-array name="panelview_flingboost_param_value" />
 
+    <!-- system boost for MTP file copy -->
+    <bool name="config_enableBoostForMtp">false</bool>
+    <integer-array name="mtpboost_param_value" />
+
     <!-- True if the device supports persisting security logs across reboots.
          This requires the device's kernel to have pstore and pmsg enabled,
          and DRAM to be powered and refreshed through all stages of reboot. -->
