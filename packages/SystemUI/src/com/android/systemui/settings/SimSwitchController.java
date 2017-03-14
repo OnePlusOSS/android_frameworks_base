@@ -65,6 +65,7 @@ import com.android.systemui.R;
 
 import org.codeaurora.internal.IExtTelephony;
 import android.os.ServiceManager;
+import com.android.systemui.qs.QuickQSPanel;
 
 public class SimSwitchController implements View.OnClickListener, View.OnLongClickListener {
     private static final String TAG = "SimSwitchController";
@@ -125,10 +126,12 @@ public class SimSwitchController implements View.OnClickListener, View.OnLongCli
 
     synchronized public void updateViews(int voiceSlotId) {
         logd("voice preferred slot " + voiceSlotId);
+        // If mQSPanel is a instanceonf QuickQSPanel,do not display
         // Is there are no valid subscription info list present (or)
         // if there is only one SIM present on device, do not display
         // voice preference selection option in quick settings panel.
-        if (mSubInfoList == null || mSubInfoList.size() <= 1 || getProvisionCount() <= 1) {
+        if (mQSPanel instanceof QuickQSPanel || mSubInfoList == null ||
+            mSubInfoList.size() <= 1 || getProvisionCount() <= 1) {
             logd("There are not subscription present or only one present ");
 
             mSimSwitcherView.setVisibility(View.GONE);
