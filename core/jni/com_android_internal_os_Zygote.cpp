@@ -40,8 +40,6 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <dlfcn.h>
-#include <cutils/properties.h>
 
 #include <cutils/fs.h>
 #include <cutils/multiuser.h>
@@ -69,8 +67,6 @@ static pid_t gSystemServerPid = 0;
 static const char kZygoteClassName[] = "com/android/internal/os/Zygote";
 static jclass gZygoteClass;
 static jmethodID gCallPostForkChildHooks;
-static int init_memcg_done = 0;
-static bool (*memperf_cg_create_fn)(int, ...) = NULL;
 
 // Must match values in com.android.internal.os.Zygote.
 enum MountExternalKind {
@@ -79,37 +75,6 @@ enum MountExternalKind {
   MOUNT_EXTERNAL_READ = 2,
   MOUNT_EXTERNAL_WRITE = 3,
 };
-
-static int init_memcg() {
-  int mem_ctl_enable = 0;
-  mem_ctl_enable = property_get_bool("ro.memperf.enable", 0);
-
-  if(!mem_ctl_enable){
-    ALOGD("MemCgroup not enabled.");
-    return -1;
-  }
-
-  char prop[128];
-  memset(prop, '\0', sizeof(prop));
-  property_get("ro.memperf.lib", prop, "");
-  void *memperf_opt_handle = dlopen(prop, RTLD_LAZY);
-
-  if (!memperf_opt_handle) {
-    ALOGD("Error opening memcg library.");
-    return -1;
-  }
-
-  dlerror();
-  memperf_cg_create_fn = (bool(*)(int, ...))dlsym(memperf_opt_handle, "umm_send");
-  const char *dlsym_error = dlerror();
-
-  if(!memperf_cg_create_fn) {
-    ALOGD("Error loading symbol. dlerror : %s", dlsym_error);
-    return -1;
-  }
-
-  return 1;
-}
 
 static void RuntimeAbort(JNIEnv* env, int line, const char* msg) {
   std::ostringstream oss;
@@ -666,18 +631,6 @@ static pid_t ForkAndSpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArra
     }
   } else if (pid > 0) {
     // the parent process
-
-    if(init_memcg_done == 0)
-      init_memcg_done = init_memcg();
-
-    if(init_memcg_done == 1) {
-      bool ret = (*memperf_cg_create_fn)(0, pid);
-      if(ret == false) {
-        ALOGD("Error creating cgroup for the process (%d)", pid);
-      } else {
-        ALOGD("Successfully Created cgroup!!");
-      }
-    }
 
 #ifdef ENABLE_SCHED_BOOST
     // unset scheduler knob
