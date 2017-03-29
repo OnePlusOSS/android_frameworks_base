@@ -69,7 +69,9 @@ public final class ShutdownThread extends Thread {
     private static final int PHONE_STATE_POLL_SLEEP_MSEC = 250;
     // maximum time we wait for the shutdown broadcast before going on.
     private static final int MAX_BROADCAST_TIME = 10*1000;
-    private static final int MAX_SHUTDOWN_WAIT_TIME = 20*1000;
+    // maximun time we wait for the mountservice before going on.
+    // Short time may cause unmount fail if 3rd app occupy files, but no impact on app use.
+    private static final int MAX_SHUTDOWN_WAIT_TIME = SystemProperties.getInt("sys.shutdown.waittime",20*1000);
     private static final int MAX_RADIO_WAIT_TIME = 12*1000;
     private static final int MAX_UNCRYPT_WAIT_TIME = 15*60*1000;
     // constants for progress bar. the values are roughly estimated based on timeout.
