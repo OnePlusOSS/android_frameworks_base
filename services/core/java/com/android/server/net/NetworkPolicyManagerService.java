@@ -1180,12 +1180,14 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
             // permission above.
 
             maybeRefreshTrustedTime();
-            synchronized (mNetworkPoliciesSecondLock) {
-                ensureActiveMobilePolicyNL();
-                normalizePoliciesNL();
-                updateNetworkEnabledNL();
-                updateNetworkRulesNL();
-                updateNotificationsNL();
+            synchronized (mUidRulesFirstLock) {
+                synchronized (mNetworkPoliciesSecondLock) {
+                    ensureActiveMobilePolicyNL();
+                    normalizePoliciesNL();
+                    updateNetworkEnabledNL();
+                    updateNetworkRulesNL();
+                    updateNotificationsNL();
+                }
             }
         }
     };
