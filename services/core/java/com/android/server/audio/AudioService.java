@@ -5065,8 +5065,17 @@ public class AudioService extends IAudioService.Stub {
                                            btDevice.getAddress());
             DeviceListSpec deviceSpec = mConnectedDevices.get(key);
             boolean isConnected = deviceSpec != null;
+            int BTdeviceList = 0;
+            for (int i = 0; i < mConnectedDevices.size(); i++) {
+                 DeviceListSpec devSpec = mConnectedDevices.valueAt(i);
+                 if (devSpec.mDeviceType == AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP) {
+                     Log.w(TAG, "onSetA2dpSinkConnectionState Addr" + devSpec.mDeviceAddress);
+                     BTdeviceList++;
+                 }
+            }
 
-            Log.d(TAG, "onSetA2dpSinkConnectionState isConnected = "+isConnected+"state="+state);
+            Log.d(TAG, "onSetA2dpSinkConnectionState isConnected = "+isConnected+
+                        "state="+state+"device:"+address);
             if (isConnected && state != BluetoothProfile.STATE_CONNECTED) {
                 if (btDevice.isBluetoothDock()) {
                     if (state == BluetoothProfile.STATE_DISCONNECTED) {
@@ -5076,6 +5085,11 @@ public class AudioService extends IAudioService.Stub {
                         makeA2dpDeviceUnavailableLater(btDevice.getAddress(), BTA2DP_DOCK_TIMEOUT_MILLIS);
                         // the next time isConnected is evaluated, it will be false for the dock
                     }
+                } else if (BTdeviceList > 1) {
+                    Log.d(TAG,"onSetA2dpSinkConnectionState: Not all device are disconnected");
+                    mConnectedDevices.remove(
+                        makeDeviceListKey(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP, address));
+                    return;
                 } else {
                     Log.d(TAG, "All devices are disconneted, update Policymanager ");
                     makeA2dpDeviceUnavailableNow(btDevice.getAddress());
