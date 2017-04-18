@@ -1086,6 +1086,8 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
                             break;
                         case WifiManager.WIFI_AP_STATE_DISABLED:
                              clearSoftApClientsNotification();
+                             mConnectedDeviceMap.clear();
+                             mL2ConnectedDeviceMap.clear();
                         case WifiManager.WIFI_AP_STATE_DISABLING:
                         case WifiManager.WIFI_AP_STATE_FAILED:
                         default:
@@ -1112,14 +1114,6 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
                 }
             } else if (action.equals(Intent.ACTION_CONFIGURATION_CHANGED)) {
                 updateConfiguration();
-            } else if(action.equals(WIFI_AP_STATE_CHANGED_ACTION)){
-                int wifiApState = intent.getIntExtra("wifi_state", WIFI_AP_STATE_DISABLED);
-                if (DBG) Log.d(TAG, "WIFI_AP_STATE_CHANGED: wifiApState="  + wifiApState);
-                if(wifiApState == WIFI_AP_STATE_ENABLED ||
-                    wifiApState == WIFI_AP_STATE_DISABLED) {
-                    mConnectedDeviceMap.clear();
-                    mL2ConnectedDeviceMap.clear();
-                }
             }
         }
     }
