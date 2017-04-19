@@ -178,20 +178,15 @@ public class ScheduleConditionProvider extends SystemConditionProviderService {
                 } else {
                     notifyCondition(conditionId, Condition.STATE_FALSE, "!meetsSchedule");
                     removeSnoozed(conditionId);
-                    if (nextUserAlarmTime == 0) {
+                    if (cal != null && nextUserAlarmTime == 0) {
                         cal.maybeSetNextAlarm(now, nextUserAlarmTime);
-                    } else {
-                        notifyCondition(conditionId, Condition.STATE_FALSE, "!meetsSchedule");
-                        if ((cal != null) && (nextUserAlarmTime == 0)) {
-                            cal.maybeSetNextAlarm(now, nextUserAlarmTime);
-                        }
                     }
-                    if (cal != null) {
-                        final long nextChangeTime = cal.getNextChangeTime(now);
-                        if (nextChangeTime > 0 && nextChangeTime > now) {
-                            if (mNextAlarmTime == 0 || nextChangeTime < mNextAlarmTime) {
-                                mNextAlarmTime = nextChangeTime;
-                            }
+                }
+                if (cal != null) {
+                    final long nextChangeTime = cal.getNextChangeTime(now);
+                    if (nextChangeTime > 0 && nextChangeTime > now) {
+                        if (mNextAlarmTime == 0 || nextChangeTime < mNextAlarmTime) {
+                            mNextAlarmTime = nextChangeTime;
                         }
                     }
                 }
