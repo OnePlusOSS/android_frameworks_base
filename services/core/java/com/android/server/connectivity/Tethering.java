@@ -187,6 +187,8 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
 
     private Notification.Builder mTetheredNotificationBuilder;
     private int mLastNotificationId;
+    private Notification.Builder softApNotificationBuilder;
+    private int mLastSoftApNotificationId = 0;
 
     private boolean mRndisEnabled;       // track the RNDIS function enabled state
     private boolean mUsbTetherRequested; // true if USB tethering should be started
@@ -667,7 +669,7 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
 
         mContext.sendStickyBroadcastAsUser(broadcast, UserHandle.ALL);
 
-        showTetheredNotification(com.android.internal.R.drawable.stat_sys_tether_wifi);
+        showSoftApClientsNotification(com.android.internal.R.drawable.stat_sys_tether_wifi);
     }
 
     private boolean readDeviceInfoFromDnsmasq(WifiDevice device) {
@@ -929,6 +931,63 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
         }
     }
 
+   private void showSoftApClientsNotification(int icon) {
+        NotificationManager notificationManager =
+                (NotificationManager)mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager == null) {
+            return;
+        }
+
+        Intent intent = new Intent();
+        intent.setClassName("com.android.settings", "com.android.settings.TetherSettings");
+        intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+
+        PendingIntent pi = PendingIntent.getActivityAsUser(mContext, 0, intent, 0,
+                null, UserHandle.CURRENT);
+
+        CharSequence message;
+        Resources r = Resources.getSystem();
+        CharSequence title = r.getText(com.android.internal.R.string.tethered_notification_title);
+
+        int size = mConnectedDeviceMap.size();
+        if (size == 0) {
+            message = r.getText(com.android.internal.R.string.tethered_notification_no_device_message);
+        } else if (size == 1) {
+            message = String.format((r.getText(com.android.internal.R.string.tethered_notification_one_device_message)).toString(),
+               size);
+        } else {
+            message = String.format((r.getText(com.android.internal.R.string.tethered_notification_multi_device_message)).toString(),
+               size);
+        }
+        if (softApNotificationBuilder == null) {
+            softApNotificationBuilder = new Notification.Builder(mContext);
+            softApNotificationBuilder.setWhen(0)
+                    .setOngoing(true)
+                    .setColor(mContext.getColor(
+                            com.android.internal.R.color.system_notification_accent_color))
+                    .setVisibility(Notification.VISIBILITY_PUBLIC)
+                    .setCategory(Notification.CATEGORY_STATUS);
+        }
+        softApNotificationBuilder.setSmallIcon(icon)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setContentIntent(pi)
+                .setPriority(Notification.PRIORITY_MIN);
+        softApNotificationBuilder.setContentText(message);
+        mLastSoftApNotificationId = icon + 10;
+
+        notificationManager.notify(mLastSoftApNotificationId, softApNotificationBuilder.build());
+    }
+
+    private void clearSoftApClientsNotification() {
+        NotificationManager notificationManager =
+            (NotificationManager)mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager != null && mLastSoftApNotificationId != 0) {
+            notificationManager.cancel(mLastSoftApNotificationId);
+            mLastSoftApNotificationId = 0;
+        }
+    }
+
     private void showTetheredNotification(int icon) {
         NotificationManager notificationManager =
                 (NotificationManager)mContext.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -938,12 +997,7 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
 
         if (mLastNotificationId != 0) {
             if (mLastNotificationId == icon) {
-                 if (mContext.getResources().getBoolean(com.android.internal.R.bool.config_softap_extention)
-                          && icon == com.android.internal.R.drawable.stat_sys_tether_wifi) {
-                      // if softap extension feature is on, allow to update icon.
-                 } else {
-                     return;
-                 }
+                return;
             }
             notificationManager.cancelAsUser(null, mLastNotificationId,
                     UserHandle.ALL);
@@ -960,23 +1014,8 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
         Resources r = Resources.getSystem();
         CharSequence title = r.getText(com.android.internal.R.string.tethered_notification_title);
 
-        CharSequence message;
-        int size = mConnectedDeviceMap.size();
-
-        if (mContext.getResources().getBoolean(com.android.internal.R.bool.config_softap_extention)
-            && icon == com.android.internal.R.drawable.stat_sys_tether_wifi) {
-            if (size == 0) {
-                message = r.getText(com.android.internal.R.string.tethered_notification_no_device_message);
-            } else if (size == 1) {
-                message = String.format((r.getText(com.android.internal.R.string.tethered_notification_one_device_message)).toString(),
-                        size);
-            } else {
-                message = String.format((r.getText(com.android.internal.R.string.tethered_notification_multi_device_message)).toString(),
-                        size);
-            }
-        } else {
-            message = r.getText(com.android.internal.R.string.tethered_notification_message);
-        }
+        CharSequence message = r.getText(com.android.internal.R.string.
+            tethered_notification_message);
 
         if (mTetheredNotificationBuilder == null) {
             mTetheredNotificationBuilder = new Notification.Builder(mContext);
@@ -991,15 +1030,6 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
                 .setContentTitle(title)
                 .setContentText(message)
                 .setContentIntent(pi);
-        if (mContext.getResources().getBoolean(com.android.internal.R.bool.config_softap_extention)
-            && icon == com.android.internal.R.drawable.stat_sys_tether_wifi
-            && size > 0) {
-            mTetheredNotificationBuilder.setContentText(message);
-            mTetheredNotificationBuilder.setPriority(Notification.PRIORITY_MIN);
-        } else {
-            mTetheredNotificationBuilder.setContentTitle(title);
-            mTetheredNotificationBuilder.setPriority(Notification.PRIORITY_DEFAULT);
-        }
         mLastNotificationId = icon;
 
         notificationManager.notifyAsUser(null, mLastNotificationId,
@@ -1055,6 +1085,7 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
                             }
                             break;
                         case WifiManager.WIFI_AP_STATE_DISABLED:
+                             clearSoftApClientsNotification();
                         case WifiManager.WIFI_AP_STATE_DISABLING:
                         case WifiManager.WIFI_AP_STATE_FAILED:
                         default:
@@ -1808,9 +1839,8 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
             // used to verify this receiver is still current
             final private int mGenerationNumber;
 
-            // we're interested in edge-triggered LOADED notifications, so
-            // ignore LOADED unless we saw an ABSENT state first
-            private boolean mSimAbsentSeen = false;
+            // used to check the sim state transition from non-loaded to loaded
+            private boolean mSimNotLoadedSeen = false;
 
             public SimChangeBroadcastReceiver(int generationNumber) {
                 super();
@@ -1828,14 +1858,14 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
                 final String state =
                         intent.getStringExtra(IccCardConstants.INTENT_KEY_ICC_STATE);
 
-                Log.d(TAG, "got Sim changed to state " + state + ", mSimAbsentSeen=" +
-                        mSimAbsentSeen);
-                if (!mSimAbsentSeen && IccCardConstants.INTENT_VALUE_ICC_ABSENT.equals(state)) {
-                    mSimAbsentSeen = true;
+                Log.d(TAG, "got Sim changed to state " + state + ", mSimNotLoadedSeen=" +
+                        mSimNotLoadedSeen);
+                if (!mSimNotLoadedSeen && !IccCardConstants.INTENT_VALUE_ICC_LOADED.equals(state)) {
+                    mSimNotLoadedSeen = true;
                 }
 
-                if (mSimAbsentSeen && IccCardConstants.INTENT_VALUE_ICC_LOADED.equals(state)) {
-                    mSimAbsentSeen = false;
+                if (mSimNotLoadedSeen && IccCardConstants.INTENT_VALUE_ICC_LOADED.equals(state)) {
+                    mSimNotLoadedSeen = false;
                     try {
                         if (mContext.getResources().getString(com.android.internal.R.string.
                                 config_mobile_hotspot_provision_app_no_ui).isEmpty() == false) {

@@ -109,6 +109,7 @@ import android.os.SystemClock;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.service.voice.IVoiceInteractionSession;
+import android.util.BoostFramework;
 import android.util.EventLog;
 import android.util.Slog;
 import android.view.Display;
@@ -183,6 +184,11 @@ class ActivityStarter {
     private IVoiceInteractionSession mVoiceSession;
     private IVoiceInteractor mVoiceInteractor;
 
+    public BoostFramework mPerf = null;
+    public boolean mIsPerfBoostEnabled = false;
+    public int mLBoostTimeOut = 0;
+    public int mLBoostCpuParamVal[];
+
     private void reset() {
         mStartActivity = null;
         mIntent = null;
@@ -225,6 +231,16 @@ class ActivityStarter {
         mService = service;
         mSupervisor = supervisor;
         mInterceptor = new ActivityStartInterceptor(mService, mSupervisor);
+        mIsPerfBoostEnabled = mService.mContext.getResources().getBoolean(
+            com.android.internal.R.bool.config_enableCpuBoostForAppLaunch);
+        if(mIsPerfBoostEnabled) {
+           mLBoostTimeOut = mService.mContext.getResources().getInteger(
+                   com.android.internal.R.integer.launchboost_timeout_param);
+           mLBoostCpuParamVal = mService.mContext.getResources().getIntArray(
+                           com.android.internal.R.array.launchboost_param_value);
+           if (mPerf == null)
+               mPerf = new BoostFramework();
+        }
     }
 
     final int startActivityLocked(IApplicationThread caller, Intent intent, Intent ephemeralIntent,
@@ -1155,6 +1171,10 @@ class ActivityStarter {
         if (mStartActivity.resultTo == null && mInTask == null && !mAddingToTask
                 && (mLaunchFlags & FLAG_ACTIVITY_NEW_TASK) != 0) {
             newTask = true;
+            if (mPerf != null) {
+                mStartActivity.perfActivityBoostHandler = mPerf.perfLockAcquire(mLBoostTimeOut, mLBoostCpuParamVal);
+            }
+
             setTaskFromReuseOrCreateNewTask(taskToAffiliate);
 
             if (mSupervisor.isLockTaskModeViolation(mStartActivity.task)) {
@@ -1172,6 +1192,9 @@ class ActivityStarter {
             if (mSupervisor.isLockTaskModeViolation(mSourceRecord.task)) {
                 Slog.e(TAG, "Attempted Lock Task Mode violation mStartActivity=" + mStartActivity);
                 return START_RETURN_LOCK_TASK_MODE_VIOLATION;
+            }
+            if (mPerf != null) {
+                mStartActivity.perfActivityBoostHandler = mPerf.perfLockAcquire(mLBoostTimeOut, mLBoostCpuParamVal);
             }
 
             final int result = setTaskFromSourceRecord();
