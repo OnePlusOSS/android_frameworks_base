@@ -49,4 +49,5 @@ interface IBluetoothManager
     boolean isBleScanAlwaysAvailable();
     int updateBleAppCount(IBinder b, boolean enable);
     boolean isBleAppPresent();
+    void setBrEdrEnableStatus(boolean status);
 }
