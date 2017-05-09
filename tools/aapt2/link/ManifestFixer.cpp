@@ -332,8 +332,8 @@ bool ManifestFixer::BuildRules(xml::XmlActionExecutor* executor,
 
   // Provider actions.
   application_action["provider"] = component_action;
-  application_action["provider"]["grant-uri-permissions"];
-  application_action["provider"]["path-permissions"];
+  application_action["provider"]["grant-uri-permission"];
+  application_action["provider"]["path-permission"];
 
   return true;
 }

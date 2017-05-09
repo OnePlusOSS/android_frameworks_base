@@ -930,12 +930,14 @@ public final class AnimatorSet extends Animator implements AnimationHandler.Anim
     }
 
     /**
-     * Gets the current position of the animation in time, which is equal to the current
-     * time minus the time that the animation started. An animation that is not yet started will
-     * return a value of zero, unless the animation has has its play time set via
-     * {@link #setCurrentPlayTime(long)}, in which case it will return the time that was set.
+     * Returns the milliseconds elapsed since the start of the animation.
      *
-     * @return The current position in time of the animation.
+     * <p>For ongoing animations, this method returns the current progress of the animation in
+     * terms of play time. For an animation that has not yet been started: if the animation has been
+     * seeked to a certain time via {@link #setCurrentPlayTime(long)}, the seeked play time will
+     * be returned; otherwise, this method will return 0.
+     *
+     * @return the current position in time of the animation in milliseconds
      */
     public long getCurrentPlayTime() {
         if (mSeekState.isActive()) {
@@ -1092,6 +1094,14 @@ public final class AnimatorSet extends Animator implements AnimationHandler.Anim
                 AnimationEvent event = mEvents.get(i);
                 Node node = event.mNode;
                 if (event.mEvent == AnimationEvent.ANIMATION_END) {
+                    if (node.mAnimation.isStarted()) {
+                        // If the animation has already been started before its due time (i.e.
+                        // the child animator is being manipulated outside of the AnimatorSet), we
+                        // need to cancel the animation to reset the internal state (e.g. frame
+                        // time tracking) and remove the self pulsing callbacks
+                        node.mAnimation.cancel();
+                    }
+                    node.mEnded = false;
                     mPlayingSet.add(event.mNode);
                     node.mAnimation.startWithoutPulsing(true);
                     pulseFrame(node, 0);
@@ -1106,6 +1116,14 @@ public final class AnimatorSet extends Animator implements AnimationHandler.Anim
                 Node node = event.mNode;
                 if (event.mEvent == AnimationEvent.ANIMATION_START) {
                     mPlayingSet.add(event.mNode);
+                    if (node.mAnimation.isStarted()) {
+                        // If the animation has already been started before its due time (i.e.
+                        // the child animator is being manipulated outside of the AnimatorSet), we
+                        // need to cancel the animation to reset the internal state (e.g. frame
+                        // time tracking) and remove the self pulsing callbacks
+                        node.mAnimation.cancel();
+                    }
+                    node.mEnded = false;
                     node.mAnimation.startWithoutPulsing(false);
                     pulseFrame(node, 0);
                 } else if (event.mEvent == AnimationEvent.ANIMATION_END && !node.mEnded) {

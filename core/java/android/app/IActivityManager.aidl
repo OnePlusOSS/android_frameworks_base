@@ -34,7 +34,7 @@ import android.app.IUidObserver;
 import android.app.IUserSwitchObserver;
 import android.app.Notification;
 import android.app.PendingIntent;
-import android.app.PictureInPictureArgs;
+import android.app.PictureInPictureParams;
 import android.app.ProfilerInfo;
 import android.app.WaitResult;
 import android.app.assist.AssistContent;
@@ -100,7 +100,7 @@ interface IActivityManager {
     boolean finishActivity(in IBinder token, int code, in Intent data, int finishTask);
     Intent registerReceiver(in IApplicationThread caller, in String callerPackage,
             in IIntentReceiver receiver, in IntentFilter filter,
-            in String requiredPermission, int userId, boolean visibleToInstantApps);
+            in String requiredPermission, int userId, int flags);
     void unregisterReceiver(in IIntentReceiver receiver);
     int broadcastIntent(in IApplicationThread caller, in Intent intent,
             in String resolvedType, in IIntentReceiver resultTo, int resultCode,
@@ -129,8 +129,7 @@ interface IActivityManager {
     void finishSubActivity(in IBinder token, in String resultWho, int requestCode);
     PendingIntent getRunningServiceControlPanel(in ComponentName service);
     ComponentName startService(in IApplicationThread caller, in Intent service,
-            in String resolvedType, int id, in Notification notification,
-            boolean requireForeground, in String callingPackage, int userId);
+            in String resolvedType, boolean requireForeground, in String callingPackage, int userId);
     int stopService(in IApplicationThread caller, in Intent service,
             in String resolvedType, int userId);
     int bindService(in IApplicationThread caller, in IBinder token, in Intent service,
@@ -190,6 +189,8 @@ interface IActivityManager {
             int flags, in Bundle options, int userId);
     void cancelIntentSender(in IIntentSender sender);
     String getPackageForIntentSender(in IIntentSender sender);
+    void registerIntentSenderCancelListener(in IIntentSender sender, in IResultReceiver receiver);
+    void unregisterIntentSenderCancelListener(in IIntentSender sender, in IResultReceiver receiver);
     void enterSafeMode();
     boolean startNextMatchingActivity(in IBinder callingActivity,
             in Intent intent, in Bundle options);
@@ -463,6 +464,7 @@ interface IActivityManager {
      *              etc.
      */
     void keyguardGoingAway(int flags);
+    int getUidProcessState(int uid, in String callingPackage);
     void registerUidObserver(in IUidObserver observer, int which, int cutpoint,
             String callingPackage);
     void unregisterUidObserver(in IUidObserver observer);
@@ -498,8 +500,9 @@ interface IActivityManager {
     boolean isInMultiWindowMode(in IBinder token);
     boolean isInPictureInPictureMode(in IBinder token);
     void killPackageDependents(in String packageName, int userId);
-    boolean enterPictureInPictureMode(in IBinder token, in PictureInPictureArgs args);
-    void setPictureInPictureArgs(in IBinder token, in PictureInPictureArgs args);
+    boolean enterPictureInPictureMode(in IBinder token, in PictureInPictureParams params);
+    void setPictureInPictureParams(in IBinder token, in PictureInPictureParams params);
+    int getMaxNumPictureInPictureActions(in IBinder token);
     void activityRelaunched(in IBinder token);
     IBinder getUriPermissionOwnerForActivity(in IBinder activityToken);
     /**
@@ -576,17 +579,6 @@ interface IActivityManager {
      * @param hasTopUi Whether the calling process has "top-level" UI.
      */
     void setHasTopUi(boolean hasTopUi);
-    /**
-     * Returns if the target of the PendingIntent can be fired directly, without triggering
-     * a work profile challenge. This can happen if the PendingIntent is to start direct-boot
-     * aware activities, and the target user is in RUNNING_LOCKED state, i.e. we should allow
-     * direct-boot aware activity to bypass work challenge when the user hasn't unlocked yet.
-     * @param intent the {@link  PendingIntent} to be tested.
-     * @return {@code true} if the intent should not trigger a work challenge, {@code false}
-     *     otherwise.
-     * @throws RemoteException
-     */
-    boolean canBypassWorkChallenge(in PendingIntent intent);
 
     // Start of O transactions
     void requestActivityRelaunch(in IBinder token);
@@ -602,7 +594,7 @@ interface IActivityManager {
     void unregisterTaskStackListener(ITaskStackListener listener);
     void moveStackToDisplay(int stackId, int displayId);
     boolean requestAutofillData(in IResultReceiver receiver, in Bundle receiverExtras,
-                                in IBinder activityToken);
+                                in IBinder activityToken, int flags);
     void dismissKeyguard(in IBinder token, in IKeyguardDismissCallback callback);
     int restartUserInBackground(int userId);
 
@@ -613,7 +605,7 @@ interface IActivityManager {
     void cancelTaskThumbnailTransition(int taskId);
 
     /**
-     * @param taskId the id of the task to retrieve the snapshots for
+     * @param taskId the id of the task to retrieve the sAutoapshots for
      * @param reducedResolution if set, if the snapshot needs to be loaded from disk, this will load
      *                          a reduced resolution of it, which is much faster
      * @return a graphic buffer representing a screenshot of a task

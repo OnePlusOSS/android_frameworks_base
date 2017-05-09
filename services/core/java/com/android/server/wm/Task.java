@@ -184,7 +184,7 @@ class Task extends WindowContainer<AppWindowToken> implements DimLayer.DimLayerU
         super.removeImmediately();
     }
 
-    void reparent(TaskStack stack, int position) {
+    void reparent(TaskStack stack, int position, boolean moveParents) {
         if (stack == mStack) {
             throw new IllegalArgumentException(
                     "task=" + this + " already child of stack=" + mStack);
@@ -195,7 +195,7 @@ class Task extends WindowContainer<AppWindowToken> implements DimLayer.DimLayerU
         final DisplayContent prevDisplayContent = getDisplayContent();
 
         getParent().removeChild(this);
-        stack.addTask(this, position, showForAllUsers(), false /* moveParents */);
+        stack.addTask(this, position, showForAllUsers(), moveParents);
 
         // Relayout display(s).
         final DisplayContent displayContent = stack.getDisplayContent();
@@ -382,9 +382,7 @@ class Task extends WindowContainer<AppWindowToken> implements DimLayer.DimLayerU
      *                    the adjusted bounds's top.
      */
     void alignToAdjustedBounds(Rect adjustedBounds, Rect tempInsetBounds, boolean alignBottom) {
-        // Task override config might be empty, while display or stack override config isn't, so
-        // we have to check merged override config here.
-        if (!isResizeable() || Configuration.EMPTY.equals(getMergedOverrideConfiguration())) {
+        if (!isResizeable() || Configuration.EMPTY.equals(getOverrideConfiguration())) {
             return;
         }
 
@@ -439,7 +437,7 @@ class Task extends WindowContainer<AppWindowToken> implements DimLayer.DimLayerU
         for (int i = mChildren.size() - 1; i >= 0; i--) {
             final AppWindowToken token = mChildren.get(i);
             // skip hidden (or about to hide) apps
-            if (token.mIsExiting || token.clientHidden || token.hiddenRequested) {
+            if (token.mIsExiting || token.isClientHidden() || token.hiddenRequested) {
                 continue;
             }
             final WindowState win = token.findMainWindow();
@@ -595,8 +593,7 @@ class Task extends WindowContainer<AppWindowToken> implements DimLayer.DimLayerU
      * we will have a jump at the end.
      */
     boolean isFloating() {
-        return StackId.tasksAreFloating(mStack.mStackId)
-            && !mStack.isBoundsAnimatingToFullscreen();
+        return StackId.tasksAreFloating(mStack.mStackId) && !mStack.isAnimatingBoundsToFullscreen();
     }
 
     WindowState getTopVisibleAppMainWindow() {
@@ -608,7 +605,7 @@ class Task extends WindowContainer<AppWindowToken> implements DimLayer.DimLayerU
         for (int i = mChildren.size() - 1; i >= 0; i--) {
             final AppWindowToken token = mChildren.get(i);
             // skip hidden (or about to hide) apps
-            if (!token.mIsExiting && !token.clientHidden && !token.hiddenRequested) {
+            if (!token.mIsExiting && !token.isClientHidden() && !token.hiddenRequested) {
                 return token;
             }
         }

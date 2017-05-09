@@ -63,6 +63,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -537,6 +538,7 @@ public class UsbDeviceManager {
                     oldFunctions = UsbManager.USB_FUNCTION_NONE;
                 }
 
+                Slog.i(TAG, "Setting adb to " + String.valueOf(enable));
                 setEnabledFunctions(oldFunctions, true, mUsbDataUnlocked);
                 updateAdbNotification();
             }
@@ -764,15 +766,16 @@ public class UsbDeviceManager {
 
             // send broadcast intent only if the USB state has changed
             if (!isUsbStateChanged(intent)) {
-                if (DEBUG) {
-                    Slog.d(TAG, "skip broadcasting " + intent + " extras: " + intent.getExtras());
-                }
+                Slog.i(TAG, "skip broadcasting " + intent + " extras: " + intent.getExtras());
                 return;
             }
-
-            if (DEBUG) Slog.d(TAG, "broadcasting " + intent + " extras: " + intent.getExtras());
-            mContext.sendStickyBroadcastAsUser(intent, UserHandle.ALL);
             mBroadcastedIntent = intent;
+
+            Random rand = new Random();
+            intent.putExtra("random_tag", rand.nextInt(1000));
+            Slog.i(TAG, "broadcasting " + intent + " extras: " + intent.getExtras());
+            mContext.sendStickyBroadcastAsUser(intent, UserHandle.ALL);
+            intent.removeExtra("random_tag");
         }
 
         private void updateUsbFunctions() {
@@ -840,6 +843,10 @@ public class UsbDeviceManager {
 
                     updateUsbNotification();
                     updateAdbNotification();
+                    if (mBootCompleted) {
+                        Slog.i(TAG, "update state " + mConnected + " " + mConfigured);
+                        updateUsbStateBroadcastIfNeeded(false);
+                    }
                     if (UsbManager.containsFunction(mCurrentFunctions,
                             UsbManager.USB_FUNCTION_ACCESSORY)) {
                         updateCurrentAccessory();
@@ -847,9 +854,9 @@ public class UsbDeviceManager {
                     if (mBootCompleted) {
                         if (!mConnected) {
                             // restore defaults when USB is disconnected
+                            Slog.i(TAG, "Disconnect, setting usb functions to null");
                             setEnabledFunctions(null, false, false);
                         }
-                        updateUsbStateBroadcastIfNeeded(false);
                         updateUsbFunctions();
                     } else {
                         mPendingBootBroadcast = true;
@@ -857,13 +864,16 @@ public class UsbDeviceManager {
                     break;
                 case MSG_UPDATE_HOST_STATE:
                     SomeArgs args = (SomeArgs) msg.obj;
+                    boolean prevHostConnected = mHostConnected;
                     mHostConnected = (args.argi1 == 1);
                     mSourcePower = (args.argi2 == 1);
                     mSinkPower = (args.argi3 == 1);
                     args.recycle();
                     updateUsbNotification();
                     if (mBootCompleted) {
-                        updateUsbStateBroadcastIfNeeded(false);
+                        if (mHostConnected || prevHostConnected) {
+                            updateUsbStateBroadcastIfNeeded(false);
+                        }
                     } else {
                         mPendingBootBroadcast = true;
                     }
@@ -877,6 +887,7 @@ public class UsbDeviceManager {
                     break;
                 case MSG_SET_CURRENT_FUNCTIONS:
                     String functions = (String) msg.obj;
+                    Slog.i(TAG, "Getting setFunction command for " + functions);
                     setEnabledFunctions(functions, false, msg.arg1 == 1);
                     break;
                 case MSG_UPDATE_USER_RESTRICTIONS:
@@ -884,6 +895,8 @@ public class UsbDeviceManager {
                     final boolean forceRestart = mUsbDataUnlocked
                             && isUsbDataTransferActive()
                             && !isUsbTransferAllowed();
+                    Slog.i(TAG, "Updating user restrictions, force restart is "
+                            + String.valueOf(forceRestart));
                     setEnabledFunctions(
                             mCurrentFunctions, forceRestart, mUsbDataUnlocked && !forceRestart);
                     break;
@@ -898,6 +911,7 @@ public class UsbDeviceManager {
                         updateUsbStateBroadcastIfNeeded(false);
                         mPendingBootBroadcast = false;
                     }
+                    Slog.i(TAG, "Boot complete, setting default functions");
                     setEnabledFunctions(null, false, false);
                     if (mCurrentAccessory != null) {
                         getCurrentSettings().accessoryAttached(mCurrentAccessory);
@@ -915,6 +929,7 @@ public class UsbDeviceManager {
                             Slog.v(TAG, "Current user switched to " + msg.arg1
                                     + "; resetting USB host stack for MTP or PTP");
                             // avoid leaking sensitive data from previous user
+                            Slog.i(TAG, "User Switched, kicking usb stack");
                             setEnabledFunctions(mCurrentFunctions, true, false);
                         }
                         mCurrentUser = msg.arg1;
@@ -1063,7 +1078,7 @@ public class UsbDeviceManager {
                                     .setContentIntent(pi)
                                     .setVisibility(Notification.VISIBILITY_PUBLIC)
                                     .extend(new Notification.TvExtender()
-                                            .setChannel(ADB_NOTIFICATION_CHANNEL_ID_TV))
+                                            .setChannelId(ADB_NOTIFICATION_CHANNEL_ID_TV))
                                     .build();
                     mAdbNotificationShown = true;
                     mNotificationManager.notifyAsUser(null, id, notification,

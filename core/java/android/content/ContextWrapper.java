@@ -605,8 +605,8 @@ public class ContextWrapper extends Context {
 
     @Override
     public Intent registerReceiver(
-        BroadcastReceiver receiver, IntentFilter filter, boolean visibleToInstantApps) {
-        return mBase.registerReceiver(receiver, filter, visibleToInstantApps);
+        BroadcastReceiver receiver, IntentFilter filter, int flags) {
+        return mBase.registerReceiver(receiver, filter, flags);
     }
 
     @Override
@@ -620,9 +620,9 @@ public class ContextWrapper extends Context {
     @Override
     public Intent registerReceiver(
         BroadcastReceiver receiver, IntentFilter filter,
-        String broadcastPermission, Handler scheduler, boolean visibleToInstantApps) {
+        String broadcastPermission, Handler scheduler, int flags) {
         return mBase.registerReceiver(receiver, filter, broadcastPermission,
-                scheduler, visibleToInstantApps);
+                scheduler, flags);
     }
 
     /** @hide */
@@ -649,13 +649,6 @@ public class ContextWrapper extends Context {
         return mBase.startForegroundService(service);
     }
 
-    /** @hide STOPSHIP remove when trial API is turned down */
-    @Override
-    public ComponentName startServiceInForeground(Intent service,
-            int id, Notification notification) {
-        return mBase.startServiceInForeground(service, id, notification);
-    }
-
     @Override
     public boolean stopService(Intent name) {
         return mBase.stopService(name);
@@ -671,13 +664,6 @@ public class ContextWrapper extends Context {
     @Override
     public ComponentName startForegroundServiceAsUser(Intent service, UserHandle user) {
         return mBase.startForegroundServiceAsUser(service, user);
-    }
-
-    /** @hide STOPSHIP removed when trial API is turned down */
-    @Override
-    public ComponentName startServiceInForegroundAsUser(Intent service,
-            int id, Notification notification, UserHandle user) {
-        return mBase.startServiceInForegroundAsUser(service, id, notification, user);
     }
 
     /** @hide */

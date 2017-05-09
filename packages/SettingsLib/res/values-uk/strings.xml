@@ -56,6 +56,8 @@
     <string name="bluetooth_profile_pan_nap" msgid="8429049285027482959">"Надання доступу до Інтернету"</string>
     <string name="bluetooth_profile_map" msgid="5465271250454324383">"Доступ до повідомлень"</string>
     <string name="bluetooth_profile_sap" msgid="5764222021851283125">"Доступ до SIM-карти"</string>
+    <string name="bluetooth_profile_a2dp_high_quality" msgid="2221025895896419505">"Використовувати аудіо високої якості: <xliff:g id="CODEC_NAME">%1$s</xliff:g>"</string>
+    <string name="bluetooth_profile_a2dp_high_quality_unknown_codec" msgid="5860996587596508755">"Використовувати аудіо високої якості"</string>
     <string name="bluetooth_a2dp_profile_summary_connected" msgid="963376081347721598">"Підключено до аудіоджерела"</string>
     <string name="bluetooth_headset_profile_summary_connected" msgid="7661070206715520671">"Підключено до звуку телеф."</string>
     <string name="bluetooth_opp_profile_summary_connected" msgid="2611913495968309066">"Підключ. до сервера передачі файлів"</string>
@@ -172,6 +174,7 @@
     <string name="wifi_allow_scan_with_traffic" msgid="3601853081178265786">"Завжди шукати мережі Wi-Fi"</string>
     <string name="mobile_data_always_on" msgid="8774857027458200434">"Не вимикати мобільне передавання даних"</string>
     <string name="bluetooth_disable_absolute_volume" msgid="2660673801947898809">"Вимкнути абсолютну гучність"</string>
+    <string name="bluetooth_enable_inband_ringing" msgid="3291686366721786740">"Увімкнути внутрішньосмугові сигнали"</string>
     <string name="bluetooth_select_avrcp_version_string" msgid="3750059931120293633">"Версія Bluetooth AVRCP"</string>
     <string name="bluetooth_select_avrcp_version_dialog_title" msgid="7277329668298705702">"Виберіть версію Bluetooth AVRCP"</string>
     <string name="bluetooth_select_a2dp_codec_type" msgid="90597356942154882">"Кодек для аудіо Bluetooth"</string>
@@ -209,6 +212,7 @@
     <string name="verify_apps_over_usb_title" msgid="4177086489869041953">"Встановлення через USB"</string>
     <string name="verify_apps_over_usb_summary" msgid="9164096969924529200">"Перевіряти безпеку додатків, установлених через ADB/ADT."</string>
     <string name="bluetooth_disable_absolute_volume_summary" msgid="6031284410786545957">"Функція абсолютної гучності Bluetooth вимикається, якщо на віддалених пристроях виникають проблеми, як-от надто висока гучність або втрата контролю."</string>
+    <string name="bluetooth_enable_inband_ringing_summary" msgid="2787866074741784975">"Дозволити відтворювати сигнали дзвінка на телефоні через гарнітуру Bluetooth"</string>
     <string name="enable_terminal_title" msgid="95572094356054120">"Локальний термінал"</string>
     <string name="enable_terminal_summary" msgid="67667852659359206">"Увімк. програму-термінал, що надає локальний доступ до оболонки"</string>
     <string name="hdcp_checking_title" msgid="8605478913544273282">"Перевірка HDCP"</string>
@@ -295,8 +299,6 @@
     <string name="inactive_app_active_summary" msgid="4174921824958516106">"Активний додаток. Торкніться, щоб дезактивувати."</string>
     <string name="runningservices_settings_title" msgid="8097287939865165213">"Запущені служби"</string>
     <string name="runningservices_settings_summary" msgid="854608995821032748">"Перегляд і керування запущеними службами"</string>
-    <string name="enable_webview_multiprocess" msgid="3352660896640797330">"Багатопроцесний WebView"</string>
-    <string name="enable_webview_multiprocess_desc" msgid="2485604010404197724">"Запустити засоби обробки відео WebView окремим процесом"</string>
     <string name="select_webview_provider_title" msgid="4628592979751918907">"Застосування WebView"</string>
     <string name="select_webview_provider_dialog_title" msgid="4370551378720004872">"Налаштувати застосування WebView"</string>
     <string name="select_webview_provider_toast_text" msgid="5466970498308266359">"Ця опція більше не дійсна. Повторіть спробу."</string>
@@ -325,7 +327,7 @@
     <string name="power_charging_duration" msgid="4676999980973411875">"<xliff:g id="LEVEL">%1$s</xliff:g> – <xliff:g id="TIME">%2$s</xliff:g> до повного заряду"</string>
     <string name="power_charging_duration_short" msgid="1098603958472207920">"<xliff:g id="LEVEL">%1$s</xliff:g> – <xliff:g id="TIME">%2$s</xliff:g>"</string>
     <string name="battery_info_status_unknown" msgid="196130600938058547">"Невідомо"</string>
-    <string name="battery_info_status_charging" msgid="1705179948350365604">"Зарядж-ся"</string>
+    <string name="battery_info_status_charging" msgid="1705179948350365604">"Заряджається"</string>
     <string name="battery_info_status_charging_lower" msgid="8689770213898117994">"заряджається"</string>
     <string name="battery_info_status_discharging" msgid="310932812698268588">"Не заряджається"</string>
     <string name="battery_info_status_not_charging" msgid="2820070506621483576">"Не заряджається"</string>

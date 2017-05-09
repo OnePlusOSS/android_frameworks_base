@@ -166,11 +166,6 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     private int mPhoneState;
     private boolean mKeyguardIsVisible;
 
-    /**
-     * If true, fingerprint was already authenticated and we don't need to start listening again
-     * until the Keyguard has been dismissed.
-     */
-    private boolean mFingerprintAlreadyAuthenticated;
     private boolean mGoingToSleep;
     private boolean mBouncer;
     private boolean mBootCompleted;
@@ -202,6 +197,11 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     private UserManager mUserManager;
     private int mFingerprintRunningState = FINGERPRINT_STATE_STOPPED;
     private LockPatternUtils mLockPatternUtils;
+
+    // If FP daemon dies, keyguard should retry after a short delay
+    private int mHardwareUnavailableRetryCount = 0;
+    private static final int HW_UNAVAILABLE_TIMEOUT = 3000; // ms
+    private static final int HW_UNAVAILABLE_RETRY_MAX = 3;
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -412,11 +412,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     private void onFingerprintAuthenticated(int userId) {
         Trace.beginSection("KeyGuardUpdateMonitor#onFingerPrintAuthenticated");
         mUserFingerprintAuthenticated.put(userId, true);
-
-        // If fingerprint unlocking is allowed, this event will lead to a Keyguard dismiss or to a
-        // wake-up (if Keyguard is not showing), so we don't need to listen until Keyguard is
-        // fully gone.
-        mFingerprintAlreadyAuthenticated = isUnlockingWithFingerprintAllowed();
+        // Don't send cancel if authentication succeeds
+        mFingerprintCancelSignal = null;
         for (int i = 0; i < mCallbacks.size(); i++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
             if (cb != null) {
@@ -482,6 +479,15 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         }
     }
 
+    private Runnable mRetryFingerprintAuthentication = new Runnable() {
+        @Override
+        public void run() {
+            Log.w(TAG, "Retrying fingerprint after HW unavailable, attempt " +
+                    mHardwareUnavailableRetryCount);
+            updateFingerprintListeningState();
+        }
+    };
+
     private void handleFingerprintError(int msgId, String errString) {
         if (msgId == FingerprintManager.FINGERPRINT_ERROR_CANCELED
                 && mFingerprintRunningState == FINGERPRINT_STATE_CANCELLING_RESTARTING) {
@@ -490,6 +496,15 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         } else {
             setFingerprintRunningState(FINGERPRINT_STATE_STOPPED);
         }
+
+        if (msgId == FingerprintManager.FINGERPRINT_ERROR_HW_UNAVAILABLE) {
+            if (mHardwareUnavailableRetryCount < HW_UNAVAILABLE_RETRY_MAX) {
+                mHardwareUnavailableRetryCount++;
+                mHandler.removeCallbacks(mRetryFingerprintAuthentication);
+                mHandler.postDelayed(mRetryFingerprintAuthentication, HW_UNAVAILABLE_TIMEOUT);
+            }
+        }
+
         for (int i = 0; i < mCallbacks.size(); i++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
             if (cb != null) {
@@ -927,7 +942,6 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
             }
         }
         mGoingToSleep = true;
-        mFingerprintAlreadyAuthenticated = false;
         updateFingerprintListeningState();
     }
 
@@ -954,6 +968,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     }
 
     private void handleScreenTurnedOff() {
+        mHardwareUnavailableRetryCount = 0;
         final int count = mCallbacks.size();
         for (int i = 0; i < count; i++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
@@ -1087,6 +1102,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     }
 
     private void updateFingerprintListeningState() {
+        mHandler.removeCallbacks(mRetryFingerprintAuthentication);
         boolean shouldListenForFingerprint = shouldListenForFingerprint();
         if (mFingerprintRunningState == FINGERPRINT_STATE_RUNNING && !shouldListenForFingerprint) {
             stopListeningForFingerprint();
@@ -1098,8 +1114,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
 
     private boolean shouldListenForFingerprint() {
         return (mKeyguardIsVisible || !mDeviceInteractive || mBouncer || mGoingToSleep)
-                && !mSwitchingUser && !mFingerprintAlreadyAuthenticated
-                && !isFingerprintDisabled(getCurrentUser());
+                && !mSwitchingUser && !isFingerprintDisabled(getCurrentUser());
     }
 
     private void startListeningForFingerprint() {
@@ -1434,9 +1449,6 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
             if (cb != null) {
                 cb.onKeyguardVisibilityChangedRaw(showing);
             }
-        }
-        if (!showing) {
-            mFingerprintAlreadyAuthenticated = false;
         }
         updateFingerprintListeningState();
     }

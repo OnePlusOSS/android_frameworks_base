@@ -57,6 +57,7 @@ import android.os.Looper;
 import android.os.StatFs;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.os.storage.StorageManager;
 import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.view.Display;
@@ -84,6 +85,37 @@ import java.lang.annotation.RetentionPolicy;
  * broadcasting and receiving intents, etc.
  */
 public abstract class Context {
+    /** @hide */
+    @IntDef(flag = true, prefix = { "MODE_" }, value = {
+            MODE_PRIVATE,
+            MODE_WORLD_READABLE,
+            MODE_WORLD_WRITEABLE,
+            MODE_APPEND,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface FileMode {}
+
+    /** @hide */
+    @IntDef(flag = true, prefix = { "MODE_" }, value = {
+            MODE_PRIVATE,
+            MODE_WORLD_READABLE,
+            MODE_WORLD_WRITEABLE,
+            MODE_MULTI_PROCESS,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface PreferencesMode {}
+
+    /** @hide */
+    @IntDef(flag = true, prefix = { "MODE_" }, value = {
+            MODE_PRIVATE,
+            MODE_WORLD_READABLE,
+            MODE_WORLD_WRITEABLE,
+            MODE_ENABLE_WRITE_AHEAD_LOGGING,
+            MODE_NO_LOCALIZED_COLLATORS,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface DatabaseMode {}
+
     /**
      * File creation mode: the default mode, where the created file can only
      * be accessed by the calling application (or all applications sharing the
@@ -291,6 +323,12 @@ public abstract class Context {
     public static final int BIND_ADJUST_WITH_ACTIVITY = 0x0080;
 
     /**
+     * @hide Flag for {@link #bindService}: like {@link #BIND_NOT_FOREGROUND}, but puts it
+     * up in to the important background state (instead of transient).
+     */
+    public static final int BIND_IMPORTANT_BACKGROUND = 0x00800000;
+
+    /**
      * @hide Flag for {@link #bindService}: allows application hosting service to manage whitelists
      * such as temporary allowing a {@code PendingIntent} to bypass Power Save mode.
      */
@@ -364,6 +402,19 @@ public abstract class Context {
      * </p>
      */
     public static final int BIND_EXTERNAL_SERVICE = 0x80000000;
+
+    /** @hide */
+    @IntDef(flag = true,
+            value = {
+                RECEIVER_VISIBLE_TO_INSTANT_APPS
+            })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface RegisterReceiverFlags {}
+
+    /**
+     * Flag for {@link #registerReceiver}: The receiver can receive broadcasts from Instant Apps.
+     */
+    public static final int RECEIVER_VISIBLE_TO_INSTANT_APPS = 0x1;
 
     /**
      * Returns an AssetManager instance for the application's package.
@@ -706,15 +757,14 @@ public abstract class Context {
      * @param name Desired preferences file. If a preferences file by this name
      * does not exist, it will be created when you retrieve an
      * editor (SharedPreferences.edit()) and then commit changes (Editor.commit()).
-     * @param mode Operating mode.  Use 0 or {@link #MODE_PRIVATE} for the
-     * default operation.
+     * @param mode Operating mode.
      *
      * @return The single {@link SharedPreferences} instance that can be used
      *         to retrieve and modify the preference values.
      *
      * @see #MODE_PRIVATE
      */
-    public abstract SharedPreferences getSharedPreferences(String name, int mode);
+    public abstract SharedPreferences getSharedPreferences(String name, @PreferencesMode int mode);
 
     /**
      * Retrieve and hold the contents of the preferences file, returning
@@ -726,8 +776,7 @@ public abstract class Context {
      * @param file Desired preferences file. If a preferences file by this name
      * does not exist, it will be created when you retrieve an
      * editor (SharedPreferences.edit()) and then commit changes (Editor.commit()).
-     * @param mode Operating mode.  Use 0 or {@link #MODE_PRIVATE} for the
-     * default operation.
+     * @param mode Operating mode.
      *
      * @return The single {@link SharedPreferences} instance that can be used
      *         to retrieve and modify the preference values.
@@ -736,7 +785,7 @@ public abstract class Context {
      * @see #MODE_PRIVATE
      * @removed
      */
-    public abstract SharedPreferences getSharedPreferences(File file, int mode);
+    public abstract SharedPreferences getSharedPreferences(File file, @PreferencesMode int mode);
 
     /**
      * Move an existing shared preferences file from the given source storage
@@ -791,9 +840,7 @@ public abstract class Context {
      *
      * @param name The name of the file to open; can not contain path
      *            separators.
-     * @param mode Operating mode. Use 0 or {@link #MODE_PRIVATE} for the
-     *            default operation. Use {@link #MODE_APPEND} to append to an
-     *            existing file.
+     * @param mode Operating mode.
      * @return The resulting {@link FileOutputStream}.
      * @see #MODE_APPEND
      * @see #MODE_PRIVATE
@@ -802,7 +849,7 @@ public abstract class Context {
      * @see #deleteFile
      * @see java.io.FileOutputStream#FileOutputStream(String)
      */
-    public abstract FileOutputStream openFileOutput(String name, int mode)
+    public abstract FileOutputStream openFileOutput(String name, @FileMode int mode)
         throws FileNotFoundException;
 
     /**
@@ -1146,16 +1193,26 @@ public abstract class Context {
 
     /**
      * Returns the absolute path to the application specific cache directory on
-     * the filesystem. These files will be ones that get deleted first when the
-     * device runs low on storage. There is no guarantee when these files will
-     * be deleted.
+     * the filesystem.
      * <p>
-     * <strong>Note: you should not <em>rely</em> on the system deleting these
-     * files for you; you should always have a reasonable maximum, such as 1 MB,
-     * for the amount of space you consume with cache files, and prune those
-     * files when exceeding that space.</strong> If your app requires a larger
-     * cache (larger than 1 MB), you should use {@link #getExternalCacheDir()}
-     * instead.
+     * The system will automatically delete files in this directory as disk
+     * space is needed elsewhere on the device. The system will always delete
+     * older files first, as reported by {@link File#lastModified()}. If
+     * desired, you can exert more control over how files are deleted using
+     * {@link StorageManager#setCacheBehaviorGroup(File, boolean)} and
+     * {@link StorageManager#setCacheBehaviorTombstone(File, boolean)}.
+     * <p>
+     * Apps are strongly encouraged to keep their usage of cache space below the
+     * quota returned by
+     * {@link StorageManager#getCacheQuotaBytes(java.util.UUID)}. If your app
+     * goes above this quota, your cached files will be some of the first to be
+     * deleted when additional disk space is needed. Conversely, if your app
+     * stays under this quota, your cached files will be some of the last to be
+     * deleted when additional disk space is needed.
+     * <p>
+     * Note that your cache quota will change over time depending on how
+     * frequently the user interacts with your app, and depending on how much
+     * system-wide disk space is used.
      * <p>
      * The returned path may change over time if the calling app is moved to an
      * adopted storage device, so only relative paths should be persisted.
@@ -1173,9 +1230,11 @@ public abstract class Context {
 
     /**
      * Returns the absolute path to the application specific cache directory on
-     * the filesystem designed for storing cached code. The system will delete
-     * any files stored in this location both when your specific application is
-     * upgraded, and when the entire platform is upgraded.
+     * the filesystem designed for storing cached code.
+     * <p>
+     * The system will delete any files stored in this location both when your
+     * specific application is upgraded, and when the entire platform is
+     * upgraded.
      * <p>
      * This location is optimal for storing compiled or optimized code generated
      * by your application at runtime.
@@ -1387,26 +1446,21 @@ public abstract class Context {
      *
      * @param name Name of the directory to retrieve.  This is a directory
      * that is created as part of your application data.
-     * @param mode Operating mode.  Use 0 or {@link #MODE_PRIVATE} for the
-     * default operation.
+     * @param mode Operating mode.
      *
      * @return A {@link File} object for the requested directory.  The directory
      * will have been created if it does not already exist.
      *
      * @see #openFileOutput(String, int)
      */
-    public abstract File getDir(String name, int mode);
+    public abstract File getDir(String name, @FileMode int mode);
 
     /**
      * Open a new private SQLiteDatabase associated with this Context's
      * application package. Create the database file if it doesn't exist.
      *
      * @param name The name (unique in the application package) of the database.
-     * @param mode Operating mode. Use 0 or {@link #MODE_PRIVATE} for the
-     *            default operation. Use
-     *            {@link #MODE_ENABLE_WRITE_AHEAD_LOGGING} to enable write-ahead
-     *            logging by default. Use {@link #MODE_NO_LOCALIZED_COLLATORS}
-     *            to disable localized collators.
+     * @param mode Operating mode.
      * @param factory An optional factory class that is called to instantiate a
      *            cursor when query is called.
      * @return The contents of a newly created database with the given name.
@@ -1418,7 +1472,7 @@ public abstract class Context {
      * @see #deleteDatabase
      */
     public abstract SQLiteDatabase openOrCreateDatabase(String name,
-            int mode, CursorFactory factory);
+            @DatabaseMode int mode, CursorFactory factory);
 
     /**
      * Open a new private SQLiteDatabase associated with this Context's
@@ -1429,11 +1483,7 @@ public abstract class Context {
      * </p>
      *
      * @param name The name (unique in the application package) of the database.
-     * @param mode Operating mode. Use 0 or {@link #MODE_PRIVATE} for the
-     *            default operation. Use
-     *            {@link #MODE_ENABLE_WRITE_AHEAD_LOGGING} to enable write-ahead
-     *            logging by default. Use {@link #MODE_NO_LOCALIZED_COLLATORS}
-     *            to disable localized collators.
+     * @param mode Operating mode.
      * @param factory An optional factory class that is called to instantiate a
      *            cursor when query is called.
      * @param errorHandler the {@link DatabaseErrorHandler} to be used when
@@ -1449,7 +1499,7 @@ public abstract class Context {
      * @see #deleteDatabase
      */
     public abstract SQLiteDatabase openOrCreateDatabase(String name,
-            int mode, CursorFactory factory,
+            @DatabaseMode int mode, CursorFactory factory,
             @Nullable DatabaseErrorHandler errorHandler);
 
     /**
@@ -1751,9 +1801,9 @@ public abstract class Context {
      * @see #startActivity(Intent)
      * @see #startIntentSender(IntentSender, Intent, int, int, int, Bundle)
      */
-    public abstract void startIntentSender(IntentSender intent,
-            Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags)
-            throws IntentSender.SendIntentException;
+    public abstract void startIntentSender(IntentSender intent, @Nullable Intent fillInIntent,
+            @Intent.MutableFlags int flagsMask, @Intent.MutableFlags int flagsValues,
+            int extraFlags) throws IntentSender.SendIntentException;
 
     /**
      * Like {@link #startActivity(Intent, Bundle)}, but taking a IntentSender
@@ -1780,9 +1830,9 @@ public abstract class Context {
      * @see #startActivity(Intent, Bundle)
      * @see #startIntentSender(IntentSender, Intent, int, int, int)
      */
-    public abstract void startIntentSender(IntentSender intent,
-            @Nullable Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags,
-            Bundle options) throws IntentSender.SendIntentException;
+    public abstract void startIntentSender(IntentSender intent, @Nullable Intent fillInIntent,
+            @Intent.MutableFlags int flagsMask, @Intent.MutableFlags int flagsValues,
+            int extraFlags, @Nullable Bundle options) throws IntentSender.SendIntentException;
 
     /**
      * Broadcast the given intent to all interested BroadcastReceivers.  This
@@ -2166,10 +2216,6 @@ public abstract class Context {
      * all other ways, this behaves the same as
      * {@link #sendBroadcast(Intent)}.
      *
-     * <p>You must hold the {@link android.Manifest.permission#BROADCAST_STICKY}
-     * permission in order to use this API.  If you do not hold that
-     * permission, {@link SecurityException} will be thrown.
-     *
      * @deprecated Sticky broadcasts should not be used.  They provide no security (anyone
      * can access them), no protection (anyone can modify them), and many other problems.
      * The recommended pattern is to use a non-sticky broadcast to report that <em>something</em>
@@ -2184,6 +2230,7 @@ public abstract class Context {
      * @see #sendStickyOrderedBroadcast(Intent, BroadcastReceiver, Handler, int, String, Bundle)
      */
     @Deprecated
+    @RequiresPermission(android.Manifest.permission.BROADCAST_STICKY)
     public abstract void sendStickyBroadcast(@RequiresPermission Intent intent);
 
     /**
@@ -2233,6 +2280,7 @@ public abstract class Context {
      * @see android.app.Activity#RESULT_OK
      */
     @Deprecated
+    @RequiresPermission(android.Manifest.permission.BROADCAST_STICKY)
     public abstract void sendStickyOrderedBroadcast(@RequiresPermission Intent intent,
             BroadcastReceiver resultReceiver,
             @Nullable Handler scheduler, int initialCode, @Nullable String initialData,
@@ -2241,10 +2289,6 @@ public abstract class Context {
     /**
      * <p>Remove the data previously sent with {@link #sendStickyBroadcast},
      * so that it is as if the sticky broadcast had never happened.
-     *
-     * <p>You must hold the {@link android.Manifest.permission#BROADCAST_STICKY}
-     * permission in order to use this API.  If you do not hold that
-     * permission, {@link SecurityException} will be thrown.
      *
      * @deprecated Sticky broadcasts should not be used.  They provide no security (anyone
      * can access them), no protection (anyone can modify them), and many other problems.
@@ -2257,6 +2301,7 @@ public abstract class Context {
      * @see #sendStickyBroadcast
      */
     @Deprecated
+    @RequiresPermission(android.Manifest.permission.BROADCAST_STICKY)
     public abstract void removeStickyBroadcast(@RequiresPermission Intent intent);
 
     /**
@@ -2424,7 +2469,8 @@ public abstract class Context {
      *
      * @param receiver The BroadcastReceiver to handle the broadcast.
      * @param filter Selects the Intent broadcasts to be received.
-     * @param visibleToInstantApps If the receiver accepts broadcasts from Instant Apps.
+     * @param flags Additional options for the receiver. May be 0 or
+     *      {@link #RECEIVER_VISIBLE_TO_INSTANT_APPS}.
      *
      * @return The first sticky intent found that matches <var>filter</var>,
      *         or null if there are none.
@@ -2436,7 +2482,7 @@ public abstract class Context {
     @Nullable
     public abstract Intent registerReceiver(@Nullable BroadcastReceiver receiver,
                                             IntentFilter filter,
-                                            boolean visibleToInstantApps);
+                                            @RegisterReceiverFlags int flags);
 
     /**
      * Register to receive intent broadcasts, to run in the context of
@@ -2475,9 +2521,9 @@ public abstract class Context {
             @Nullable Handler scheduler);
 
     /**
-     * Register to receive intent broadcasts, with the receiver optionally being
-     * exposed to Instant Apps. See
-     * {@link #registerReceiver(BroadcastReceiver, IntentFilter, boolean)} and
+     * Register to receive intent broadcasts, to run in the context of
+     * <var>scheduler</var>. See
+     * {@link #registerReceiver(BroadcastReceiver, IntentFilter, int)} and
      * {@link #registerReceiver(BroadcastReceiver, IntentFilter, String, Handler)}
      * for more information.
      *
@@ -2496,12 +2542,13 @@ public abstract class Context {
      *      no permission is required.
      * @param scheduler Handler identifying the thread that will receive
      *      the Intent.  If null, the main thread of the process will be used.
-     * @param visibleToInstantApps If the receiver accepts broadcasts from Instant Apps.
+     * @param flags Additional options for the receiver. May be 0 or
+     *      {@link #RECEIVER_VISIBLE_TO_INSTANT_APPS}.
      *
      * @return The first sticky intent found that matches <var>filter</var>,
      *         or null if there are none.
      *
-     * @see #registerReceiver(BroadcastReceiver, IntentFilter, boolean)
+     * @see #registerReceiver(BroadcastReceiver, IntentFilter, int)
      * @see #registerReceiver(BroadcastReceiver, IntentFilter, String, Handler)
      * @see #sendBroadcast
      * @see #unregisterReceiver
@@ -2509,7 +2556,7 @@ public abstract class Context {
     @Nullable
     public abstract Intent registerReceiver(BroadcastReceiver receiver,
             IntentFilter filter, @Nullable String broadcastPermission,
-            @Nullable Handler scheduler, boolean visibleToInstantApps);
+            @Nullable Handler scheduler, @RegisterReceiverFlags int flags);
 
     /**
      * @hide
@@ -2647,18 +2694,6 @@ public abstract class Context {
     public abstract ComponentName startForegroundServiceAsUser(Intent service, UserHandle user);
 
     /**
-     * Start a service directly into the "foreground service" state.  Unlike {@link #startService},
-     * this method can be used from within background operations like broadcast receivers
-     * or scheduled jobs.  The API entry point for this is in NotificationManager in order to
-     * preserve appropriate public package layering.
-     * @hide
-     * @deprecated STOPSHIP remove in favor of two-step startForegroundService() + startForeground()
-     */
-    @Nullable
-    public abstract ComponentName startServiceInForeground(Intent service,
-            int id, Notification notification);
-
-    /**
      * Request that a given application service be stopped.  If the service is
      * not running, nothing happens.  Otherwise it is stopped.  Note that calls
      * to startService() are not counted -- this stops the service no matter
@@ -2694,16 +2729,6 @@ public abstract class Context {
      */
     @Nullable
     public abstract ComponentName startServiceAsUser(Intent service, UserHandle user);
-
-    /**
-     * @hide like {@link #startServiceInForeground(Intent, int, Notification)}
-     * but for a specific user.
-     * @deprecated STOPSHIP remove when trial API is turned off
-     */
-    @Deprecated
-    @Nullable
-    public abstract ComponentName startServiceInForegroundAsUser(Intent service,
-            int id, Notification notification, UserHandle user);
 
     /**
      * @hide like {@link #stopService(Intent)} but for a specific user.
@@ -2745,7 +2770,8 @@ public abstract class Context {
      *          {@link #BIND_WAIVE_PRIORITY}.
      * @return If you have successfully bound to the service, {@code true} is returned;
      *         {@code false} is returned if the connection is not made so you will not
-     *         receive the service object.
+     *         receive the service object. However, you should still call
+     *         {@link #unbindService} to release the connection.
      *
      * @throws SecurityException If the caller does not have permission to access the service
      * or the service can not be found.
@@ -2896,6 +2922,7 @@ public abstract class Context {
             BATTERY_SERVICE,
             JOB_SCHEDULER_SERVICE,
             //@hide: PERSISTENT_DATA_BLOCK_SERVICE,
+            //@hide: OEM_LOCK_SERVICE,
             MEDIA_PROJECTION_SERVICE,
             MIDI_SERVICE,
             RADIO_SERVICE,
@@ -2946,9 +2973,6 @@ public abstract class Context {
      *  <dt> {@link #CONNECTIVITY_SERVICE} ("connection")
      *  <dd> A {@link android.net.ConnectivityManager ConnectivityManager} for
      *  handling management of network connections.
-     *  <dt> {@link #IPSEC_SERVICE} ("ipsec")
-     *  <dd> A {@link android.net.IpSecManager IpSecManager} for managing IPSec on
-     *  sockets and networks.
      *  <dt> {@link #WIFI_SERVICE} ("wifi")
      *  <dd> A {@link android.net.wifi.WifiManager WifiManager} for management of Wi-Fi
      *  connectivity.  On releases before NYC, it should only be obtained from an application
@@ -3040,7 +3064,7 @@ public abstract class Context {
      * @see android.os.HardwarePropertiesManager
      * @see #HARDWARE_PROPERTIES_SERVICE
      */
-    public abstract Object getSystemService(@ServiceName @NonNull String name);
+    public abstract @Nullable Object getSystemService(@ServiceName @NonNull String name);
 
     /**
      * Return the handle to a system-level service by class.
@@ -3070,7 +3094,7 @@ public abstract class Context {
      * @return The service or null if the class is not a supported system service.
      */
     @SuppressWarnings("unchecked")
-    public final <T> T getSystemService(Class<T> serviceClass) {
+    public final @Nullable <T> T getSystemService(@NonNull Class<T> serviceClass) {
         // Because subclasses may override getSystemService(String) we cannot
         // perform a lookup by class alone.  We must first map the class to its
         // service name then invoke the string-based method.
@@ -3084,7 +3108,7 @@ public abstract class Context {
      * @param serviceClass The class of the desired service.
      * @return The service name or null if the class is not a supported system service.
      */
-    public abstract String getSystemServiceName(Class<?> serviceClass);
+    public abstract @Nullable String getSystemServiceName(@NonNull Class<?> serviceClass);
 
     /**
      * Use with {@link #getSystemService} to retrieve a
@@ -3293,6 +3317,7 @@ public abstract class Context {
      * {@link android.net.IpSecManager} for encrypting Sockets or Networks with
      * IPSec.
      *
+     * @hide
      * @see #getSystemService
      */
     public static final String IPSEC_SERVICE = "ipsec";
@@ -3742,12 +3767,13 @@ public abstract class Context {
     public static final String PRINT_SERVICE = "print";
 
     /**
+     * Use with {@link #getSystemService} to retrieve a
      * {@link android.companion.CompanionDeviceManager} for managing companion devices
      *
      * @see #getSystemService
      * @see android.companion.CompanionDeviceManager
      */
-    public static final String COMPANION_DEVICE_SERVICE = "companion_device";
+    public static final String COMPANION_DEVICE_SERVICE = "companiondevice";
 
     /**
      * Use with {@link #getSystemService} to retrieve a
@@ -3815,6 +3841,17 @@ public abstract class Context {
      */
     @SystemApi
     public static final String PERSISTENT_DATA_BLOCK_SERVICE = "persistent_data_block";
+
+    /**
+     * Use with {@link #getSystemService} to retrieve a {@link
+     * android.service.oemlock.OemLockManager} instance for managing the OEM lock.
+     *
+     * @see #getSystemService
+     * @see android.service.oemlock.OemLockManager
+     * @hide
+     */
+    @SystemApi
+    public static final String OEM_LOCK_SERVICE = "oem_lock";
 
     /**
      * Use with {@link #getSystemService} to retrieve a {@link
@@ -4080,15 +4117,7 @@ public abstract class Context {
      *
      * @param toPackage The package you would like to allow to access the Uri.
      * @param uri The Uri you would like to grant access to.
-     * @param modeFlags The desired access modes.  Any combination of
-     * {@link Intent#FLAG_GRANT_READ_URI_PERMISSION
-     * Intent.FLAG_GRANT_READ_URI_PERMISSION},
-     * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION
-     * Intent.FLAG_GRANT_WRITE_URI_PERMISSION},
-     * {@link Intent#FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-     * Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION}, or
-     * {@link Intent#FLAG_GRANT_PREFIX_URI_PERMISSION
-     * Intent.FLAG_GRANT_PREFIX_URI_PERMISSION}.
+     * @param modeFlags The desired access modes.
      *
      * @see #revokeUriPermission
      */
@@ -4119,11 +4148,7 @@ public abstract class Context {
      * revoke grants that another app could be strongly expecting to stick around.</p>
      *
      * @param uri The Uri you would like to revoke access to.
-     * @param modeFlags The desired access modes.  Any combination of
-     * {@link Intent#FLAG_GRANT_READ_URI_PERMISSION
-     * Intent.FLAG_GRANT_READ_URI_PERMISSION} or
-     * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION
-     * Intent.FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * @param modeFlags The access modes to revoke.
      *
      * @see #grantUriPermission
      */
@@ -4146,11 +4171,7 @@ public abstract class Context {
      *
      * @param toPackage The package you had previously granted access to.
      * @param uri The Uri you would like to revoke access to.
-     * @param modeFlags The desired access modes.  Any combination of
-     * {@link Intent#FLAG_GRANT_READ_URI_PERMISSION
-     * Intent.FLAG_GRANT_READ_URI_PERMISSION} or
-     * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION
-     * Intent.FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * @param modeFlags The access modes to revoke.
      *
      * @see #grantUriPermission
      */
@@ -4168,9 +4189,7 @@ public abstract class Context {
      * @param pid The process ID being checked against.  Must be &gt; 0.
      * @param uid The user ID being checked against.  A uid of 0 is the root
      * user, which will pass every permission check.
-     * @param modeFlags The type of access to grant.  May be one or both of
-     * {@link Intent#FLAG_GRANT_READ_URI_PERMISSION Intent.FLAG_GRANT_READ_URI_PERMISSION} or
-     * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION Intent.FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * @param modeFlags The access modes to check.
      *
      * @return {@link PackageManager#PERMISSION_GRANTED} if the given
      * pid/uid is allowed to access that uri, or
@@ -4179,10 +4198,12 @@ public abstract class Context {
      * @see #checkCallingUriPermission
      */
     @CheckResult(suggest="#enforceUriPermission(Uri,int,int,String)")
+    @PackageManager.PermissionResult
     public abstract int checkUriPermission(Uri uri, int pid, int uid,
             @Intent.AccessUriMode int modeFlags);
 
     /** @hide */
+    @PackageManager.PermissionResult
     public abstract int checkUriPermission(Uri uri, int pid, int uid,
             @Intent.AccessUriMode int modeFlags, IBinder callerToken);
 
@@ -4197,9 +4218,7 @@ public abstract class Context {
      * will always fail.
      *
      * @param uri The uri that is being checked.
-     * @param modeFlags The type of access to grant.  May be one or both of
-     * {@link Intent#FLAG_GRANT_READ_URI_PERMISSION Intent.FLAG_GRANT_READ_URI_PERMISSION} or
-     * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION Intent.FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * @param modeFlags The access modes to check.
      *
      * @return {@link PackageManager#PERMISSION_GRANTED} if the caller
      * is allowed to access that uri, or
@@ -4208,6 +4227,7 @@ public abstract class Context {
      * @see #checkUriPermission(Uri, int, int, int)
      */
     @CheckResult(suggest="#enforceCallingUriPermission(Uri,int,String)")
+    @PackageManager.PermissionResult
     public abstract int checkCallingUriPermission(Uri uri, @Intent.AccessUriMode int modeFlags);
 
     /**
@@ -4217,9 +4237,7 @@ public abstract class Context {
      * if you are not currently processing an IPC.  Use with care!
      *
      * @param uri The uri that is being checked.
-     * @param modeFlags The type of access to grant.  May be one or both of
-     * {@link Intent#FLAG_GRANT_READ_URI_PERMISSION Intent.FLAG_GRANT_READ_URI_PERMISSION} or
-     * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION Intent.FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * @param modeFlags The access modes to check.
      *
      * @return {@link PackageManager#PERMISSION_GRANTED} if the caller
      * is allowed to access that uri, or
@@ -4228,6 +4246,7 @@ public abstract class Context {
      * @see #checkCallingUriPermission
      */
     @CheckResult(suggest="#enforceCallingOrSelfUriPermission(Uri,int,String)")
+    @PackageManager.PermissionResult
     public abstract int checkCallingOrSelfUriPermission(Uri uri,
             @Intent.AccessUriMode int modeFlags);
 
@@ -4245,15 +4264,14 @@ public abstract class Context {
      * @param pid The process ID being checked against.  Must be &gt; 0.
      * @param uid The user ID being checked against.  A uid of 0 is the root
      * user, which will pass every permission check.
-     * @param modeFlags The type of access to grant.  May be one or both of
-     * {@link Intent#FLAG_GRANT_READ_URI_PERMISSION Intent.FLAG_GRANT_READ_URI_PERMISSION} or
-     * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION Intent.FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * @param modeFlags The access modes to check.
      *
      * @return {@link PackageManager#PERMISSION_GRANTED} if the caller
      * is allowed to access that uri or holds one of the given permissions, or
      * {@link PackageManager#PERMISSION_DENIED} if it is not.
      */
     @CheckResult(suggest="#enforceUriPermission(Uri,String,String,int,int,int,String)")
+    @PackageManager.PermissionResult
     public abstract int checkUriPermission(@Nullable Uri uri, @Nullable String readPermission,
             @Nullable String writePermission, int pid, int uid,
             @Intent.AccessUriMode int modeFlags);
@@ -4270,9 +4288,7 @@ public abstract class Context {
      * @param pid The process ID being checked against.  Must be &gt; 0.
      * @param uid The user ID being checked against.  A uid of 0 is the root
      * user, which will pass every permission check.
-     * @param modeFlags The type of access to grant.  May be one or both of
-     * {@link Intent#FLAG_GRANT_READ_URI_PERMISSION Intent.FLAG_GRANT_READ_URI_PERMISSION} or
-     * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION Intent.FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * @param modeFlags The access modes to enforce.
      * @param message A message to include in the exception if it is thrown.
      *
      * @see #checkUriPermission(Uri, int, int, int)
@@ -4292,9 +4308,7 @@ public abstract class Context {
      * will always throw a SecurityException.
      *
      * @param uri The uri that is being checked.
-     * @param modeFlags The type of access to grant.  May be one or both of
-     * {@link Intent#FLAG_GRANT_READ_URI_PERMISSION Intent.FLAG_GRANT_READ_URI_PERMISSION} or
-     * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION Intent.FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * @param modeFlags The access modes to enforce.
      * @param message A message to include in the exception if it is thrown.
      *
      * @see #checkCallingUriPermission(Uri, int)
@@ -4311,9 +4325,7 @@ public abstract class Context {
      * with care!
      *
      * @param uri The uri that is being checked.
-     * @param modeFlags The type of access to grant.  May be one or both of
-     * {@link Intent#FLAG_GRANT_READ_URI_PERMISSION Intent.FLAG_GRANT_READ_URI_PERMISSION} or
-     * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION Intent.FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * @param modeFlags The access modes to enforce.
      * @param message A message to include in the exception if it is thrown.
      *
      * @see #checkCallingOrSelfUriPermission(Uri, int)
@@ -4335,9 +4347,7 @@ public abstract class Context {
      * @param pid The process ID being checked against.  Must be &gt; 0.
      * @param uid The user ID being checked against.  A uid of 0 is the root
      * user, which will pass every permission check.
-     * @param modeFlags The type of access to grant.  May be one or both of
-     * {@link Intent#FLAG_GRANT_READ_URI_PERMISSION Intent.FLAG_GRANT_READ_URI_PERMISSION} or
-     * {@link Intent#FLAG_GRANT_WRITE_URI_PERMISSION Intent.FLAG_GRANT_WRITE_URI_PERMISSION}.
+     * @param modeFlags The access modes to enforce.
      * @param message A message to include in the exception if it is thrown.
      *
      * @see #checkUriPermission(Uri, String, String, int, int, int)
@@ -4348,8 +4358,14 @@ public abstract class Context {
             @Nullable String message);
 
     /** @hide */
-    @IntDef(flag = true,
-            value = {CONTEXT_INCLUDE_CODE, CONTEXT_IGNORE_SECURITY, CONTEXT_RESTRICTED})
+    @IntDef(flag = true, prefix = { "CONTEXT_" }, value = {
+            CONTEXT_INCLUDE_CODE,
+            CONTEXT_IGNORE_SECURITY,
+            CONTEXT_RESTRICTED,
+            CONTEXT_DEVICE_PROTECTED_STORAGE,
+            CONTEXT_CREDENTIAL_PROTECTED_STORAGE,
+            CONTEXT_REGISTER_PACKAGE,
+    })
     @Retention(RetentionPolicy.SOURCE)
     public @interface CreatePackageOptions {}
 
@@ -4421,8 +4437,7 @@ public abstract class Context {
      * {@link #CONTEXT_INCLUDE_CODE} for more information}.
      *
      * @param packageName Name of the application's package.
-     * @param flags Option flags, one of {@link #CONTEXT_INCLUDE_CODE}
-     *              or {@link #CONTEXT_IGNORE_SECURITY}.
+     * @param flags Option flags.
      *
      * @return A {@link Context} for the application.
      *
@@ -4441,7 +4456,7 @@ public abstract class Context {
      * @hide
      */
     public abstract Context createPackageContextAsUser(
-            String packageName, int flags, UserHandle user)
+            String packageName, @CreatePackageOptions int flags, UserHandle user)
             throws PackageManager.NameNotFoundException;
 
     /**
@@ -4450,7 +4465,7 @@ public abstract class Context {
      * @hide
      */
     public abstract Context createApplicationContext(ApplicationInfo application,
-            int flags) throws PackageManager.NameNotFoundException;
+            @CreatePackageOptions int flags) throws PackageManager.NameNotFoundException;
 
     /**
      * Return a new Context object for the given split name. The new Context has a ClassLoader and

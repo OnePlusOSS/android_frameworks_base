@@ -16,7 +16,6 @@
 
 package android.widget;
 
-import static android.os.Build.VERSION_CODES.JELLY_BEAN_MR1;
 import static android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH;
 import static android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_START_INDEX;
 import static android.view.accessibility.AccessibilityNodeInfo.EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY;
@@ -59,6 +58,7 @@ import android.graphics.drawable.Drawable;
 import android.graphics.fonts.FontVariationAxis;
 import android.icu.text.DecimalFormatSymbols;
 import android.os.AsyncTask;
+import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
 import android.os.LocaleList;
 import android.os.Parcel;
@@ -125,6 +125,7 @@ import android.view.ContextMenu;
 import android.view.DragEvent;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
+import android.view.InputDevice;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -178,18 +179,43 @@ import java.util.Arrays;
 import java.util.Locale;
 
 /**
- * Displays text to the user and optionally allows them to edit it.  A TextView
- * is a complete text editor, however the basic class is configured to not
- * allow editing; see {@link EditText} for a subclass that configures the text
- * view for editing.
- *
+ * A user interface element that displays text to the user.
+ * To provide user-editable text, see {@link EditText}.
  * <p>
- * To allow users to copy some or all of the TextView's value and paste it somewhere else, set the
- * XML attribute {@link android.R.styleable#TextView_textIsSelectable
- * android:textIsSelectable} to "true" or call
- * {@link #setTextIsSelectable setTextIsSelectable(true)}. The {@code textIsSelectable} flag
- * allows users to make selection gestures in the TextView, which in turn triggers the system's
- * built-in copy/paste controls.
+ * The following code sample shows a typical use, with an XML layout
+ * and code to modify the contents of the text view:
+ * </p>
+
+ * <pre>
+ * &lt;LinearLayout
+       xmlns:android="http://schemas.android.com/apk/res/android"
+       android:layout_width="match_parent"
+       android:layout_height="match_parent"&gt;
+ *    &lt;TextView
+ *        android:id="@+id/text_view_id"
+ *        android:layout_height="wrap_content"
+ *        android:layout_width="wrap_content"
+ *        android:text="@string/hello" /&gt;
+ * &lt;/LinearLayout&gt;
+ * </pre>
+ * <p>
+ * This code sample demonstrates how to modify the contents of the text view
+ * defined in the previous XML layout:
+ * </p>
+ * <pre>
+ * public class MainActivity extends Activity {
+ *
+ *    protected void onCreate(Bundle savedInstanceState) {
+ *         super.onCreate(savedInstanceState);
+ *         setContentView(R.layout.activity_main);
+ *         final TextView helloTextView = (TextView) findViewById(R.id.text_view_id);
+ *         helloTextView.setText(R.string.user_greeting);
+ *     }
+ * }
+ * </pre>
+ * <p>
+ * To customize the appearance of TextView, see <a href="https://developer.android.com/guide/topics/ui/themes.html">Styles and Themes</a>.
+ * </p>
  * <p>
  * <b>XML attributes</b>
  * <p>
@@ -369,6 +395,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     private TextClassifier mTextClassifier;
 
+    // A flag to prevent repeated movements from escaping the enclosing text view. The idea here is
+    // that if a user is holding down a movement key to traverse text, we shouldn't also traverse
+    // the view hierarchy. On the other hand, if the user is using the movement key to traverse
+    // views (i.e. the first movement was to traverse out of this view, or this view was traversed
+    // into by the user holding the movement key down) then we shouldn't prevent the focus from
+    // changing.
+    private boolean mPreventDefaultMovement;
+
     private TextUtils.TruncateAt mEllipsize;
 
     static class Drawables {
@@ -408,7 +442,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
         public Drawables(Context context) {
             final int targetSdkVersion = context.getApplicationInfo().targetSdkVersion;
-            mIsRtlCompatibilityMode = targetSdkVersion < JELLY_BEAN_MR1
+            mIsRtlCompatibilityMode = targetSdkVersion < VERSION_CODES.JELLY_BEAN_MR1
                     || !context.getApplicationInfo().hasRtlSupport();
             mOverride = false;
         }
@@ -674,7 +708,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     int mTextEditSuggestionHighlightStyle;
 
     /**
-     * EditText specific data, created on demand when one of the Editor fields is used.
+     * {@link EditText} specific data, created on demand when one of the Editor fields is used.
      * See {@link #createEditorIfNeeded()}.
      */
     private Editor mEditor;
@@ -878,10 +912,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         break;
 
                     case com.android.internal.R.styleable.TextAppearance_fontFamily:
-                        try {
-                            fontTypeface = appearance.getFont(attr);
-                        } catch (UnsupportedOperationException | Resources.NotFoundException e) {
-                            // Expected if it is not a font resource.
+                        if (!context.isRestricted()) {
+                            try {
+                                fontTypeface = appearance.getFont(attr);
+                            } catch (UnsupportedOperationException
+                                    | Resources.NotFoundException e) {
+                                // Expected if it is not a font resource.
+                            }
                         }
                         if (fontTypeface == null) {
                             fontFamily = appearance.getString(attr);
@@ -1195,11 +1232,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     break;
 
                 case com.android.internal.R.styleable.TextView_fontFamily:
-                    try {
-                        fontTypeface = a.getFont(attr);
-                    } catch (UnsupportedOperationException | Resources.NotFoundException e) {
-                        // Expected if it is not a resource reference or if it is a reference to
-                        // another resource type.
+                    if (!context.isRestricted()) {
+                        try {
+                            fontTypeface = a.getFont(attr);
+                        } catch (UnsupportedOperationException | Resources.NotFoundException e) {
+                            // Expected if it is not a resource reference or if it is a reference to
+                            // another resource type.
+                        }
                     }
                     if (fontTypeface == null) {
                         fontFamily = a.getString(attr);
@@ -1346,6 +1385,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         autoSizePresetTextSizes.recycle();
                     }
                     break;
+                case com.android.internal.R.styleable.TextView_justificationMode:
+                    mJustificationMode = a.getInt(attr, Layout.JUSTIFICATION_MODE_NONE);
+                    break;
             }
         }
 
@@ -1363,7 +1405,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 == (EditorInfo.TYPE_CLASS_NUMBER | EditorInfo.TYPE_NUMBER_VARIATION_PASSWORD);
 
         mUseInternationalizedInput =
-                context.getApplicationInfo().targetSdkVersion >= android.os.Build.VERSION_CODES.O;
+                context.getApplicationInfo().targetSdkVersion >= VERSION_CODES.O;
 
         if (inputMethod != null) {
             Class<?> c;
@@ -1408,7 +1450,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         } else if (numeric != 0) {
             createEditorIfNeeded();
             mEditor.mKeyListener = DigitsKeyListener.getInstance(
-                    mUseInternationalizedInput ? getTextLocale() : null,
+                    null,  // locale
                     (numeric & SIGNED) != 0,
                     (numeric & DECIMAL) != 0);
             inputType = mEditor.mKeyListener.getInputType();
@@ -1670,6 +1712,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *        {@link TextView#AUTO_SIZE_TEXT_TYPE_NONE} or
      *        {@link TextView#AUTO_SIZE_TEXT_TYPE_UNIFORM}
      *
+     * @throws IllegalArgumentException if <code>autoSizeTextType</code> is none of the types above.
+     *
      * @attr ref android.R.styleable#TextView_autoSizeTextType
      *
      * @see #getAutoSizeTextType()
@@ -1731,11 +1775,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #getAutoSizeStepGranularity()
      * @see #getAutoSizeTextAvailableSizes()
      */
-    public void setAutoSizeTextTypeUniformWithConfiguration(
-            int autoSizeMinTextSize,
-            int autoSizeMaxTextSize,
-            int autoSizeStepGranularity,
-            int unit) throws IllegalArgumentException {
+    public void setAutoSizeTextTypeUniformWithConfiguration(int autoSizeMinTextSize,
+            int autoSizeMaxTextSize, int autoSizeStepGranularity, int unit) {
         if (supportsAutoSizeText()) {
             final DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
             final int autoSizeMinTextSizeInPx = (int) TypedValue.applyDimension(
@@ -1772,8 +1813,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @see #getAutoSizeMaxTextSize()
      * @see #getAutoSizeTextAvailableSizes()
      */
-    public void setAutoSizeTextTypeUniformWithPresetSizes(@NonNull int[] presetSizes, int unit)
-            throws IllegalArgumentException {
+    public void setAutoSizeTextTypeUniformWithPresetSizes(@NonNull int[] presetSizes, int unit) {
         if (supportsAutoSizeText()) {
             final int presetSizesLength = presetSizes.length;
             if (presetSizesLength > 0) {
@@ -1897,10 +1937,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      *
      * @throws IllegalArgumentException if any of the params are invalid
      */
-    private void validateAndSetAutoSizeTextTypeUniformConfiguration(
-            int autoSizeMinTextSizeInPx,
-            int autoSizeMaxTextSizeInPx,
-            int autoSizeStepGranularityInPx) throws IllegalArgumentException {
+    private void validateAndSetAutoSizeTextTypeUniformConfiguration(int autoSizeMinTextSizeInPx,
+            int autoSizeMaxTextSizeInPx, int autoSizeStepGranularityInPx) {
         // First validate.
         if (autoSizeMinTextSizeInPx <= 0) {
             throw new IllegalArgumentException("Minimum auto-size text size ("
@@ -2176,10 +2214,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * with an argument of {@link android.widget.TextView.BufferType#SPANNABLE BufferType.SPANNABLE}
      * or {@link android.widget.TextView.BufferType#EDITABLE BufferType.EDITABLE}, you can cast
      * the return value from this method to Spannable or Editable, respectively.
-     * <p/>
-     * The content of the return value should not be modified. If you want a modifiable one, you
-     * should make your own copy first.
      *
+     * <p>The content of the return value should not be modified. If you want a modifiable one, you
+     * should make your own copy first.</p>
+     *
+     * @return The text displayed by the text view.
      * @attr ref android.R.styleable#TextView_text
      */
     @ViewDebug.CapturedViewProperty
@@ -2189,6 +2228,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     /**
      * Returns the length, in characters, of the text managed by this TextView
+     * @return The length of the text managed by the TextView in characters.
      */
     public int length() {
         return mText.length();
@@ -2205,26 +2245,28 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the height of one standard line in pixels.  Note that markup
-     * within the text can cause individual lines to be taller or shorter
-     * than this height, and the layout may contain additional first-
-     * or last-line padding.
+     * Gets the vertical distance between lines of text, in pixels.
+     * Note that markup within the text can cause individual lines
+     * to be taller or shorter than this height, and the layout may
+     * contain additional first-or last-line padding.
+     * @return The height of one standard line in pixels.
      */
     public int getLineHeight() {
         return FastMath.round(mTextPaint.getFontMetricsInt(null) * mSpacingMult + mSpacingAdd);
     }
 
     /**
-     * @return the Layout that is currently being used to display the text.
-     * This can be null if the text or width has recently changes.
+     * Gets the {@link android.text.Layout} that is currently being used to display the text.
+     * This value can be null if the text or width has recently changed.
+     * @return The Layout that is currently being used to display the text.
      */
     public final Layout getLayout() {
         return mLayout;
     }
 
     /**
-     * @return the Layout that is currently being used to display the hint text.
-     * This can be null.
+     * @return the {@link android.text.Layout} that is currently being used to
+     * display the hint text. This can be null.
      */
     final Layout getHintLayout() {
         return mHintLayout;
@@ -2276,8 +2318,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the current key listener for this TextView.
+     * Gets the current {@link KeyListener} for the TextView.
      * This will frequently be null for non-EditText TextViews.
+     * @return the current key listener for this TextView.
      *
      * @attr ref android.R.styleable#TextView_numeric
      * @attr ref android.R.styleable#TextView_digits
@@ -2354,17 +2397,20 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the movement method being used for this TextView.
+     * Gets the {@link android.text.method.MovementMethod} being used for this TextView,
+     * which provides positioning, scrolling, and text selection functionality.
      * This will frequently be null for non-EditText TextViews.
+     * @return the movement method being used for this TextView.
+     * @see android.text.method.MovementMethod
      */
     public final MovementMethod getMovementMethod() {
         return mMovement;
     }
 
     /**
-     * Sets the movement method (arrow key handler) to be used for
-     * this TextView.  This can be null to disallow using the arrow keys
-     * to move the cursor or scroll the view.
+     * Sets the {@link android.text.method.MovementMethod} for handling arrow key movement
+     * for this TextView. This can be null to disallow using the arrow keys to move the
+     * cursor or scroll the view.
      * <p>
      * Be warned that if you want a TextView with a key listener or movement
      * method not to be focusable, or if you want a TextView without a
@@ -2401,9 +2447,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
+     * Gets the current {@link android.text.method.TransformationMethod} for the TextView.
+     * This is frequently null, except for single-line and password fields.
      * @return the current transformation method for this TextView.
-     * This will frequently be null except for single-line and password
-     * fields.
      *
      * @attr ref android.R.styleable#TextView_password
      * @attr ref android.R.styleable#TextView_singleLine
@@ -3339,10 +3385,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
         Typeface fontTypeface = null;
         String fontFamily = null;
-        try {
-            fontTypeface = ta.getFont(R.styleable.TextAppearance_fontFamily);
-        } catch (UnsupportedOperationException | Resources.NotFoundException e) {
-            // Expected if it is not a font resource.
+        if (!context.isRestricted()) {
+            try {
+                fontTypeface = ta.getFont(R.styleable.TextAppearance_fontFamily);
+            } catch (UnsupportedOperationException | Resources.NotFoundException e) {
+                // Expected if it is not a font resource.
+            }
         }
         if (fontTypeface == null) {
             fontFamily = ta.getString(R.styleable.TextAppearance_fontFamily);
@@ -3400,11 +3448,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         return mTextPaint.getTextLocales();
     }
 
-    private void changeListenerLocaleTo(@NonNull Locale locale) {
+    private void changeListenerLocaleTo(@Nullable Locale locale) {
         if (mListenerChanged) {
             // If a listener has been explicitly set, don't change it. We may break something.
             return;
         }
+        // The following null check is not absolutely necessary since all calling points of
+        // changeListenerLocaleTo() guarantee a non-null mEditor at the moment. But this is left
+        // here in case others would want to call this method in the future.
         if (mEditor != null) {
             KeyListener listener = mEditor.mKeyListener;
             if (listener instanceof DigitsKeyListener) {
@@ -3418,14 +3469,23 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             } else {
                 return;
             }
+            final boolean wasPasswordType = isPasswordInputType(mEditor.mInputType);
             setKeyListenerOnly(listener);
             setInputTypeFromEditor();
+            if (wasPasswordType) {
+                final int newInputClass = mEditor.mInputType & EditorInfo.TYPE_MASK_CLASS;
+                if (newInputClass == EditorInfo.TYPE_CLASS_TEXT) {
+                    mEditor.mInputType |= EditorInfo.TYPE_TEXT_VARIATION_PASSWORD;
+                } else if (newInputClass == EditorInfo.TYPE_CLASS_NUMBER) {
+                    mEditor.mInputType |= EditorInfo.TYPE_NUMBER_VARIATION_PASSWORD;
+                }
+            }
         }
     }
 
     /**
-     * Set the default {@link LocaleList} of the text in this TextView to a one-member list
-     * containing just the given value.
+     * Set the default {@link Locale} of the text in this TextView to a one-member
+     * {@link LocaleList} containing just the given Locale.
      *
      * @param locale the {@link Locale} for drawing text, must not be null.
      *
@@ -3434,7 +3494,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     public void setTextLocale(@NonNull Locale locale) {
         mLocalesChanged = true;
         mTextPaint.setTextLocale(locale);
-        changeListenerLocaleTo(locale);
         if (mLayout != null) {
             nullLayouts();
             requestLayout();
@@ -3456,7 +3515,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     public void setTextLocales(@NonNull @Size(min = 1) LocaleList locales) {
         mLocalesChanged = true;
         mTextPaint.setTextLocales(locales);
-        changeListenerLocaleTo(locales.get(0));
         if (mLayout != null) {
             nullLayouts();
             requestLayout();
@@ -3468,9 +3526,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     protected void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         if (!mLocalesChanged) {
-            final LocaleList locales = LocaleList.getDefault();
-            mTextPaint.setTextLocales(locales);
-            changeListenerLocaleTo(locales.get(0));
+            mTextPaint.setTextLocales(LocaleList.getDefault());
             if (mLayout != null) {
                 nullLayouts();
                 requestLayout();
@@ -3488,7 +3544,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the size (in scaled pixels) of thee default text size in this TextView.
+     * @return the size (in scaled pixels) of the default text size in this TextView.
      * @hide
      */
     @ViewDebug.ExportedProperty(category = "text")
@@ -3570,16 +3626,19 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the extent by which text is currently being stretched
-     * horizontally.  This will usually be 1.
+     * Gets the extent by which text should be stretched horizontally.
+     * This will usually be 1.0.
+     * @return The horizontal scale factor.
      */
     public float getTextScaleX() {
         return mTextPaint.getTextScaleX();
     }
 
     /**
-     * Sets the extent by which text should be stretched horizontally.
-     *
+     * Sets the horizontal scale factor for text. The default value
+     * is 1.0. Values greater than 1.0 stretch the text wider.
+     * Values less than 1.0 make the text narrower. By default, this value is 1.0.
+     * @param size The horizontal scale factor.
      * @attr ref android.R.styleable#TextView_textScaleX
      */
     @android.view.RemotableViewMethod
@@ -3622,8 +3681,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the current typeface and style in which the text is being
-     * displayed.
+     * Gets the current {@link Typeface} that is used to style the text.
+     * @return The current Typeface.
      *
      * @see #setTypeface(Typeface)
      *
@@ -3656,8 +3715,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the extent by which text is currently being letter-spaced.
-     * This will normally be 0.
+     * Gets the text letter-space value, which determines the spacing between characters.
+     * The value returned is in ems. Normally, this value is 0.0.
+     * @return The text letter-space value in ems.
      *
      * @see #setLetterSpacing(float)
      * @see Paint#setLetterSpacing
@@ -3667,12 +3727,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * Sets text letter-spacing.  The value is in 'EM' units.  Typical values
+     * Sets text letter-spacing in em units.  Typical values
      * for slight expansion will be around 0.05.  Negative values tighten text.
      *
      * @see #getLetterSpacing()
      * @see Paint#getLetterSpacing
      *
+     * @param letterSpacing A text letter-space value in ems.
      * @attr ref android.R.styleable#TextView_letterSpacing
      */
     @android.view.RemotableViewMethod
@@ -3737,7 +3798,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the currently set break strategy.
+     * Gets the current strategy for breaking paragraphs into lines.
+     * @return the current strategy for breaking paragraphs into lines.
      *
      * @attr ref android.R.styleable#TextView_breakStrategy
      * @see #setBreakStrategy(int)
@@ -3748,9 +3810,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * Sets the hyphenation frequency. The default value for both TextView and EditText, which is
-     * set from the theme, is {@link Layout#HYPHENATION_FREQUENCY_NORMAL}.
+     * Sets the frequency of automatic hyphenation to use when determining word breaks.
+     * The default value for both TextView and {@link EditText} is
+     * {@link Layout#HYPHENATION_FREQUENCY_NORMAL}.
+     * Note that the default hyphenation frequency value is set from the theme.
      *
+     * @param hyphenationFrequency The hyphenation frequency to use.
      * @attr ref android.R.styleable#TextView_hyphenationFrequency
      * @see #getHyphenationFrequency()
      */
@@ -3764,7 +3829,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the currently set hyphenation frequency.
+     * Gets the current frequency of automatic hyphenation to be used when determining word breaks.
+     * @return the current frequency of automatic hyphenation to be used when determining word
+     * breaks.
      *
      * @attr ref android.R.styleable#TextView_hyphenationFrequency
      * @see #setHyphenationFrequency(int)
@@ -3835,26 +3902,42 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * are invalid. If a specified axis name is not defined in the font, the settings will be
      * ignored.
      *
+     * <p>
+     * Examples,
+     * <ul>
+     * <li>Set font width to 150.
      * <pre>
-     *   textView.setFontVariationSettings("'wdth' 1.0");
-     *   textView.setFontVariationSettings("'AX  ' 1.8, 'FB  ' 2.0");
+     * <code>
+     *   TextView textView = (TextView) findViewById(R.id.textView);
+     *   textView.setFontVariationSettings("'wdth' 150");
+     * </code>
      * </pre>
+     * </li>
+     *
+     * <li>Set the font slant to 20 degrees and ask for italic style.
+     * <pre>
+     * <code>
+     *   TextView textView = (TextView) findViewById(R.id.textView);
+     *   textView.setFontVariationSettings("'slnt' 20, 'ital' 1");
+     * </code>
+     * </pre>
+     * </p>
+     * </li>
+     * </ul>
      *
      * @param fontVariationSettings font variation settings. You can pass null or empty string as
      *                              no variation settings.
-     *
      * @return true if the given settings is effective to at least one font file underlying this
      *         TextView. This function also returns true for empty settings string. Otherwise
      *         returns false.
      *
-     * @throws FontVariationAxis.InvalidFormatException
-     *         If given string is not a valid font variation settings format.
+     * @throws IllegalArgumentException If given string is not a valid font variation settings
+     *                                  format.
      *
      * @see #getFontVariationSettings()
-     * @see Paint#getFontVariationSettings() Paint.getFontVariationSettings()
+     * @see FontVariationAxis
      */
-    public boolean setFontVariationSettings(@Nullable String fontVariationSettings)
-            throws FontVariationAxis.InvalidFormatException {
+    public boolean setFontVariationSettings(@Nullable String fontVariationSettings) {
         final String existingSettings = mTextPaint.getFontVariationSettings();
         if (fontVariationSettings == existingSettings
                 || (fontVariationSettings != null
@@ -3923,7 +4006,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * <p>Return the current color selected for normal text.</p>
+     * Return the current color selected for normal text.
      *
      * @return Returns the current text color.
      */
@@ -4033,7 +4116,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the vertical offset of the shadow layer
+     * Gets the vertical offset of the shadow layer.
+     * @return The vertical offset of the shadow layer.
      *
      * @see #setShadowLayer(float, float, float, int)
      *
@@ -4044,6 +4128,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
+     * Gets the color of the shadow layer.
      * @return the color of the shadow layer
      *
      * @see #setShadowLayer(float, float, float, int)
@@ -4056,8 +4141,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the base paint used for the text.  Please use this only to
-     * consult the Paint's properties and not to change them.
+     * Gets the {@link TextPaint} used for the text.
+     * Use this only to consult the Paint's properties and not to change them.
+     * @return The base paint used for the text.
      */
     public TextPaint getPaint() {
         return mTextPaint;
@@ -4101,7 +4187,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * Returns the list of URLSpans attached to the text
+     * Returns the list of {@link android.text.style.URLSpan URLSpans} attached to the text
      * (by {@link Linkify} or otherwise) if any.  You can call
      * {@link URLSpan#getURL} on them to find where they link to
      * or use {@link Spanned#getSpanStart} and {@link Spanned#getSpanEnd}
@@ -4262,7 +4348,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @return the flags on the Paint being used to display the text.
+     * Gets the flags on the Paint being used to display the text.
+     * @return The flags on the Paint being used to display the text.
      * @see Paint#getFlags
      */
     public int getPaintFlags() {
@@ -5282,7 +5369,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             sendAfterTextChanged((Editable) text);
         } else {
             // Always notify AutoFillManager - it will return right away if autofill is disabled.
-            notifyAutoFillManagerAfterTextChanged();
+            notifyAutoFillManagerAfterTextChangedIfNeeded();
         }
 
         // SelectionModifierCursorController depends on textCanBeSelected, which depends on text
@@ -5586,6 +5673,29 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         mEditor.mInputType = type;
     }
 
+    /**
+     * @return {@code null} if the key listener should use pre-O (locale-independent). Otherwise
+     *         a {@code Locale} object that can be used to customize key various listeners.
+     * @see DateKeyListener#getInstance(Locale)
+     * @see DateTimeKeyListener#getInstance(Locale)
+     * @see DigitsKeyListener#getInstance(Locale)
+     * @see TimeKeyListener#getInstance(Locale)
+     */
+    @Nullable
+    private Locale getCustomLocaleForKeyListenerOrNull() {
+        if (!mUseInternationalizedInput) {
+            // If the application does not target O, stick to the previous behavior.
+            return null;
+        }
+        final LocaleList locales = getImeHintLocales();
+        if (locales == null) {
+            // If the application does not explicitly specify IME hint locale, also stick to the
+            // previous behavior.
+            return null;
+        }
+        return locales.get(0);
+    }
+
     private void setInputType(int type, boolean direct) {
         final int cls = type & EditorInfo.TYPE_MASK_CLASS;
         KeyListener input;
@@ -5603,15 +5713,26 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
             input = TextKeyListener.getInstance(autotext, cap);
         } else if (cls == EditorInfo.TYPE_CLASS_NUMBER) {
+            final Locale locale = getCustomLocaleForKeyListenerOrNull();
             input = DigitsKeyListener.getInstance(
-                    mUseInternationalizedInput ? getTextLocale() : null,
+                    locale,
                     (type & EditorInfo.TYPE_NUMBER_FLAG_SIGNED) != 0,
                     (type & EditorInfo.TYPE_NUMBER_FLAG_DECIMAL) != 0);
-            if (mUseInternationalizedInput) {
-                type = input.getInputType(); // Override type, if necessary for i18n.
+            if (locale != null) {
+                // Override type, if necessary for i18n.
+                int newType = input.getInputType();
+                final int newClass = newType & EditorInfo.TYPE_MASK_CLASS;
+                if (newClass != EditorInfo.TYPE_CLASS_NUMBER) {
+                    // The class is different from the original class. So we need to override
+                    // 'type'. But we want to keep the password flag if it's there.
+                    if ((type & EditorInfo.TYPE_NUMBER_VARIATION_PASSWORD) != 0) {
+                        newType |= EditorInfo.TYPE_TEXT_VARIATION_PASSWORD;
+                    }
+                    type = newType;
+                }
             }
         } else if (cls == EditorInfo.TYPE_CLASS_DATETIME) {
-            final Locale locale = mUseInternationalizedInput ? getTextLocale() : null;
+            final Locale locale = getCustomLocaleForKeyListenerOrNull();
             switch (type & EditorInfo.TYPE_MASK_VARIATION) {
                 case EditorInfo.TYPE_DATETIME_VARIATION_DATE:
                     input = DateKeyListener.getInstance(locale);
@@ -5653,8 +5774,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     /**
      * Change the editor type integer associated with the text view, which
-     * will be reported to an IME with {@link EditorInfo#imeOptions} when it
-     * has focus.
+     * is reported to an Input Method Editor (IME) with {@link EditorInfo#imeOptions}
+     * when it has focus.
      * @see #getImeOptions
      * @see android.view.inputmethod.EditorInfo
      * @attr ref android.R.styleable#TextView_imeOptions
@@ -5666,8 +5787,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * Get the type of the IME editor.
-     *
+     * Get the type of the Input Method Editor (IME).
+     * @return the type of the IME
      * @see #setImeOptions(int)
      * @see android.view.inputmethod.EditorInfo
      */
@@ -5884,6 +6005,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * Change "hint" locales associated with the text view, which will be reported to an IME with
      * {@link EditorInfo#hintLocales} when it has focus.
      *
+     * Starting with Android O, this also causes internationalized listeners to be created (or
+     * change locale) based on the first locale in the input locale list.
+     *
      * <p><strong>Note:</strong> If you want new "hint" to take effect immediately you need to
      * call {@link InputMethodManager#restartInput(View)}.</p>
      * @param hintLocales List of the languages that the user is supposed to switch to no matter
@@ -5895,6 +6019,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         createEditorIfNeeded();
         mEditor.createInputContentTypeIfNeeded();
         mEditor.mInputContentType.imeHintLocales = hintLocales;
+        if (mUseInternationalizedInput) {
+            changeListenerLocaleTo(hintLocales == null ? null : hintLocales.get(0));
+        }
     }
 
     /**
@@ -7042,6 +7169,15 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             return KEY_EVENT_NOT_HANDLED;
         }
 
+        // If this is the initial keydown, we don't want to prevent a movement away from this view.
+        // While this shouldn't be necessary because any time we're preventing default movement we
+        // should be restricting the focus to remain within this view, thus we'll also receive
+        // the key up event, occasionally key up events will get dropped and we don't want to
+        // prevent the user from traversing out of this on the next key down.
+        if (event.getRepeatCount() == 0 && !KeyEvent.isModifierKey(keyCode)) {
+            mPreventDefaultMovement = false;
+        }
+
         switch (keyCode) {
             case KeyEvent.KEYCODE_ENTER:
                 if (event.hasNoModifiers()) {
@@ -7173,16 +7309,23 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
             if (doDown) {
                 if (mMovement.onKeyDown(this, (Spannable) mText, keyCode, event)) {
+                    if (event.getRepeatCount() == 0 && !KeyEvent.isModifierKey(keyCode)) {
+                        mPreventDefaultMovement = true;
+                    }
                     return KEY_DOWN_HANDLED_BY_MOVEMENT_METHOD;
                 }
             }
-            // Consume arrows to prevent focus leaving the editor.
-            if (isDirectionalNavigationKey(keyCode)) {
+            // Consume arrows from keyboard devices to prevent focus leaving the editor.
+            // DPAD/JOY devices (Gamepads, TV remotes) often lack a TAB key so allow those
+            // to move focus with arrows.
+            if (event.getSource() == InputDevice.SOURCE_KEYBOARD
+                    && isDirectionalNavigationKey(keyCode)) {
                 return KEY_EVENT_HANDLED;
             }
         }
 
-        return KEY_EVENT_NOT_HANDLED;
+        return mPreventDefaultMovement && !KeyEvent.isModifierKey(keyCode)
+                ? KEY_EVENT_HANDLED : KEY_EVENT_NOT_HANDLED;
     }
 
     /**
@@ -7213,6 +7356,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         if (!isEnabled()) {
             return super.onKeyUp(keyCode, event);
+        }
+
+        if (!KeyEvent.isModifierKey(keyCode)) {
+            mPreventDefaultMovement = false;
         }
 
         switch (keyCode) {
@@ -7488,7 +7635,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     /**
      * Called by the framework in response to a text auto-correction (such as fixing a typo using a
-     * a dictionary) from the current input method, provided by it calling
+     * dictionary) from the current input method, provided by it calling
      * {@link InputConnection#commitCorrection(CorrectionInfo) InputConnection.commitCorrection()}.
      * The default implementation flashes the background of the corrected word to provide
      * feedback to the user.
@@ -8148,9 +8295,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         mTempTextPaint.set(getPaint());
         mTempTextPaint.setTextSize(suggestedSizeInPx);
 
+        final int availableWidth = mHorizontallyScrolling
+                ? VERY_WIDE
+                : getMeasuredWidth() - getTotalPaddingLeft() - getTotalPaddingRight();
         final StaticLayout.Builder layoutBuilder = StaticLayout.Builder.obtain(
-                text, 0, text.length(),  mTempTextPaint,
-                getMeasuredWidth() - getTotalPaddingLeft() - getTotalPaddingRight());
+                text, 0, text.length(),  mTempTextPaint, availableWidth);
 
         layoutBuilder.setAlignment(getLayoutAlignment())
                 .setLineSpacing(getLineSpacingExtra(), getLineSpacingMultiplier())
@@ -8470,7 +8619,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         // right where it is most likely to be annoying.
         final boolean clamped = grav > 0;
         // FIXME: Is it okay to truncate this, or should we round?
-        final int x = (int) layout.getPrimaryHorizontal(offset, clamped, true);
+        final int x = (int) layout.getPrimaryHorizontal(offset, clamped);
         final int top = layout.getLineTop(line);
         final int bottom = layout.getLineTop(line + 1);
 
@@ -9183,12 +9332,17 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
 
         // Always notify AutoFillManager - it will return right away if autofill is disabled.
-        notifyAutoFillManagerAfterTextChanged();
+        notifyAutoFillManagerAfterTextChangedIfNeeded();
 
         hideErrorIfUnchanged();
     }
 
-    private void notifyAutoFillManagerAfterTextChanged() {
+    private void notifyAutoFillManagerAfterTextChangedIfNeeded() {
+        // It is important to not check whether the view is important for autofill
+        // since the user can trigger autofill manually on not important views.
+        if (!isAutofillable()) {
+            return;
+        }
         final AutofillManager afm = mContext.getSystemService(AutofillManager.class);
         if (afm != null) {
             if (DEBUG_AUTOFILL) {
@@ -9196,6 +9350,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
             afm.notifyValueChanged(TextView.this);
         }
+    }
+
+    private boolean isAutofillable() {
+        // It is important to not check whether the view is important for autofill
+        // since the user can trigger autofill manually on not important views.
+        return getAutofillType() != AUTOFILL_TYPE_NONE;
     }
 
     void updateAfterEdit() {
@@ -9590,6 +9750,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         return super.onTrackballEvent(event);
     }
 
+    /**
+     * Sets the Scroller used for producing a scrolling animation
+     *
+     * @param s A Scroller instance
+     */
     public void setScroller(Scroller s) {
         mScroller = s;
     }
@@ -10068,9 +10233,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         structure.setInputType(getInputType());
     }
 
-    // TODO(b/33197203): add unit/CTS tests for autofill methods
-
     boolean canRequestAutofill() {
+        if (!isAutofillable()) {
+            return false;
+        }
         final AutofillManager afm = mContext.getSystemService(AutofillManager.class);
         if (afm != null) {
             return afm.isEnabled();
@@ -10218,16 +10384,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     positionInfoStartIndex + positionInfoLength,
                     viewportToContentHorizontalOffset(), viewportToContentVerticalOffset());
             CursorAnchorInfo cursorAnchorInfo = builder.setMatrix(null).build();
-            if (mTempRect == null) mTempRect = new Rect();
-            Rect viewBoundsInScreen = mTempRect;
-            info.getBoundsInScreen(viewBoundsInScreen);
+            int[] locationOnScreen = getLocationOnScreen();
             for (int i = 0; i < positionInfoLength; i++) {
                 int flags = cursorAnchorInfo.getCharacterBoundsFlags(positionInfoStartIndex + i);
                 if ((flags & FLAG_HAS_VISIBLE_REGION) == FLAG_HAS_VISIBLE_REGION) {
                     RectF bounds = cursorAnchorInfo
                             .getCharacterBounds(positionInfoStartIndex + i);
                     if (bounds != null) {
-                        bounds.offset(viewBoundsInScreen.left, viewBoundsInScreen.top);
+                        bounds.offset(locationOnScreen[0], locationOnScreen[1]);
                         boundingRects[i] = bounds;
                     }
                 }
@@ -10537,6 +10701,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     /**
      * Returns whether this text view is a current input method target.  The
      * default implementation just checks with {@link InputMethodManager}.
+     * @return True if the TextView is a current input method target; false otherwise.
      */
     public boolean isInputMethodTarget() {
         InputMethodManager imm = InputMethodManager.peekInstance();

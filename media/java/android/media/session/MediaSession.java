@@ -93,12 +93,6 @@ public final class MediaSession {
     public static final int FLAG_HANDLES_TRANSPORT_CONTROLS = 1 << 1;
 
     /**
-     * Set this flag on the session to indicate that it handles queue
-     * management commands through its {@link Callback}.
-     */
-    public static final int FLAG_HANDLES_QUEUE_COMMANDS = 1 << 2;
-
-    /**
      * System only flag for a session that needs to have priority over all other
      * sessions. This flag ensures this session will receive media button events
      * regardless of the current ordering in the system.
@@ -112,7 +106,6 @@ public final class MediaSession {
     @IntDef(flag = true, value = {
             FLAG_HANDLES_MEDIA_BUTTONS,
             FLAG_HANDLES_TRANSPORT_CONTROLS,
-            FLAG_HANDLES_QUEUE_COMMANDS,
             FLAG_EXCLUSIVE_GLOBAL_PRIORITY })
     public @interface SessionFlags { }
 
@@ -493,41 +486,6 @@ public final class MediaSession {
     }
 
     /**
-     * Set the repeat mode for this session.
-     * <p>
-     * Note that if this method is not called before, {@link MediaController#getRepeatMode}
-     * will return {@link PlaybackState#REPEAT_MODE_NONE}.
-     *
-     * @param repeatMode The repeat mode. Must be one of the followings:
-     *                   {@link PlaybackState#REPEAT_MODE_NONE},
-     *                   {@link PlaybackState#REPEAT_MODE_ONE},
-     *                   {@link PlaybackState#REPEAT_MODE_ALL}
-     */
-    public void setRepeatMode(@PlaybackState.RepeatMode int repeatMode) {
-        try {
-            mBinder.setRepeatMode(repeatMode);
-        } catch (RemoteException e) {
-            Log.e(TAG, "Error in setRepeatMode.", e);
-        }
-    }
-
-    /**
-     * Set the shuffle mode for this session.
-     * <p>
-     * Note that if this method is not called before, {@link MediaController#isShuffleModeEnabled}
-     * will return {@code false}.
-     *
-     * @param enabled {@code true} to enable the shuffle mode, {@code false} to disable.
-     */
-    public void setShuffleModeEnabled(boolean enabled) {
-        try {
-            mBinder.setShuffleModeEnabled(enabled);
-        } catch (RemoteException e) {
-            Log.e(TAG, "Error in setShuffleModeEnabled.", e);
-        }
-    }
-
-    /**
      * Set some extras that can be associated with the {@link MediaSession}. No assumptions should
      * be made as to how a {@link MediaController} will handle these extras.
      * Keys should be fully qualified (e.g. com.example.MY_EXTRA) to avoid conflicts.
@@ -646,32 +604,8 @@ public final class MediaSession {
         postToCallback(CallbackMessageHandler.MSG_RATE, rating);
     }
 
-    private void dispatchRepeatMode(int repeatMode) {
-        postToCallback(CallbackMessageHandler.MSG_REPEAT_MODE, repeatMode);
-    }
-
-    private void dispatchShuffleMode(boolean enabled) {
-        postToCallback(CallbackMessageHandler.MSG_SHUFFLE_MODE, enabled);
-    }
-
     private void dispatchCustomAction(String action, Bundle args) {
         postToCallback(CallbackMessageHandler.MSG_CUSTOM_ACTION, action, args);
-    }
-
-    private void dispatchAddQueueItem(MediaDescription description) {
-        postToCallback(CallbackMessageHandler.MSG_ADD_QUEUE_ITEM, description);
-    }
-
-    private void dispatchAddQueueItem(MediaDescription description, int index) {
-        postToCallback(CallbackMessageHandler.MSG_ADD_QUEUE_ITEM_AT, description, index);
-    }
-
-    private void dispatchRemoveQueueItem(MediaDescription description) {
-        postToCallback(CallbackMessageHandler.MSG_REMOVE_QUEUE_ITEM, description);
-    }
-
-    private void dispatchRemoveQueueItemAt(int index) {
-        postToCallback(CallbackMessageHandler.MSG_REMOVE_QUEUE_ITEM_AT, index);
     }
 
     private void dispatchMediaButton(Intent mediaButtonIntent) {
@@ -695,20 +629,8 @@ public final class MediaSession {
         postToCallback(CallbackMessageHandler.MSG_COMMAND, cmd);
     }
 
-    private void postToCallback(int what, int arg1) {
-        postToCallback(what, null, arg1);
-    }
-
     private void postToCallback(int what, Object obj) {
         postToCallback(what, obj, null);
-    }
-
-    private void postToCallback(int what, Object obj, int arg1) {
-        synchronized (mLock) {
-            if (mCallback != null) {
-                mCallback.post(what, obj, arg1);
-            }
-        }
     }
 
     private void postToCallback(int what, Object obj, Bundle extras) {
@@ -1048,33 +970,6 @@ public final class MediaSession {
         }
 
         /**
-         * Override to handle the setting of the repeat mode.
-         * <p>
-         * You should call {@link #setRepeatMode} before end of this method in order to notify
-         * the change to the {@link MediaController}, or {@link MediaController#getRepeatMode}
-         * could return an invalid value.
-         *
-         * @param repeatMode The repeat mode which is one of followings:
-         *                   {@link PlaybackState#REPEAT_MODE_NONE},
-         *                   {@link PlaybackState#REPEAT_MODE_ONE},
-         *                   {@link PlaybackState#REPEAT_MODE_ALL}
-         */
-        public void onSetRepeatMode(@PlaybackState.RepeatMode int repeatMode) {
-        }
-
-        /**
-         * Override to handle the setting of the shuffle mode.
-         * <p>
-         * You should call {@link #setShuffleModeEnabled} before the end of this method in order to
-         * notify the change to the {@link MediaController}, or
-         * {@link MediaController#isShuffleModeEnabled} could return an invalid value.
-         *
-         * @param enabled true when the shuffle mode is enabled, false otherwise.
-         */
-        public void onSetShuffleModeEnabled(boolean enabled) {
-        }
-
-        /**
          * Called when a {@link MediaController} wants a {@link PlaybackState.CustomAction} to be
          * performed.
          *
@@ -1083,47 +978,6 @@ public final class MediaSession {
          * @param extras Optional extras specified by the {@link MediaController}.
          */
         public void onCustomAction(@NonNull String action, @Nullable Bundle extras) {
-        }
-
-        /**
-         * Called when a {@link MediaController} wants to add a {@link QueueItem} with the given
-         * {@link MediaDescription description} at the end of the play queue.
-         *
-         * @param description The {@link MediaDescription} for creating the {@link QueueItem} to be
-         *                    inserted.
-         */
-        public void onAddQueueItem(MediaDescription description) {
-        }
-
-        /**
-         * Called when a {@link MediaController} wants to add a {@link QueueItem} with the given
-         * {@link MediaDescription description} at the specified position in the play queue.
-         *
-         * @param description The {@link MediaDescription} for creating the {@link QueueItem} to be
-         *                    inserted.
-         * @param index The index at which the created {@link QueueItem} is to be inserted.
-         */
-        public void onAddQueueItem(MediaDescription description, int index) {
-        }
-
-        /**
-         * Called when a {@link MediaController} wants to remove the first occurrence of the
-         * specified {@link QueueItem} with the given {@link MediaDescription description}
-         * in the play queue.
-         *
-         * @param description The {@link MediaDescription} for denoting the {@link QueueItem} to be
-         *                    removed.
-         */
-        public void onRemoveQueueItem(MediaDescription description) {
-        }
-
-        /**
-         * Called when a {@link MediaController} wants to remove a {@link QueueItem} at the
-         * specified position in the play queue.
-         *
-         * @param index The index of the element to be removed.
-         */
-        public void onRemoveQueueItemAt(int index) {
         }
     }
 
@@ -1297,58 +1151,10 @@ public final class MediaSession {
         }
 
         @Override
-        public void onRepeatMode(int repeatMode) {
-            MediaSession session = mMediaSession.get();
-            if (session != null) {
-                session.dispatchRepeatMode(repeatMode);
-            }
-        }
-
-        @Override
-        public void onShuffleMode(boolean enabled) {
-            MediaSession session = mMediaSession.get();
-            if (session != null) {
-                session.dispatchShuffleMode(enabled);
-            }
-        }
-
-        @Override
         public void onCustomAction(String action, Bundle args) {
             MediaSession session = mMediaSession.get();
             if (session != null) {
                 session.dispatchCustomAction(action, args);
-            }
-        }
-
-        @Override
-        public void onAddQueueItem(MediaDescription description) {
-            MediaSession session = mMediaSession.get();
-            if (session != null) {
-                session.dispatchAddQueueItem(description);
-            }
-        }
-
-        @Override
-        public void onAddQueueItemAt(MediaDescription description, int index) {
-            MediaSession session = mMediaSession.get();
-            if (session != null) {
-                session.dispatchAddQueueItem(description, index);
-            }
-        }
-
-        @Override
-        public void onRemoveQueueItem(MediaDescription description) {
-            MediaSession session = mMediaSession.get();
-            if (session != null) {
-                session.dispatchRemoveQueueItem(description);
-            }
-        }
-
-        @Override
-        public void onRemoveQueueItemAt(int index) {
-            MediaSession session = mMediaSession.get();
-            if (session != null) {
-                session.dispatchRemoveQueueItemAt(index);
             }
         }
 
@@ -1376,7 +1182,7 @@ public final class MediaSession {
      */
     public static final class QueueItem implements Parcelable {
         /**
-         * This id is reserved. No items can be explicitly asigned this id.
+         * This id is reserved. No items can be explicitly assigned this id.
          */
         public static final int UNKNOWN_ID = -1;
 
@@ -1485,15 +1291,9 @@ public final class MediaSession {
         private static final int MSG_REWIND = 17;
         private static final int MSG_SEEK_TO = 18;
         private static final int MSG_RATE = 19;
-        private static final int MSG_REPEAT_MODE = 20;
-        private static final int MSG_SHUFFLE_MODE = 21;
-        private static final int MSG_CUSTOM_ACTION = 22;
-        private static final int MSG_ADJUST_VOLUME = 23;
-        private static final int MSG_SET_VOLUME = 24;
-        private static final int MSG_ADD_QUEUE_ITEM = 25;
-        private static final int MSG_ADD_QUEUE_ITEM_AT = 26;
-        private static final int MSG_REMOVE_QUEUE_ITEM = 27;
-        private static final int MSG_REMOVE_QUEUE_ITEM_AT = 28;
+        private static final int MSG_CUSTOM_ACTION = 20;
+        private static final int MSG_ADJUST_VOLUME = 21;
+        private static final int MSG_SET_VOLUME = 22;
 
         private MediaSession.Callback mCallback;
 
@@ -1582,33 +1382,15 @@ public final class MediaSession {
                 case MSG_RATE:
                     mCallback.onSetRating((Rating) msg.obj);
                     break;
-                case MSG_REPEAT_MODE:
-                    mCallback.onSetRepeatMode(msg.arg1);
-                    break;
-                case MSG_SHUFFLE_MODE:
-                    mCallback.onSetShuffleModeEnabled((boolean) msg.obj);
-                    break;
                 case MSG_CUSTOM_ACTION:
                     mCallback.onCustomAction((String) msg.obj, msg.getData());
-                    break;
-                case MSG_ADD_QUEUE_ITEM:
-                    mCallback.onAddQueueItem((MediaDescription) msg.obj);
-                    break;
-                case MSG_ADD_QUEUE_ITEM_AT:
-                    mCallback.onAddQueueItem((MediaDescription) msg.obj, msg.arg1);
-                    break;
-                case MSG_REMOVE_QUEUE_ITEM:
-                    mCallback.onRemoveQueueItem((MediaDescription) msg.obj);
-                    break;
-                case MSG_REMOVE_QUEUE_ITEM_AT:
-                    mCallback.onRemoveQueueItemAt(msg.arg1);
                     break;
                 case MSG_ADJUST_VOLUME:
                     synchronized (mLock) {
                         vp = mVolumeProvider;
                     }
                     if (vp != null) {
-                        vp.onAdjustVolume(msg.arg1);
+                        vp.onAdjustVolume((int) msg.obj);
                     }
                     break;
                 case MSG_SET_VOLUME:
@@ -1616,7 +1398,7 @@ public final class MediaSession {
                         vp = mVolumeProvider;
                     }
                     if (vp != null) {
-                        vp.onSetVolumeTo(msg.arg1);
+                        vp.onSetVolumeTo((int) msg.obj);
                     }
                     break;
             }

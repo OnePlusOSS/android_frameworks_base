@@ -798,6 +798,19 @@ public class BackupManagerService {
         return ((app.flags & ApplicationInfo.FLAG_STOPPED) != 0);
     }
 
+    // We also avoid backups of 'disabled' apps
+    private static boolean appIsDisabled(ApplicationInfo app, PackageManager pm) {
+        switch (pm.getApplicationEnabledSetting(app.packageName)) {
+            case PackageManager.COMPONENT_ENABLED_STATE_DISABLED:
+            case PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER:
+            case PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED:
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
     /* does *not* check overall backup eligibility policy! */
     private static boolean appGetsFullBackup(PackageInfo pkg) {
         if (pkg.applicationInfo.backupAgentName != null) {
@@ -2612,8 +2625,12 @@ public class BackupManagerService {
                 // Can't delete op from mCurrentOperations here. waitUntilOperationComplete may be
                 // called after we receive cancel here. We need this op's state there.
 
-                // Remove all pending timeout messages for this operation type.
-                mBackupHandler.removeMessages(getMessageIdForOperationType(op.type));
+                // Remove all pending timeout messages of types OP_TYPE_BACKUP_WAIT and
+                // OP_TYPE_RESTORE_WAIT. On the other hand, OP_TYPE_BACKUP cannot time out and
+                // doesn't require cancellation.
+                if (op.type == OP_TYPE_BACKUP_WAIT || op.type == OP_TYPE_RESTORE_WAIT) {
+                    mBackupHandler.removeMessages(getMessageIdForOperationType(op.type));
+                }
             }
             mCurrentOpLock.notifyAll();
         }
@@ -5624,14 +5641,24 @@ public class BackupManagerService {
     // The job scheduler says our constraints don't hold any more,
     // so tear down any ongoing backup task right away.
     void endFullBackup() {
-        synchronized (mQueueLock) {
-            if (mRunningFullBackupTask != null) {
-                if (DEBUG_SCHEDULING) {
-                    Slog.i(TAG, "Telling running backup to stop");
+        // offload the mRunningFullBackupTask.handleCancel() call to another thread,
+        // as we might have to wait for mCancelLock
+        Runnable endFullBackupRunnable = new Runnable() {
+            @Override
+            public void run() {
+                PerformFullTransportBackupTask pftbt = null;
+                synchronized (mQueueLock) {
+                    if (mRunningFullBackupTask != null) {
+                        if (DEBUG_SCHEDULING) {
+                            Slog.i(TAG, "Telling running backup to stop");
+                        }
+                        pftbt = mRunningFullBackupTask;
+                    }
                 }
-                mRunningFullBackupTask.handleCancel(true);
+                pftbt.handleCancel(true);
             }
-        }
+        };
+        new Thread(endFullBackupRunnable, "end-full-backup").start();
     }
 
     // ----- Restore infrastructure -----
@@ -9174,6 +9201,9 @@ if (MORE_DEBUG) Slog.v(TAG, "   + got " + nRead + "; now wanting " + (size - soF
 
         // state RESTORE_FINISHED : provide the "no more data" signpost callback at the end
         private void restoreFinished() {
+            if (DEBUG) {
+                Slog.d(TAG, "restoreFinished packageName=" + mCurrentPackage.packageName);
+            }
             try {
                 prepareOperationTimeout(mEphemeralOpToken, TIMEOUT_RESTORE_FINISHED_INTERVAL, this,
                         OP_TYPE_RESTORE_WAIT);
@@ -10774,7 +10804,8 @@ if (MORE_DEBUG) Slog.v(TAG, "   + got " + nRead + "; now wanting " + (size - soF
             PackageInfo packageInfo = mPackageManager.getPackageInfo(packageName,
                     PackageManager.GET_SIGNATURES);
             if (!appIsEligibleForBackup(packageInfo.applicationInfo) ||
-                    appIsStopped(packageInfo.applicationInfo)) {
+                    appIsStopped(packageInfo.applicationInfo) ||
+                    appIsDisabled(packageInfo.applicationInfo, mPackageManager)) {
                 return false;
             }
             IBackupTransport transport = mTransportManager.getCurrentTransportBinder();

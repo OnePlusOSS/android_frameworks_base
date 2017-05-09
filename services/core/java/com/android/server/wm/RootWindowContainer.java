@@ -188,7 +188,12 @@ class RootWindowContainer extends WindowContainer<DisplayContent> {
         if (dc == null) {
             final Display display = mService.mDisplayManager.getDisplay(displayId);
             if (display != null) {
-                dc = createDisplayContent(display);
+                final long callingIdentity = Binder.clearCallingIdentity();
+                try {
+                    dc = createDisplayContent(display);
+                } finally {
+                    Binder.restoreCallingIdentity(callingIdentity);
+                }
             }
         }
         return dc;
@@ -669,7 +674,7 @@ class RootWindowContainer extends WindowContainer<DisplayContent> {
                 if (win.getDisplayContent().mWallpaperController.isWallpaperTarget(win)) {
                     wallpaperDestroyed = true;
                 }
-                win.destroyOrSaveSurface();
+                win.destroyOrSaveSurfaceUnchecked();
             } while (i > 0);
             mService.mDestroySurface.clear();
         }

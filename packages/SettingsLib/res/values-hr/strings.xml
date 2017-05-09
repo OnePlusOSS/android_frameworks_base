@@ -56,6 +56,8 @@
     <string name="bluetooth_profile_pan_nap" msgid="8429049285027482959">"Dijeljenje internetske veze"</string>
     <string name="bluetooth_profile_map" msgid="5465271250454324383">"Pristup porukama"</string>
     <string name="bluetooth_profile_sap" msgid="5764222021851283125">"Pristup SIM-u"</string>
+    <string name="bluetooth_profile_a2dp_high_quality" msgid="2221025895896419505">"Upotrebljavaj visokokvalitetan audio: <xliff:g id="CODEC_NAME">%1$s</xliff:g>"</string>
+    <string name="bluetooth_profile_a2dp_high_quality_unknown_codec" msgid="5860996587596508755">"Upotrebljavaj visokokvalitetan audio"</string>
     <string name="bluetooth_a2dp_profile_summary_connected" msgid="963376081347721598">"Povezano s medijskim zvukom"</string>
     <string name="bluetooth_headset_profile_summary_connected" msgid="7661070206715520671">"Povezano sa telefonskim zvukom"</string>
     <string name="bluetooth_opp_profile_summary_connected" msgid="2611913495968309066">"Povezano s poslužiteljem za prijenos datoteka"</string>
@@ -172,6 +174,7 @@
     <string name="wifi_allow_scan_with_traffic" msgid="3601853081178265786">"Uvijek dopusti slobodno traženje Wi-Fi mreže"</string>
     <string name="mobile_data_always_on" msgid="8774857027458200434">"Mobilni podaci uvijek aktivni"</string>
     <string name="bluetooth_disable_absolute_volume" msgid="2660673801947898809">"Onemogući apsolutnu glasnoću"</string>
+    <string name="bluetooth_enable_inband_ringing" msgid="3291686366721786740">"Omogući zvuk zvona unutar pojasne širine"</string>
     <string name="bluetooth_select_avrcp_version_string" msgid="3750059931120293633">"Verzija AVRCP-a za Bluetooth"</string>
     <string name="bluetooth_select_avrcp_version_dialog_title" msgid="7277329668298705702">"Odaberite verziju AVRCP-a za Bluetooth"</string>
     <string name="bluetooth_select_a2dp_codec_type" msgid="90597356942154882">"Kodek za Bluetooth Audio"</string>
@@ -209,10 +212,11 @@
     <string name="verify_apps_over_usb_title" msgid="4177086489869041953">"Potvrdi aplikacije putem USB-a"</string>
     <string name="verify_apps_over_usb_summary" msgid="9164096969924529200">"Provjerite uzrokuju li aplikacije instalirane putem ADB-a/ADT-a poteškoće."</string>
     <string name="bluetooth_disable_absolute_volume_summary" msgid="6031284410786545957">"Onemogućuje Bluetoothovu značajku apsolutne glasnoće ako udaljeni uređaji imaju poteškoća sa zvukom, kao što su, primjerice, neprihvatljiva glasnoća ili nepostojanje kontrole."</string>
+    <string name="bluetooth_enable_inband_ringing_summary" msgid="2787866074741784975">"Omogući reprodukciju melodija zvona telefona putem Bluetooth slušalica"</string>
     <string name="enable_terminal_title" msgid="95572094356054120">"Lokalni terminal"</string>
     <string name="enable_terminal_summary" msgid="67667852659359206">"Omogući aplikaciju terminala koja nudi pristup lokalnoj ovojnici"</string>
     <string name="hdcp_checking_title" msgid="8605478913544273282">"HDCP provjera"</string>
-    <string name="hdcp_checking_dialog_title" msgid="5141305530923283">"Postav. ponaš. HDCP prov."</string>
+    <string name="hdcp_checking_dialog_title" msgid="5141305530923283">"Postavke HDCP provjere"</string>
     <string name="debug_debugging_category" msgid="6781250159513471316">"Otklanjanje pogrešaka"</string>
     <string name="debug_app" msgid="8349591734751384446">"Aplikacija za otklanjanje pogrešaka"</string>
     <string name="debug_app_not_set" msgid="718752499586403499">"Nema aplikacije za otklanjanje pogrešaka"</string>
@@ -295,8 +299,6 @@
     <string name="inactive_app_active_summary" msgid="4174921824958516106">"Aktivno. Dodirnite da biste to promijenili."</string>
     <string name="runningservices_settings_title" msgid="8097287939865165213">"Pokrenute usluge"</string>
     <string name="runningservices_settings_summary" msgid="854608995821032748">"Pogledajte i nadzirite pokrenute procese"</string>
-    <string name="enable_webview_multiprocess" msgid="3352660896640797330">"Višeprocesni web-prikaz"</string>
-    <string name="enable_webview_multiprocess_desc" msgid="2485604010404197724">"Ispunjivače web-prikaza pokreni zasebno"</string>
     <string name="select_webview_provider_title" msgid="4628592979751918907">"Implementacija WebViewa"</string>
     <string name="select_webview_provider_dialog_title" msgid="4370551378720004872">"Postavi implementaciju WebViewa"</string>
     <string name="select_webview_provider_toast_text" msgid="5466970498308266359">"Taj izbor više nije važeći. Pokušajte ponovo."</string>

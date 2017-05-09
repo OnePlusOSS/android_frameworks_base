@@ -16,7 +16,7 @@
 
 package com.android.server.autofill.ui;
 
-import static com.android.server.autofill.ui.Helper.DEBUG;
+import static com.android.server.autofill.Helper.sDebug;
 
 import android.annotation.NonNull;
 import android.app.Dialog;
@@ -24,6 +24,7 @@ import android.content.Context;
 import android.content.IntentSender;
 import android.os.Handler;
 import android.service.autofill.SaveInfo;
+import android.text.Html;
 import android.util.ArraySet;
 import android.util.Slog;
 import android.view.Gravity;
@@ -41,7 +42,7 @@ import com.android.server.UiThread;
  */
 final class SaveUi {
 
-    private static final String TAG = "SaveUi";
+    private static final String TAG = "AutofillSaveUi";
 
     public interface OnSaveListener {
         void onSave();
@@ -60,7 +61,7 @@ final class SaveUi {
 
         @Override
         public void onSave() {
-            if (DEBUG) Slog.d(TAG, "onSave(): " + mDone);
+            if (sDebug) Slog.d(TAG, "onSave(): " + mDone);
             if (mDone) {
                 return;
             }
@@ -70,7 +71,7 @@ final class SaveUi {
 
         @Override
         public void onCancel(IntentSender listener) {
-            if (DEBUG) Slog.d(TAG, "onCancel(): " + mDone);
+            if (sDebug) Slog.d(TAG, "onCancel(): " + mDone);
             if (mDone) {
                 return;
             }
@@ -80,7 +81,7 @@ final class SaveUi {
 
         @Override
         public void onDestroy() {
-            if (DEBUG) Slog.d(TAG, "onDestroy(): " + mDone);
+            if (sDebug) Slog.d(TAG, "onDestroy(): " + mDone);
             if (mDone) {
                 return;
             }
@@ -125,23 +126,24 @@ final class SaveUi {
             types.add(context.getString(R.string.autofill_save_type_email_address));
         }
 
-        final String title;
+        final CharSequence title;
         switch (types.size()) {
             case 1:
-                title = context.getString(R.string.autofill_save_title_with_type,
-                        types.valueAt(0), providerLabel);
+                title = Html.fromHtml(context.getString(R.string.autofill_save_title_with_type,
+                        types.valueAt(0), providerLabel), 0);
                 break;
             case 2:
-                title = context.getString(R.string.autofill_save_title_with_2types,
-                        types.valueAt(0), types.valueAt(1), providerLabel);
+                title = Html.fromHtml(context.getString(R.string.autofill_save_title_with_2types,
+                        types.valueAt(0), types.valueAt(1), providerLabel), 0);
                 break;
             case 3:
-                title = context.getString(R.string.autofill_save_title_with_3types,
-                        types.valueAt(0), types.valueAt(1), types.valueAt(2), providerLabel);
+                title = Html.fromHtml(context.getString(R.string.autofill_save_title_with_3types,
+                        types.valueAt(0), types.valueAt(1), types.valueAt(2), providerLabel), 0);
                 break;
             default:
                 // Use generic if more than 3 or invalid type (size 0).
-                title = context.getString(R.string.autofill_save_title, providerLabel);
+                title = Html.fromHtml(
+                        context.getString(R.string.autofill_save_title, providerLabel), 0);
         }
 
         titleView.setText(title);
@@ -152,26 +154,28 @@ final class SaveUi {
             subTitleView.setVisibility(View.VISIBLE);
         }
 
-        if (DEBUG) {
-            Slog.d(TAG, "Title: " + title + " SubTitle: " + subTitle);
+        Slog.i(TAG, "Showing save dialog: " + title);
+        if (sDebug) {
+            Slog.d(TAG, "SubTitle: " + subTitle);
         }
 
         final TextView noButton = view.findViewById(R.id.autofill_save_no);
-        if (info.getNegativeActionTitle() != null) {
-            noButton.setText(info.getNegativeActionTitle());
-            noButton.setOnClickListener((v) -> mListener.onCancel(
-                    info.getNegativeActionListener()));
+        if (info.getNegativeActionStyle() == SaveInfo.NEGATIVE_BUTTON_STYLE_REJECT) {
+            noButton.setText(R.string.save_password_notnow);
         } else {
-            noButton.setOnClickListener((v) -> mListener.onCancel(null));
+            noButton.setText(R.string.autofill_save_no);
         }
+        noButton.setOnClickListener((v) -> mListener.onCancel(
+                info.getNegativeActionListener()));
 
         final View yesButton = view.findViewById(R.id.autofill_save_yes);
         yesButton.setOnClickListener((v) -> mListener.onSave());
 
         final View closeButton = view.findViewById(R.id.autofill_save_close);
-        closeButton.setOnClickListener((v) -> mListener.onCancel(null));
+        closeButton.setOnClickListener((v) -> mListener.onCancel(
+                info.getNegativeActionListener()));
 
-        mDialog = new Dialog(context, R.style.Theme_Material_Panel);
+        mDialog = new Dialog(context, R.style.Theme_DeviceDefault_Light_Panel);
         mDialog.setContentView(view);
 
         final Window window = mDialog.getWindow();
@@ -183,7 +187,9 @@ final class SaveUi {
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
         window.setGravity(Gravity.BOTTOM | Gravity.CENTER);
         window.setCloseOnTouchOutside(true);
-        window.getAttributes().width = WindowManager.LayoutParams.MATCH_PARENT;
+        final WindowManager.LayoutParams params = window.getAttributes();
+        params.width = WindowManager.LayoutParams.MATCH_PARENT;
+        params.accessibilityTitle = context.getString(R.string.autofill_save_accessibility_title);
 
         mDialog.show();
     }

@@ -133,10 +133,8 @@ public class WifiSignalController extends
     @Override
     public void notifyListeners(SignalCallback callback) {
         // only show wifi in the cluster if connected or if wifi-only
-        boolean visibleWhenEnabled = mContext.getResources().getBoolean(
-                R.bool.config_showWifiIndicatorWhenEnabled);
         boolean wifiVisible = mCurrentState.enabled
-                && (mCurrentState.connected || !mHasMobileData || visibleWhenEnabled);
+                && (mCurrentState.connected || !mHasMobileData);
         String wifiDesc = wifiVisible ? mCurrentState.ssid : null;
         boolean ssidPresent = wifiVisible && mCurrentState.ssid != null;
         String contentDescription = getStringIfExists(getContentDescription());

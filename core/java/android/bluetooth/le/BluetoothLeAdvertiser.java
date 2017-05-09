@@ -17,11 +17,11 @@
 package android.bluetooth.le;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothUuid;
 import android.bluetooth.IBluetoothGatt;
 import android.bluetooth.IBluetoothManager;
-import android.bluetooth.le.IAdvertiserCallback;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
@@ -363,12 +363,12 @@ public final class BluetoothLeAdvertiser {
             boolean support2MPhy = mBluetoothAdapter.isLe2MPhySupported();
             int pphy = parameters.getPrimaryPhy();
             int sphy = parameters.getSecondaryPhy();
-            if (pphy == AdvertisingSetParameters.PHY_LE_CODED && !supportCodedPhy) {
+            if (pphy == BluetoothDevice.PHY_LE_CODED && !supportCodedPhy) {
                 throw new IllegalArgumentException("Unsupported primary PHY selected");
             }
 
-            if ((sphy == AdvertisingSetParameters.PHY_LE_CODED && !supportCodedPhy)
-                || (sphy == AdvertisingSetParameters.PHY_LE_2M && !support2MPhy)) {
+            if ((sphy == BluetoothDevice.PHY_LE_CODED && !supportCodedPhy)
+                || (sphy == BluetoothDevice.PHY_LE_2M && !support2MPhy)) {
                 throw new IllegalArgumentException("Unsupported secondary PHY selected");
             }
 
@@ -539,6 +539,17 @@ public final class BluetoothLeAdvertiser {
                             new AdvertisingSet(advertiserId, mBluetoothManager);
                         mAdvertisingSets.put(advertiserId, advertisingSet);
                         callback.onAdvertisingSetStarted(advertisingSet, txPower, status);
+                    }
+                });
+            }
+
+            @Override
+            public void onOwnAddressRead(int advertiserId, int addressType, String address) {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        AdvertisingSet advertisingSet = mAdvertisingSets.get(advertiserId);
+                        callback.onOwnAddressRead(advertisingSet, addressType, address);
                     }
                 });
             }

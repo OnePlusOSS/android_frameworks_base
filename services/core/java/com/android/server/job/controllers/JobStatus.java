@@ -19,13 +19,13 @@ package com.android.server.job.controllers;
 import android.app.AppGlobals;
 import android.app.IActivityManager;
 import android.app.job.JobInfo;
+import android.app.job.JobWorkItem;
 import android.content.ClipData;
 import android.content.ComponentName;
 import android.content.ContentProvider;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Binder;
-import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserHandle;
@@ -34,7 +34,10 @@ import android.util.ArraySet;
 import android.util.Slog;
 import android.util.TimeUtils;
 
+import com.android.server.job.GrantedUriPermissions;
+
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
@@ -66,6 +69,11 @@ public final class JobStatus {
     static final int CONSTRAINT_CONTENT_TRIGGER = 1<<26;
     static final int CONSTRAINT_DEVICE_NOT_DOZING = 1<<25;
     static final int CONSTRAINT_NOT_ROAMING = 1<<24;
+    static final int CONSTRAINT_METERED = 1<<23;
+
+    static final int CONNECTIVITY_MASK =
+            CONSTRAINT_UNMETERED | CONSTRAINT_CONNECTIVITY |
+            CONSTRAINT_NOT_ROAMING | CONSTRAINT_METERED;
 
     // Soft override: ignore constraints like time that don't affect API availability
     public static final int OVERRIDE_SOFT = 1;
@@ -96,8 +104,11 @@ public final class JobStatus {
 
     final String tag;
 
-    private IBinder permissionOwner;
+    private GrantedUriPermissions uriPerms;
     private boolean prepared;
+
+    static final boolean DEBUG_PREPARE = true;
+    private Throwable unpreparedPoint = null;
 
     /**
      * Earliest point in the future at which this job will be eligible to run. A value of 0
@@ -120,11 +131,51 @@ public final class JobStatus {
     // Set to true if doze constraint was satisfied due to app being whitelisted.
     public boolean dozeWhitelisted;
 
+    /**
+     * Flag for {@link #trackingControllers}: the battery controller is currently tracking this job.
+     */
+    public static final int TRACKING_BATTERY = 1<<0;
+    /**
+     * Flag for {@link #trackingControllers}: the network connectivity controller is currently
+     * tracking this job.
+     */
+    public static final int TRACKING_CONNECTIVITY = 1<<1;
+    /**
+     * Flag for {@link #trackingControllers}: the content observer controller is currently
+     * tracking this job.
+     */
+    public static final int TRACKING_CONTENT = 1<<2;
+    /**
+     * Flag for {@link #trackingControllers}: the idle controller is currently tracking this job.
+     */
+    public static final int TRACKING_IDLE = 1<<3;
+    /**
+     * Flag for {@link #trackingControllers}: the storage controller is currently tracking this job.
+     */
+    public static final int TRACKING_STORAGE = 1<<4;
+    /**
+     * Flag for {@link #trackingControllers}: the time controller is currently tracking this job.
+     */
+    public static final int TRACKING_TIME = 1<<5;
+
+    /**
+     * Bit mask of controllers that are currently tracking the job.
+     */
+    private int trackingControllers;
+
     // These are filled in by controllers when preparing for execution.
     public ArraySet<Uri> changedUris;
     public ArraySet<String> changedAuthorities;
 
     public int lastEvaluatedPriority;
+
+    // If non-null, this is work that has been enqueued for the job.
+    public ArrayList<JobWorkItem> pendingWork;
+
+    // If non-null, this is work that is currently being executed.
+    public ArrayList<JobWorkItem> executingWork;
+
+    public int nextPendingWorkId = 1;
 
     // Used by shell commands
     public int overrideState = 0;
@@ -181,15 +232,28 @@ public final class JobStatus {
         this.numFailures = numFailures;
 
         int requiredConstraints = job.getConstraintFlags();
-        if (job.getNetworkType() == JobInfo.NETWORK_TYPE_ANY) {
-            requiredConstraints |= CONSTRAINT_CONNECTIVITY;
+
+        switch (job.getNetworkType()) {
+            case JobInfo.NETWORK_TYPE_NONE:
+                // No constraint.
+                break;
+            case JobInfo.NETWORK_TYPE_ANY:
+                requiredConstraints |= CONSTRAINT_CONNECTIVITY;
+                break;
+            case JobInfo.NETWORK_TYPE_UNMETERED:
+                requiredConstraints |= CONSTRAINT_UNMETERED;
+                break;
+            case JobInfo.NETWORK_TYPE_NOT_ROAMING:
+                requiredConstraints |= CONSTRAINT_NOT_ROAMING;
+                break;
+            case JobInfo.NETWORK_TYPE_METERED:
+                requiredConstraints |= CONSTRAINT_METERED;
+                break;
+            default:
+                Slog.w(TAG, "Unrecognized networking constraint " + job.getNetworkType());
+                break;
         }
-        if (job.getNetworkType() == JobInfo.NETWORK_TYPE_UNMETERED) {
-            requiredConstraints |= CONSTRAINT_UNMETERED;
-        }
-        if (job.getNetworkType() == JobInfo.NETWORK_TYPE_NOT_ROAMING) {
-            requiredConstraints |= CONSTRAINT_NOT_ROAMING;
-        }
+
         if (earliestRunTimeElapsedMillis != NO_EARLIEST_RUNTIME) {
             requiredConstraints |= CONSTRAINT_TIMING_DELAY;
         }
@@ -256,91 +320,129 @@ public final class JobStatus {
                 earliestRunTimeElapsedMillis, latestRunTimeElapsedMillis);
     }
 
-    public void prepare(IActivityManager am) {
+    public void enqueueWorkLocked(IActivityManager am, JobWorkItem work) {
+        if (pendingWork == null) {
+            pendingWork = new ArrayList<>();
+        }
+        work.setWorkId(nextPendingWorkId);
+        nextPendingWorkId++;
+        if (work.getIntent() != null
+                && GrantedUriPermissions.checkGrantFlags(work.getIntent().getFlags())) {
+            work.setGrants(GrantedUriPermissions.createFromIntent(am, work.getIntent(), sourceUid,
+                    sourcePackageName, sourceUserId, toShortString()));
+        }
+        pendingWork.add(work);
+    }
+
+    public JobWorkItem dequeueWorkLocked() {
+        if (pendingWork != null && pendingWork.size() > 0) {
+            JobWorkItem work = pendingWork.remove(0);
+            if (work != null) {
+                if (executingWork == null) {
+                    executingWork = new ArrayList<>();
+                }
+                executingWork.add(work);
+                work.bumpDeliveryCount();
+            }
+            return work;
+        }
+        return null;
+    }
+
+    public boolean hasExecutingWorkLocked() {
+        return executingWork != null && executingWork.size() > 0;
+    }
+
+    private static void ungrantWorkItem(IActivityManager am, JobWorkItem work) {
+        if (work.getGrants() != null) {
+            ((GrantedUriPermissions)work.getGrants()).revoke(am);
+        }
+    }
+
+    public boolean completeWorkLocked(IActivityManager am, int workId) {
+        if (executingWork != null) {
+            final int N = executingWork.size();
+            for (int i = 0; i < N; i++) {
+                JobWorkItem work = executingWork.get(i);
+                if (work.getWorkId() == workId) {
+                    executingWork.remove(i);
+                    ungrantWorkItem(am, work);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static void ungrantWorkList(IActivityManager am, ArrayList<JobWorkItem> list) {
+        if (list != null) {
+            final int N = list.size();
+            for (int i = 0; i < N; i++) {
+                ungrantWorkItem(am, list.get(i));
+            }
+        }
+    }
+
+    public void stopTrackingJobLocked(IActivityManager am, JobStatus incomingJob) {
+        if (incomingJob != null) {
+            // We are replacing with a new job -- transfer the work!  We do any executing
+            // work first, since that was originally at the front of the pending work.
+            if (executingWork != null && executingWork.size() > 0) {
+                incomingJob.pendingWork = executingWork;
+            }
+            if (incomingJob.pendingWork == null) {
+                incomingJob.pendingWork = pendingWork;
+            } else if (pendingWork != null && pendingWork.size() > 0) {
+                incomingJob.pendingWork.addAll(pendingWork);
+            }
+            pendingWork = null;
+            executingWork = null;
+            incomingJob.nextPendingWorkId = nextPendingWorkId;
+        } else {
+            // We are completely stopping the job...  need to clean up work.
+            ungrantWorkList(am, pendingWork);
+            pendingWork = null;
+            ungrantWorkList(am, executingWork);
+            executingWork = null;
+        }
+    }
+
+    public void prepareLocked(IActivityManager am) {
         if (prepared) {
             Slog.wtf(TAG, "Already prepared: " + this);
             return;
         }
         prepared = true;
+        if (DEBUG_PREPARE) {
+            unpreparedPoint = null;
+        }
         final ClipData clip = job.getClipData();
         if (clip != null) {
-            final int N = clip.getItemCount();
-            for (int i = 0; i < N; i++) {
-                grantItemLocked(am, clip.getItemAt(i), sourceUid, sourcePackageName, sourceUserId);
-            }
+            uriPerms = GrantedUriPermissions.createFromClip(am, clip, sourceUid, sourcePackageName,
+                    sourceUserId, job.getClipGrantFlags(), toShortString());
         }
     }
 
-    public void unprepare(IActivityManager am) {
+    public void unprepareLocked(IActivityManager am) {
         if (!prepared) {
             Slog.wtf(TAG, "Hasn't been prepared: " + this);
+            if (DEBUG_PREPARE && unpreparedPoint != null) {
+                Slog.e(TAG, "Was already unprepared at ", unpreparedPoint);
+            }
             return;
         }
         prepared = false;
-        if (permissionOwner != null) {
-            final ClipData clip = job.getClipData();
-            if (clip != null) {
-                final int N = clip.getItemCount();
-                for (int i = 0; i < N; i++) {
-                    revokeItemLocked(am, clip.getItemAt(i));
-                }
-            }
+        if (DEBUG_PREPARE) {
+            unpreparedPoint = new Throwable().fillInStackTrace();
+        }
+        if (uriPerms != null) {
+            uriPerms.revoke(am);
+            uriPerms = null;
         }
     }
 
-    public boolean isPrepared() {
+    public boolean isPreparedLocked() {
         return prepared;
-    }
-
-    private final void grantUriLocked(IActivityManager am, Uri uri, int sourceUid,
-            String targetPackage, int targetUserId) {
-        try {
-            int sourceUserId = ContentProvider.getUserIdFromUri(uri,
-                    UserHandle.getUserId(sourceUid));
-            uri = ContentProvider.getUriWithoutUserId(uri);
-            if (permissionOwner == null) {
-                permissionOwner = am.newUriPermissionOwner("job: " + toShortString());
-            }
-            am.grantUriPermissionFromOwner(permissionOwner, sourceUid, targetPackage,
-                    uri, job.getClipGrantFlags(), sourceUserId, targetUserId);
-        } catch (RemoteException e) {
-            Slog.e("JobScheduler", "AM dead");
-        }
-    }
-
-    private final void grantItemLocked(IActivityManager am, ClipData.Item item, int sourceUid,
-            String targetPackage, int targetUserId) {
-        if (item.getUri() != null) {
-            grantUriLocked(am, item.getUri(), sourceUid, targetPackage, targetUserId);
-        }
-        Intent intent = item.getIntent();
-        if (intent != null && intent.getData() != null) {
-            grantUriLocked(am, intent.getData(), sourceUid, targetPackage, targetUserId);
-        }
-    }
-
-    private final void revokeUriLocked(IActivityManager am, Uri uri) {
-        int userId = ContentProvider.getUserIdFromUri(uri,
-                UserHandle.getUserId(Binder.getCallingUid()));
-        long ident = Binder.clearCallingIdentity();
-        try {
-            uri = ContentProvider.getUriWithoutUserId(uri);
-            am.revokeUriPermissionFromOwner(permissionOwner, uri,
-                    job.getClipGrantFlags(), userId);
-        } catch (RemoteException e) {
-        } finally {
-            Binder.restoreCallingIdentity(ident);
-        }
-    }
-
-    private final void revokeItemLocked(IActivityManager am, ClipData.Item item) {
-        if (item.getUri() != null) {
-            revokeUriLocked(am, item.getUri());
-        }
-        Intent intent = item.getIntent();
-        if (intent != null && intent.getData() != null) {
-            revokeUriLocked(am, intent.getData());
-        }
     }
 
     public JobInfo getJob() {
@@ -405,15 +507,24 @@ public final class JobStatus {
         return job.getFlags();
     }
 
+    /** Does this job have any sort of networking constraint? */
     public boolean hasConnectivityConstraint() {
+        return (requiredConstraints&CONNECTIVITY_MASK) != 0;
+    }
+
+    public boolean needsAnyConnectivity() {
         return (requiredConstraints&CONSTRAINT_CONNECTIVITY) != 0;
     }
 
-    public boolean hasUnmeteredConstraint() {
+    public boolean needsUnmeteredConnectivity() {
         return (requiredConstraints&CONSTRAINT_UNMETERED) != 0;
     }
 
-    public boolean hasNotRoamingConstraint() {
+    public boolean needsMeteredConnectivity() {
+        return (requiredConstraints&CONSTRAINT_METERED) != 0;
+    }
+
+    public boolean needsNonRoamingConnectivity() {
         return (requiredConstraints&CONSTRAINT_NOT_ROAMING) != 0;
     }
 
@@ -509,6 +620,10 @@ public final class JobStatus {
         return setConstraintSatisfied(CONSTRAINT_UNMETERED, state);
     }
 
+    boolean setMeteredConstraintSatisfied(boolean state) {
+        return setConstraintSatisfied(CONSTRAINT_METERED, state);
+    }
+
     boolean setNotRoamingConstraintSatisfied(boolean state) {
         return setConstraintSatisfied(CONSTRAINT_NOT_ROAMING, state);
     }
@@ -539,6 +654,18 @@ public final class JobStatus {
         return (satisfiedConstraints&constraint) != 0;
     }
 
+    boolean clearTrackingController(int which) {
+        if ((trackingControllers&which) != 0) {
+            trackingControllers &= ~which;
+            return true;
+        }
+        return false;
+    }
+
+    void setTrackingController(int which) {
+        trackingControllers |= which;
+    }
+
     public boolean shouldDump(int filterUid) {
         return filterUid == -1 || UserHandle.getAppId(getUid()) == filterUid
                 || UserHandle.getAppId(getSourceUid()) == filterUid;
@@ -547,6 +674,9 @@ public final class JobStatus {
     /**
      * @return Whether or not this job is ready to run, based on its requirements. This is true if
      * the constraints are satisfied <strong>or</strong> the deadline on the job has expired.
+     * TODO: This function is called a *lot*.  We should probably just have it check an
+     * already-computed boolean, which we updated whenever we see one of the states it depends
+     * on here change.
      */
     public boolean isReady() {
         // Deadline constraint trumps other constraints (except for periodic jobs where deadline
@@ -740,6 +870,16 @@ public final class JobStatus {
         }
     }
 
+    private void dumpJobWorkItem(PrintWriter pw, String prefix, JobWorkItem work, int index) {
+        pw.print(prefix); pw.print("  #"); pw.print(index); pw.print(": #");
+        pw.print(work.getWorkId()); pw.print(" "); pw.print(work.getDeliveryCount());
+        pw.print("x "); pw.println(work.getIntent());
+        if (work.getGrants() != null) {
+            pw.print(prefix); pw.println("  URI grants:");
+            ((GrantedUriPermissions)work.getGrants()).dump(pw, prefix + "    ");
+        }
+    }
+
     // Dumpsys infrastructure
     public void dump(PrintWriter pw, String prefix, boolean full) {
         pw.print(prefix); UserHandle.formatUid(pw, callingUid);
@@ -805,6 +945,10 @@ public final class JobStatus {
                 job.getClipData().toShortString(b);
                 pw.println(b);
             }
+            if (uriPerms != null) {
+                pw.print(prefix); pw.println("  Granted URI permissions:");
+                uriPerms.dump(pw, prefix + "  ");
+            }
             if (job.getNetworkType() != JobInfo.NETWORK_TYPE_NONE) {
                 pw.print(prefix); pw.print("  Network type: "); pw.println(job.getNetworkType());
             }
@@ -842,6 +986,16 @@ public final class JobStatus {
                 pw.print(prefix); pw.println("Doze whitelisted: true");
             }
         }
+        if (trackingControllers != 0) {
+            pw.print(prefix); pw.print("Tracking:");
+            if ((trackingControllers&TRACKING_BATTERY) != 0) pw.print(" BATTERY");
+            if ((trackingControllers&TRACKING_CONNECTIVITY) != 0) pw.print(" CONNECTIVITY");
+            if ((trackingControllers&TRACKING_CONTENT) != 0) pw.print(" CONTENT");
+            if ((trackingControllers&TRACKING_IDLE) != 0) pw.print(" IDLE");
+            if ((trackingControllers&TRACKING_STORAGE) != 0) pw.print(" STORAGE");
+            if ((trackingControllers&TRACKING_TIME) != 0) pw.print(" TIME");
+            pw.println();
+        }
         if (changedAuthorities != null) {
             pw.print(prefix); pw.println("Changed authorities:");
             for (int i=0; i<changedAuthorities.size(); i++) {
@@ -852,6 +1006,18 @@ public final class JobStatus {
                 for (int i=0; i<changedUris.size(); i++) {
                     pw.print(prefix); pw.print("  "); pw.println(changedUris.valueAt(i));
                 }
+            }
+        }
+        if (pendingWork != null && pendingWork.size() > 0) {
+            pw.print(prefix); pw.println("Pending work:");
+            for (int i = 0; i < pendingWork.size(); i++) {
+                dumpJobWorkItem(pw, prefix, pendingWork.get(i), i);
+            }
+        }
+        if (executingWork != null && executingWork.size() > 0) {
+            pw.print(prefix); pw.println("Executing work:");
+            for (int i = 0; i < executingWork.size(); i++) {
+                dumpJobWorkItem(pw, prefix, executingWork.get(i), i);
             }
         }
         pw.print(prefix); pw.print("Earliest run time: ");

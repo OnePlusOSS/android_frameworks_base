@@ -64,8 +64,10 @@ import android.os.FileUtils;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.PatternMatcher;
+import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
+import android.os.storage.StorageManager;
 import android.system.ErrnoException;
 import android.system.OsConstants;
 import android.system.StructStat;
@@ -116,6 +118,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 
@@ -142,7 +145,12 @@ public class PackageParser {
     private static final boolean DEBUG_PARSER = false;
     private static final boolean DEBUG_BACKUP = false;
 
-    private static final boolean MULTI_PACKAGE_APK_ENABLED = false;
+    private static final String PROPERTY_CHILD_PACKAGES_ENABLED =
+            "persist.sys.child_packages_enabled";
+
+    private static final boolean MULTI_PACKAGE_APK_ENABLED = Build.IS_DEBUGGABLE &&
+            SystemProperties.getBoolean(PROPERTY_CHILD_PACKAGES_ENABLED, false);
+
     private static final int MAX_PACKAGES_PER_APK = 5;
 
     public static final int APK_SIGNING_UNKNOWN = 0;
@@ -193,10 +201,10 @@ public class PackageParser {
     private static final String META_DATA_INSTANT_APPS = "instantapps.clients.allowed";
 
     /**
-     * Bit mask of all the valid bits that can be set in restartOnConfigChanges.
+     * Bit mask of all the valid bits that can be set in recreateOnConfigChanges.
      * @hide
      */
-    private static final int RESTART_ON_CONFIG_CHANGES_MASK =
+    private static final int RECREATE_ON_CONFIG_CHANGES_MASK =
             ActivityInfo.CONFIG_MCC | ActivityInfo.CONFIG_MNC;
 
     // These are the tags supported by child packages
@@ -539,6 +547,8 @@ public class PackageParser {
      */
     public interface Callback {
         boolean hasFeature(String feature);
+        String[] getOverlayPaths(String targetPackageName, String targetPath);
+        String[] getOverlayApks(String targetPackageName);
     }
 
     /**
@@ -554,6 +564,14 @@ public class PackageParser {
 
         @Override public boolean hasFeature(String feature) {
             return mPm.hasSystemFeature(feature);
+        }
+
+        @Override public String[] getOverlayPaths(String targetPackageName, String targetPath) {
+            return null;
+        }
+
+        @Override public String[] getOverlayApks(String targetPackageName) {
+            return null;
         }
     }
 
@@ -1046,7 +1064,19 @@ public class PackageParser {
 
         try {
             final byte[] bytes = IoUtils.readFileAsByteArray(cacheFile.getAbsolutePath());
-            return fromCacheEntry(bytes);
+            Package p = fromCacheEntry(bytes);
+            if (mCallback != null) {
+                String[] overlayApks = mCallback.getOverlayApks(p.packageName);
+                if (overlayApks != null && overlayApks.length > 0) {
+                    for (String overlayApk : overlayApks) {
+                        // If a static RRO is updated, return null.
+                        if (!isCacheUpToDate(new File(overlayApk), cacheFile)) {
+                            return null;
+                        }
+                    }
+                }
+            }
+            return p;
         } catch (Exception e) {
             Slog.w(TAG, "Error reading package cache: ", e);
 
@@ -1230,7 +1260,7 @@ public class PackageParser {
             parser = assets.openXmlResourceParser(cookie, ANDROID_MANIFEST_FILENAME);
 
             final String[] outError = new String[1];
-            final Package pkg = parseBaseApk(res, parser, flags, outError);
+            final Package pkg = parseBaseApk(apkPath, res, parser, flags, outError);
             if (pkg == null) {
                 throw new PackageParserException(mParseError,
                         apkPath + " (at " + parser.getPositionDescription() + "): " + outError[0]);
@@ -1930,6 +1960,7 @@ public class PackageParser {
      * need to consider whether they should be supported by split APKs and child
      * packages.
      *
+     * @param apkPath The package apk file path
      * @param res The resources from which to resolve values
      * @param parser The manifest parser
      * @param flags Flags how to parse
@@ -1939,7 +1970,7 @@ public class PackageParser {
      * @throws XmlPullParserException
      * @throws IOException
      */
-    private Package parseBaseApk(Resources res, XmlResourceParser parser, int flags,
+    private Package parseBaseApk(String apkPath, Resources res, XmlResourceParser parser, int flags,
             String[] outError) throws XmlPullParserException, IOException {
         final String splitName;
         final String pkgName;
@@ -1957,6 +1988,15 @@ public class PackageParser {
         } catch (PackageParserException e) {
             mParseError = PackageManager.INSTALL_PARSE_FAILED_BAD_PACKAGE_NAME;
             return null;
+        }
+
+        if (mCallback != null) {
+            String[] overlayPaths = mCallback.getOverlayPaths(pkgName, apkPath);
+            if (overlayPaths != null && overlayPaths.length > 0) {
+                for (String overlayPath : overlayPaths) {
+                    res.getAssets().addOverlayPath(overlayPath);
+                }
+            }
         }
 
         final Package pkg = new Package(pkgName);
@@ -2111,6 +2151,12 @@ public class PackageParser {
                 pkg.mIsStaticOverlay = sa.getBoolean(
                         com.android.internal.R.styleable.AndroidManifestResourceOverlay_isStatic,
                         false);
+                final String propName = sa.getString(
+                        com.android.internal.R.styleable
+                        .AndroidManifestResourceOverlay_requiredSystemPropertyName);
+                final String propValue = sa.getString(
+                        com.android.internal.R.styleable
+                        .AndroidManifestResourceOverlay_requiredSystemPropertyValue);
                 sa.recycle();
 
                 if (pkg.mOverlayTarget == null) {
@@ -2118,15 +2164,22 @@ public class PackageParser {
                     mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
                     return null;
                 }
+
                 if (pkg.mOverlayPriority < 0 || pkg.mOverlayPriority > 9999) {
                     outError[0] = "<overlay> priority must be between 0 and 9999";
                     mParseError =
                         PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
                     return null;
                 }
-                if (pkg.mIsStaticOverlay) {
-                    // TODO(b/35742444): Need to support selection method based on a package name.
+
+                // check to see if overlay should be excluded based on system property condition
+                if (!checkOverlayRequiredSystemProperty(propName, propValue)) {
+                    Slog.i(TAG, "Skipping target and overlay pair " + pkg.mOverlayTarget + " and "
+                        + pkg.baseCodePath+ ": overlay ignored due to required system property: "
+                        + propName + " with value: " + propValue);
+                    return null;
                 }
+
                 XmlUtils.skipCurrentTag(parser);
 
             } else if (tagName.equals(TAG_KEY_SETS)) {
@@ -2529,6 +2582,25 @@ public class PackageParser {
             adjustPackageToBeUnresizeableAndUnpipable(pkg);
         }
         return pkg;
+    }
+
+    private boolean checkOverlayRequiredSystemProperty(String propName, String propValue) {
+
+        if (TextUtils.isEmpty(propName) || TextUtils.isEmpty(propValue)) {
+            if (!TextUtils.isEmpty(propName) || !TextUtils.isEmpty(propValue)) {
+                // malformed condition - incomplete
+                Slog.w(TAG, "Disabling overlay - incomplete property :'" + propName
+                    + "=" + propValue + "' - require both requiredSystemPropertyName"
+                    + " AND requiredSystemPropertyValue to be specified.");
+                return false;
+            }
+            // no valid condition set - so no exclusion criteria, overlay will be included.
+            return true;
+        }
+
+        // check property value - make sure it is both set and equal to expected value
+        final String currValue = SystemProperties.get(propName);
+        return (currValue != null && currValue.equals(propValue));
     }
 
     /**
@@ -3228,8 +3300,8 @@ public class PackageParser {
         a.info.targetPackage = str != null ? str.intern() : null;
 
         str = sa.getNonResourceString(
-                com.android.internal.R.styleable.AndroidManifestInstrumentation_targetProcess);
-        a.info.targetProcess = str != null ? str.intern() : null;
+                com.android.internal.R.styleable.AndroidManifestInstrumentation_targetProcesses);
+        a.info.targetProcesses = str != null ? str.intern() : null;
 
         a.info.handleProfiling = sa.getBoolean(
                 com.android.internal.R.styleable.AndroidManifestInstrumentation_handleProfiling,
@@ -3363,7 +3435,13 @@ public class PackageParser {
             if (sa.getBoolean(
                     com.android.internal.R.styleable.AndroidManifestApplication_persistent,
                     false)) {
-                ai.flags |= ApplicationInfo.FLAG_PERSISTENT;
+                // Check if persistence is based on a feature being present
+                final String requiredFeature = sa.getNonResourceString(
+                    com.android.internal.R.styleable.
+                    AndroidManifestApplication_persistentWhenFeatureAvailable);
+                if (requiredFeature == null || mCallback.hasFeature(requiredFeature)) {
+                    ai.flags |= ApplicationInfo.FLAG_PERSISTENT;
+                }
             }
         }
 
@@ -4141,7 +4219,7 @@ public class PackageParser {
                     ActivityManager.getDefaultAppRecentsLimitStatic());
             a.info.configChanges = getActivityConfigChanges(
                     sa.getInt(R.styleable.AndroidManifestActivity_configChanges, 0),
-                    sa.getInt(R.styleable.AndroidManifestActivity_restartOnConfigChanges, 0));
+                    sa.getInt(R.styleable.AndroidManifestActivity_recreateOnConfigChanges, 0));
             a.info.softInputMode = sa.getInt(
                     R.styleable.AndroidManifestActivity_windowSoftInputMode, 0);
 
@@ -4226,7 +4304,7 @@ public class PackageParser {
         boolean visibleToEphemeral =
                 sa.getBoolean(R.styleable.AndroidManifestActivity_visibleToInstantApps, false);
         if (visibleToEphemeral) {
-            a.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_EPHEMERAL;
+            a.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_INSTANT_APP;
             owner.visibleToInstantApps = true;
         }
 
@@ -4268,9 +4346,17 @@ public class PackageParser {
                     a.intents.add(intent);
                 }
                 // adjust activity flags when we implicitly expose it via a browsable filter
-                intent.setVisibleToInstantApp(visibleToEphemeral || isWebBrowsableIntent(intent));
+                final int visibility = visibleToEphemeral
+                        ? IntentFilter.VISIBILITY_EXPLICIT
+                        : !receiver && isImplicitlyExposedIntent(intent)
+                                ? IntentFilter.VISIBILITY_IMPLICIT
+                                : IntentFilter.VISIBILITY_NONE;
+                intent.setVisibilityToInstantApp(visibility);
                 if (intent.isVisibleToInstantApp()) {
-                    a.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_EPHEMERAL;
+                    a.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_INSTANT_APP;
+                }
+                if (intent.isImplicitlyVisibleToInstantApp()) {
+                    a.info.flags |= ActivityInfo.FLAG_IMPLICITLY_VISIBLE_TO_INSTANT_APP;
                 }
                 if (LOG_UNSAFE_BROADCASTS && receiver
                         && (owner.applicationInfo.targetSdkVersion >= Build.VERSION_CODES.O)) {
@@ -4301,9 +4387,17 @@ public class PackageParser {
                     owner.preferredActivityFilters.add(intent);
                 }
                 // adjust activity flags when we implicitly expose it via a browsable filter
-                intent.setVisibleToInstantApp(visibleToEphemeral || isWebBrowsableIntent(intent));
+                final int visibility = visibleToEphemeral
+                        ? IntentFilter.VISIBILITY_EXPLICIT
+                        : !receiver && isImplicitlyExposedIntent(intent)
+                                ? IntentFilter.VISIBILITY_IMPLICIT
+                                : IntentFilter.VISIBILITY_NONE;
+                intent.setVisibilityToInstantApp(visibility);
                 if (intent.isVisibleToInstantApp()) {
-                    a.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_EPHEMERAL;
+                    a.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_INSTANT_APP;
+                }
+                if (intent.isImplicitlyVisibleToInstantApp()) {
+                    a.info.flags |= ActivityInfo.FLAG_IMPLICITLY_VISIBLE_TO_INSTANT_APP;
                 }
             } else if (parser.getName().equals("meta-data")) {
                 if ((a.metaData = parseMetaData(res, parser, a.metaData,
@@ -4313,16 +4407,18 @@ public class PackageParser {
                 // we don't have an attribute [or it's false], but, we have meta-data
                 if (!visibleToEphemeral && a.metaData.getBoolean(META_DATA_INSTANT_APPS)) {
                     visibleToEphemeral = true; // set in case there are more intent filters
-                    a.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_EPHEMERAL;
+                    a.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_INSTANT_APP;
+                    a.info.flags &= ~ActivityInfo.FLAG_IMPLICITLY_VISIBLE_TO_INSTANT_APP;
                     owner.visibleToInstantApps = true;
                     // cycle through any filters already seen
                     for (int i = a.intents.size() - 1; i >= 0; --i) {
-                        a.intents.get(i).setVisibleToInstantApp(true /*visibleToInstantApp*/);
+                        a.intents.get(i)
+                                .setVisibilityToInstantApp(IntentFilter.VISIBILITY_EXPLICIT);
                     }
                     if (owner.preferredActivityFilters != null) {
                         for (int i = owner.preferredActivityFilters.size() - 1; i >= 0; --i) {
                             owner.preferredActivityFilters.get(i)
-                                    .setVisibleToInstantApp(true /*visibleToInstantApp*/);
+                                    .setVisibilityToInstantApp(IntentFilter.VISIBILITY_EXPLICIT);
                         }
                     }
                 }
@@ -4427,13 +4523,13 @@ public class PackageParser {
 
     /**
      * @param configChanges The bit mask of configChanges fetched from AndroidManifest.xml.
-     * @param restartOnConfigChanges The bit mask restartOnConfigChanges fetched from
-     *                               AndroidManifest.xml.
+     * @param recreateOnConfigChanges The bit mask recreateOnConfigChanges fetched from
+     *                                AndroidManifest.xml.
      * @hide Exposed for unit testing only.
      */
     @TestApi
-    public static int getActivityConfigChanges(int configChanges, int restartOnConfigChanges) {
-        return configChanges | ((~restartOnConfigChanges) & RESTART_ON_CONFIG_CHANGES_MASK);
+    public static int getActivityConfigChanges(int configChanges, int recreateOnConfigChanges) {
+        return configChanges | ((~recreateOnConfigChanges) & RECREATE_ON_CONFIG_CHANGES_MASK);
     }
 
     private void parseLayout(Resources res, AttributeSet attrs, Activity a) {
@@ -4600,7 +4696,7 @@ public class PackageParser {
 
         // TODO add visibleToInstantApps attribute to activity alias
         final boolean visibleToEphemeral =
-                ((a.info.flags & ActivityInfo.FLAG_VISIBLE_TO_EPHEMERAL) != 0);
+                ((a.info.flags & ActivityInfo.FLAG_VISIBLE_TO_INSTANT_APP) != 0);
 
         sa.recycle();
 
@@ -4628,13 +4724,20 @@ public class PackageParser {
                             + mArchiveSourcePath + " "
                             + parser.getPositionDescription());
                 } else {
-                    intent.setVisibleToInstantApp(
-                            visibleToEphemeral || isWebBrowsableIntent(intent));
                     a.intents.add(intent);
                 }
                 // adjust activity flags when we implicitly expose it via a browsable filter
+                final int visibility = visibleToEphemeral
+                        ? IntentFilter.VISIBILITY_EXPLICIT
+                        : isImplicitlyExposedIntent(intent)
+                                ? IntentFilter.VISIBILITY_IMPLICIT
+                                : IntentFilter.VISIBILITY_NONE;
+                intent.setVisibilityToInstantApp(visibility);
                 if (intent.isVisibleToInstantApp()) {
-                    a.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_EPHEMERAL;
+                    a.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_INSTANT_APP;
+                }
+                if (intent.isImplicitlyVisibleToInstantApp()) {
+                    a.info.flags |= ActivityInfo.FLAG_IMPLICITLY_VISIBLE_TO_INSTANT_APP;
                 }
             } else if (parser.getName().equals("meta-data")) {
                 if ((a.metaData=parseMetaData(res, parser, a.metaData,
@@ -4777,7 +4880,7 @@ public class PackageParser {
         final boolean visibleToEphemeral =
                 sa.getBoolean(R.styleable.AndroidManifestProvider_visibleToInstantApps, false);
         if (visibleToEphemeral) {
-            p.info.flags |= ProviderInfo.FLAG_VISIBLE_TO_EPHEMERAL;
+            p.info.flags |= ProviderInfo.FLAG_VISIBLE_TO_INSTANT_APP;
             owner.visibleToInstantApps = true;
         }
 
@@ -4829,12 +4932,11 @@ public class PackageParser {
                         intent, outError)) {
                     return false;
                 }
-                outInfo.intents.add(intent);
-                // adjust provider flags when we implicitly expose it via a browsable filter
-                intent.setVisibleToInstantApp(visibleToEphemeral || isWebBrowsableIntent(intent));
-                if (intent.isVisibleToInstantApp()) {
-                    outInfo.info.flags |= ProviderInfo.FLAG_VISIBLE_TO_EPHEMERAL;
+                if (visibleToEphemeral) {
+                    intent.setVisibilityToInstantApp(IntentFilter.VISIBILITY_EXPLICIT);
+                    outInfo.info.flags |= ProviderInfo.FLAG_VISIBLE_TO_INSTANT_APP;
                 }
+                outInfo.intents.add(intent);
 
             } else if (parser.getName().equals("meta-data")) {
                 if ((outInfo.metaData=parseMetaData(res, parser,
@@ -4844,11 +4946,12 @@ public class PackageParser {
                 // we don't have an attribute [or it's false], but, we have meta-data
                 if (!visibleToEphemeral && outInfo.metaData.getBoolean(META_DATA_INSTANT_APPS)) {
                     visibleToEphemeral = true; // set in case there are more intent filters
-                    outInfo.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_EPHEMERAL;
+                    outInfo.info.flags |= ProviderInfo.FLAG_VISIBLE_TO_INSTANT_APP;
                     owner.visibleToInstantApps = true;
                     // cycle through any filters already seen
                     for (int i = outInfo.intents.size() - 1; i >= 0; --i) {
-                        outInfo.intents.get(i).setVisibleToInstantApp(true /*visibleToInstantApp*/);
+                        outInfo.intents.get(i)
+                                .setVisibilityToInstantApp(IntentFilter.VISIBILITY_EXPLICIT);
                     }
                 }
 
@@ -5104,7 +5207,7 @@ public class PackageParser {
         boolean visibleToEphemeral =
                 sa.getBoolean(R.styleable.AndroidManifestService_visibleToInstantApps, false);
         if (visibleToEphemeral) {
-            s.info.flags |= ServiceInfo.FLAG_VISIBLE_TO_EPHEMERAL;
+            s.info.flags |= ServiceInfo.FLAG_VISIBLE_TO_INSTANT_APP;
             owner.visibleToInstantApps = true;
         }
 
@@ -5135,10 +5238,9 @@ public class PackageParser {
                         intent, outError)) {
                     return null;
                 }
-                // adjust activity flags when we implicitly expose it via a browsable filter
-                intent.setVisibleToInstantApp(visibleToEphemeral || isWebBrowsableIntent(intent));
-                if (intent.isVisibleToInstantApp()) {
-                    s.info.flags |= ServiceInfo.FLAG_VISIBLE_TO_EPHEMERAL;
+                if (visibleToEphemeral) {
+                    intent.setVisibilityToInstantApp(IntentFilter.VISIBILITY_EXPLICIT);
+                    s.info.flags |= ServiceInfo.FLAG_VISIBLE_TO_INSTANT_APP;
                 }
                 s.intents.add(intent);
             } else if (parser.getName().equals("meta-data")) {
@@ -5149,11 +5251,12 @@ public class PackageParser {
                 // we don't have an attribute [or it's false], but, we have meta-data
                 if (!visibleToEphemeral && s.metaData.getBoolean(META_DATA_INSTANT_APPS)) {
                     visibleToEphemeral = true; // set in case there are more intent filters
-                    s.info.flags |= ActivityInfo.FLAG_VISIBLE_TO_EPHEMERAL;
+                    s.info.flags |= ServiceInfo.FLAG_VISIBLE_TO_INSTANT_APP;
                     owner.visibleToInstantApps = true;
                     // cycle through any filters already seen
                     for (int i = s.intents.size() - 1; i >= 0; --i) {
-                        s.intents.get(i).setVisibleToInstantApp(true /*visibleToInstantApp*/);
+                        s.intents.get(i)
+                                .setVisibilityToInstantApp(IntentFilter.VISIBILITY_EXPLICIT);
                     }
                 }
             } else {
@@ -5177,8 +5280,11 @@ public class PackageParser {
         return s;
     }
 
-    private boolean isWebBrowsableIntent(IntentInfo intent) {
-        return intent.hasCategory(Intent.CATEGORY_BROWSABLE);
+    private boolean isImplicitlyExposedIntent(IntentInfo intent) {
+        return intent.hasCategory(Intent.CATEGORY_BROWSABLE)
+                || intent.hasAction(Intent.ACTION_SEND)
+                || intent.hasAction(Intent.ACTION_SENDTO)
+                || intent.hasAction(Intent.ACTION_SEND_MULTIPLE);
     }
 
     private boolean parseAllMetaData(Resources res, XmlResourceParser parser, String tag,
@@ -5733,11 +5839,14 @@ public class PackageParser {
         }
 
         public void setApplicationVolumeUuid(String volumeUuid) {
+            final UUID storageUuid = StorageManager.convert(volumeUuid);
             this.applicationInfo.volumeUuid = volumeUuid;
+            this.applicationInfo.storageUuid = storageUuid;
             if (childPackages != null) {
                 final int packageCount = childPackages.size();
                 for (int i = 0; i < packageCount; i++) {
                     childPackages.get(i).applicationInfo.volumeUuid = volumeUuid;
+                    childPackages.get(i).applicationInfo.storageUuid = storageUuid;
                 }
             }
         }
@@ -7129,8 +7238,8 @@ public class PackageParser {
                 info.targetPackage = info.targetPackage.intern();
             }
 
-            if (info.targetProcess != null) {
-                info.targetProcess = info.targetProcess.intern();
+            if (info.targetProcesses != null) {
+                info.targetProcesses = info.targetProcesses.intern();
             }
         }
 

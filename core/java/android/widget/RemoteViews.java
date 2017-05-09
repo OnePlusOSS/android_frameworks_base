@@ -252,9 +252,7 @@ public class RemoteViews implements Parcelable, Filter {
                 if (mEnterAnimationId != 0) {
                     opts = ActivityOptions.makeCustomAnimation(context, mEnterAnimationId, 0);
                 } else {
-                    opts = ActivityOptions.makeScaleUpAnimation(view,
-                            0, 0,
-                            view.getMeasuredWidth(), view.getMeasuredHeight());
+                    opts = ActivityOptions.makeBasic();
                 }
 
                 if (launchStackId != StackId.INVALID_STACK_ID) {
@@ -413,6 +411,30 @@ public class RemoteViews implements Parcelable, Filter {
         mBitmapCache = new BitmapCache();
         setBitmapCache(mBitmapCache);
         recalculateMemoryUsage();
+    }
+
+    private static class RemoteViewsContextWrapper extends ContextWrapper {
+        private final Context mContextForResources;
+
+        RemoteViewsContextWrapper(Context context, Context contextForResources) {
+            super(context);
+            mContextForResources = contextForResources;
+        }
+
+        @Override
+        public Resources getResources() {
+            return mContextForResources.getResources();
+        }
+
+        @Override
+        public Resources.Theme getTheme() {
+            return mContextForResources.getTheme();
+        }
+
+        @Override
+        public String getPackageName() {
+            return mContextForResources.getPackageName();
+        }
     }
 
     private class SetEmptyView extends Action {
@@ -1787,7 +1809,7 @@ public class RemoteViews implements Parcelable, Filter {
 
         @Override
         public Action initActionAsync(ViewTree root, ViewGroup rootParent, OnClickHandler handler) {
-            final TextView target = (TextView) root.findViewById(viewId);
+            final TextView target = root.findViewById(viewId);
             if (target == null) return ACTION_NOOP;
 
             TextViewDrawableAction copy = useIcons ?
@@ -3242,20 +3264,7 @@ public class RemoteViews implements Parcelable, Filter {
         // still returns the current users userId so settings like data / time formats
         // are loaded without requiring cross user persmissions.
         final Context contextForResources = getContextForResources(context);
-        Context inflationContext = new ContextWrapper(context) {
-            @Override
-            public Resources getResources() {
-                return contextForResources.getResources();
-            }
-            @Override
-            public Resources.Theme getTheme() {
-                return contextForResources.getTheme();
-            }
-            @Override
-            public String getPackageName() {
-                return contextForResources.getPackageName();
-            }
-        };
+        Context inflationContext = new RemoteViewsContextWrapper(context, contextForResources);
 
         LayoutInflater inflater = (LayoutInflater)
                 context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
@@ -3688,12 +3697,12 @@ public class RemoteViews implements Parcelable, Filter {
             createTree();
         }
 
-        public View findViewById(int id) {
+        public <T extends View> T findViewById(int id) {
             if (mChildren == null) {
                 return mRoot.findViewById(id);
             }
             ViewTree tree = findViewTreeById(id);
-            return tree == null ? null : tree.mRoot;
+            return tree == null ? null : (T) tree.mRoot;
         }
 
         public void addChild(ViewTree child) {

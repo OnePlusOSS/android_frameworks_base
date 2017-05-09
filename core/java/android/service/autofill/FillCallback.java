@@ -18,7 +18,6 @@ package android.service.autofill;
 
 import android.annotation.Nullable;
 import android.app.Activity;
-import android.os.Bundle;
 import android.os.RemoteException;
 
 /**
@@ -27,17 +26,19 @@ import android.os.RemoteException;
  */
 public final class FillCallback {
     private final IFillCallback mCallback;
+    private final int mRequestId;
     private boolean mCalled;
 
     /** @hide */
-    public FillCallback(IFillCallback callback) {
+    public FillCallback(IFillCallback callback, int requestId) {
         mCallback = callback;
+        mRequestId = requestId;
     }
 
     /**
      * Notifies the Android System that an
-     * {@link AutofillService#onFillRequest(android.app.assist.AssistStructure, Bundle,
-     * int, android.os.CancellationSignal, FillCallback)} was successfully fulfilled by the service.
+     * {@link AutofillService#onFillRequest(FillRequest, android.os.CancellationSignal,
+     * FillCallback)} was successfully fulfilled by the service.
      *
      * @param response autofill information for that activity, or {@code null} when the activity
      * cannot be autofilled (for example, if it only contains read-only fields). See
@@ -46,6 +47,11 @@ public final class FillCallback {
     public void onSuccess(@Nullable FillResponse response) {
         assertNotCalled();
         mCalled = true;
+
+        if (response != null) {
+            response.setRequestId(mRequestId);
+        }
+
         try {
             mCallback.onSuccess(response);
         } catch (RemoteException e) {
@@ -55,9 +61,8 @@ public final class FillCallback {
 
     /**
      * Notifies the Android System that an
-     * {@link AutofillService#onFillRequest(android.app.assist.AssistStructure,
-     * Bundle, int, android.os.CancellationSignal, FillCallback)}
-     * could not be fulfilled by the service.
+     * {@link AutofillService#onFillRequest(FillRequest, android.os.CancellationSignal,
+     * FillCallback)} could not be fulfilled by the service.
      *
      * @param message error message to be displayed to the user.
      */

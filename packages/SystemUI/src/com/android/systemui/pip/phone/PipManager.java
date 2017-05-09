@@ -86,6 +86,7 @@ public class PipManager implements BasePipManager {
 
             ComponentName topPipActivity = PipUtils.getTopPinnedActivity(mContext,
                     mActivityManager);
+            mMenuController.hideMenu();
             mNotificationController.onActivityUnpinned(topPipActivity);
 
             SystemServicesProxy.getInstance(mContext).setPipVisibility(topPipActivity != null);
@@ -102,6 +103,7 @@ public class PipManager implements BasePipManager {
             // Re-enable touches after the animation completes
             mTouchHandler.setTouchEnabled(true);
             mTouchHandler.onPinnedStackAnimationEnded();
+            mMenuController.onPinnedStackAnimationEnded();
         }
 
         @Override
@@ -142,10 +144,10 @@ public class PipManager implements BasePipManager {
 
         @Override
         public void onMovementBoundsChanged(Rect insetBounds, Rect normalBounds,
-                Rect animatingBounds, boolean fromImeAdjustement) {
+                Rect animatingBounds, boolean fromImeAdjustement, int displayRotation) {
             mHandler.post(() -> {
                 mTouchHandler.onMovementBoundsChanged(insetBounds, normalBounds, animatingBounds,
-                        fromImeAdjustement);
+                        fromImeAdjustement, displayRotation);
             });
         }
 

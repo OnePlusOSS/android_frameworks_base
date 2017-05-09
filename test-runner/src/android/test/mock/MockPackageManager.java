@@ -371,7 +371,25 @@ public class MockPackageManager extends PackageManager {
 
     /** @hide */
     @Override
+    public int getInstantAppCookieMaxBytes() {
+        throw new UnsupportedOperationException();
+    }
+
+    /** @hide */
+    @Override
     public int getInstantAppCookieMaxSize() {
+        throw new UnsupportedOperationException();
+    }
+
+    /** @hide */
+    @Override
+    public void clearInstantAppCookie() {
+        throw new UnsupportedOperationException();
+    }
+
+    /** @hide */
+    @Override
+    public void updateInstantAppCookie(@NonNull byte[] cookie) {
         throw new UnsupportedOperationException();
     }
 
@@ -1124,6 +1142,21 @@ public class MockPackageManager extends PackageManager {
      */
     @Override
     public ComponentName getInstantAppResolverSettingsComponent() {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * @hide
+     */
+    @Override
+    public ComponentName getInstantAppInstallerComponent() {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * @hide
+     */
+    public String getInstantAppAndroidId(String packageName, UserHandle user) {
         throw new UnsupportedOperationException();
     }
 }

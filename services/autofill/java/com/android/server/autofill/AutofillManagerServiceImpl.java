@@ -16,21 +16,14 @@
 
 package com.android.server.autofill;
 
-import static android.service.autofill.AutofillService.EXTRA_SESSION_ID;
-import static android.service.voice.VoiceInteractionSession.KEY_RECEIVER_EXTRAS;
-import static android.service.voice.VoiceInteractionSession.KEY_STRUCTURE;
-import static android.view.autofill.AutofillManager.FLAG_START_SESSION;
+import static android.view.autofill.AutofillManager.ACTION_START_SESSION;
 import static android.view.autofill.AutofillManager.NO_SESSION;
 
-import static com.android.server.autofill.Helper.DEBUG;
-import static com.android.server.autofill.Helper.VERBOSE;
+import static com.android.server.autofill.Helper.sVerbose;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.app.Activity;
-import android.app.ActivityManager;
 import android.app.AppGlobals;
-import android.app.assist.AssistStructure;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
@@ -48,11 +41,12 @@ import android.os.UserManager;
 import android.provider.Settings;
 import android.service.autofill.AutofillService;
 import android.service.autofill.AutofillServiceInfo;
+import android.service.autofill.FillEventHistory;
+import android.service.autofill.FillEventHistory.Event;
+import android.service.autofill.FillResponse;
 import android.service.autofill.IAutoFillService;
 import android.text.TextUtils;
 import android.util.LocalLog;
-import android.util.Log;
-import android.util.PrintWriterPrinter;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.view.autofill.AutofillId;
@@ -62,7 +56,6 @@ import android.view.autofill.IAutoFillManagerClient;
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.os.HandlerCaller;
-import com.android.internal.os.IResultReceiver;
 import com.android.server.autofill.ui.AutoFillUI;
 
 import java.io.PrintWriter;
@@ -116,62 +109,12 @@ final class AutofillManagerServiceImpl {
      * <p>They're kept until the {@link AutofillService} finished handling a request, an error
      * occurs, or the session times out.
      */
-    // TODO(b/33197203): need to make sure service is bound while callback is pending and/or
-    // use WeakReference
     @GuardedBy("mLock")
     private final SparseArray<Session> mSessions = new SparseArray<>();
 
-    /**
-     * Receiver of assist data from the app's {@link Activity}.
-     */
-    private final IResultReceiver mAssistReceiver = new IResultReceiver.Stub() {
-        @Override
-        public void send(int resultCode, Bundle resultData) throws RemoteException {
-            if (VERBOSE) {
-                Slog.v(TAG, "resultCode on mAssistReceiver: " + resultCode);
-            }
-
-            final AssistStructure structure = resultData.getParcelable(KEY_STRUCTURE);
-            if (structure == null) {
-                Slog.wtf(TAG, "no assist structure for id " + resultCode);
-                return;
-            }
-
-            final Bundle receiverExtras = resultData.getBundle(KEY_RECEIVER_EXTRAS);
-            if (receiverExtras == null) {
-                Slog.wtf(TAG, "No " + KEY_RECEIVER_EXTRAS + " on receiver");
-                return;
-            }
-
-            final int sessionId = receiverExtras.getInt(EXTRA_SESSION_ID);
-            final Session session;
-            synchronized (mLock) {
-                session = mSessions.get(sessionId);
-                if (session == null) {
-                    Slog.w(TAG, "no server session for " + sessionId);
-                    return;
-                }
-                // TODO(b/33197203): since service is fetching the data (to use for save later),
-                // we should optimize what's sent (for example, remove layout containers,
-                // color / font info, etc...)
-                session.setStructureLocked(structure);
-            }
-
-
-            // TODO(b/33197203, b/33269702): Must fetch the data so it's available later on
-            // handleSave(), even if if the activity is gone by then, but structure.ensureData()
-            // gives a ONE_WAY warning because system_service could block on app calls.
-            // We need to change AssistStructure so it provides a "one-way" writeToParcel()
-            // method that sends all the data
-            structure.ensureData();
-
-            // Sanitize structure before it's sent to service.
-            structure.sanitizeForParceling(true);
-
-            // TODO(b/33197203): Need to pipe the bundle
-            session.mRemoteFillService.onFillRequest(structure, null, session.mFlags);
-        }
-    };
+    /** The last selection */
+    @GuardedBy("mLock")
+    private FillEventHistory mEventHistory;
 
     AutofillManagerServiceImpl(Context context, Object lock, LocalLog requestsHistory,
             int userId, AutoFillUI ui, boolean disabled) {
@@ -184,11 +127,10 @@ final class AutofillManagerServiceImpl {
     }
 
     CharSequence getServiceName() {
-        if (mInfo == null) {
+        final String packageName = getPackageName();
+        if (packageName == null) {
             return null;
         }
-        final ComponentName serviceComponent = mInfo.getServiceInfo().getComponentName();
-        final String packageName = serviceComponent.getPackageName();
 
         try {
             final PackageManager pm = mContext.getPackageManager();
@@ -197,6 +139,23 @@ final class AutofillManagerServiceImpl {
         } catch (Exception e) {
             Slog.e(TAG, "Could not get label for " + packageName + ": " + e);
             return packageName;
+        }
+    }
+
+    String getPackageName() {
+        final ComponentName serviceComponent = getServiceComponentName();
+        if (serviceComponent != null) {
+            return serviceComponent.getPackageName();
+        }
+        return null;
+    }
+
+    ComponentName getServiceComponentName() {
+        synchronized (mLock) {
+            if (mInfo == null) {
+                return null;
+            }
+            return mInfo.getServiceInfo().getComponentName();
         }
     }
 
@@ -236,10 +195,10 @@ final class AutofillManagerServiceImpl {
                         session.removeSelfLocked();
                     }
                 }
-                sendStateToClients();
+                sendStateToClients(false);
             }
-        } catch (PackageManager.NameNotFoundException e) {
-            Slog.e(TAG, "Bad autofill service name " + componentName + ": " + e);
+        } catch (Exception e) {
+            Slog.e(TAG, "Bad AutofillService '" + componentName + "': " + e);
         }
     }
 
@@ -287,7 +246,9 @@ final class AutofillManagerServiceImpl {
         }
         final Session session = mSessions.get(sessionId);
         if (session != null && uid == session.uid) {
-            session.setHasCallback(hasIt);
+            synchronized (mLock) {
+                session.setHasCallbackLocked(hasIt);
+            }
         }
     }
 
@@ -311,7 +272,7 @@ final class AutofillManagerServiceImpl {
                         hasCallback + " f=" + flags;
         mRequestsHistory.log(historyItem);
 
-        newSession.updateLocked(autofillId, virtualBounds, value, FLAG_START_SESSION);
+        newSession.updateLocked(autofillId, virtualBounds, value, ACTION_START_SESSION, flags);
 
         return newSession.id;
     }
@@ -323,16 +284,17 @@ final class AutofillManagerServiceImpl {
 
         final Session session = mSessions.get(sessionId);
         if (session == null || uid != session.uid) {
-            Slog.w(TAG, "finishSessionLocked(): no session for " + sessionId + "(" + uid + ")");
+            if (sVerbose) {
+                Slog.v(TAG, "finishSessionLocked(): no session for " + sessionId + "(" + uid + ")");
+            }
             return;
         }
 
         final boolean finished = session.showSaveLocked();
-        if (DEBUG) {
-            Log.d(TAG, "finishSessionLocked(): session finished on save? " + finished);
-        }
+        if (sVerbose) Slog.v(TAG, "finishSessionLocked(): session finished on save? " + finished);
+
         if (finished) {
-            session.removeSelf();
+            session.removeSelfLocked();
         }
     }
 
@@ -377,7 +339,7 @@ final class AutofillManagerServiceImpl {
         do {
             tries++;
             if (tries > MAX_SESSION_ID_CREATE_TRIES) {
-                Log.w(TAG, "Cannot create session in " + MAX_SESSION_ID_CREATE_TRIES + " tries");
+                Slog.w(TAG, "Cannot create session in " + MAX_SESSION_ID_CREATE_TRIES + " tries");
                 return null;
             }
 
@@ -385,32 +347,10 @@ final class AutofillManagerServiceImpl {
         } while (sessionId == NO_SESSION || mSessions.indexOfKey(sessionId) >= 0);
 
         final Session newSession = new Session(this, mUi, mContext, mHandlerCaller, mUserId, mLock,
-                sessionId, uid, activityToken, windowToken, appCallbackToken, hasCallback, flags,
+                sessionId, uid, activityToken, windowToken, appCallbackToken, hasCallback,
                 mInfo.getServiceInfo().getComponentName(), packageName);
         mSessions.put(newSession.id, newSession);
 
-        /*
-         * TODO(b/33197203): apply security checks below:
-         * - checks if disabled by secure settings / device policy
-         * - log operation using noteOp()
-         * - check flags
-         * - display disclosure if needed
-         */
-        try {
-            final Bundle receiverExtras = new Bundle();
-            receiverExtras.putInt(EXTRA_SESSION_ID, sessionId);
-            final long identity = Binder.clearCallingIdentity();
-            try {
-                if (!ActivityManager.getService().requestAutofillData(mAssistReceiver,
-                        receiverExtras, activityToken)) {
-                    Slog.w(TAG, "failed to request autofill data for " + activityToken);
-                }
-            } finally {
-                Binder.restoreCallingIdentity(identity);
-            }
-        } catch (RemoteException e) {
-            // Should not happen, it's a local call.
-        }
         return newSession;
     }
 
@@ -453,17 +393,17 @@ final class AutofillManagerServiceImpl {
     }
 
     void updateSessionLocked(int sessionId, int uid, AutofillId autofillId, Rect virtualBounds,
-            AutofillValue value, int flags) {
+            AutofillValue value, int action, int flags) {
         final Session session = mSessions.get(sessionId);
         if (session == null || session.uid != uid) {
-            if (VERBOSE) {
+            if (sVerbose) {
                 Slog.v(TAG, "updateSessionLocked(): session gone for " + sessionId + "(" + uid
                         + ")");
             }
             return;
         }
 
-        session.updateLocked(autofillId, virtualBounds, value, flags);
+        session.updateLocked(autofillId, virtualBounds, value, action, flags);
     }
 
     void removeSessionLocked(int sessionId) {
@@ -483,19 +423,83 @@ final class AutofillManagerServiceImpl {
     }
 
     void destroyLocked() {
-        if (VERBOSE) {
-            Slog.v(TAG, "destroyLocked()");
-        }
+        if (sVerbose) Slog.v(TAG, "destroyLocked()");
 
         final int numSessions = mSessions.size();
         for (int i = 0; i < numSessions; i++) {
             mSessions.valueAt(i).destroyLocked();
         }
         mSessions.clear();
+
+        sendStateToClients(true);
     }
 
     CharSequence getServiceLabel() {
         return mInfo.getServiceInfo().loadLabel(mContext.getPackageManager());
+    }
+
+    /**
+     * Initializes the last fill selection after an autofill service returned a new
+     * {@link FillResponse}.
+     */
+    void setLastResponse(int serviceUid, @NonNull FillResponse response) {
+        synchronized (mLock) {
+            mEventHistory = new FillEventHistory(serviceUid, response.getClientState());
+        }
+    }
+
+    /**
+     * Updates the last fill selection when an authentication was selected.
+     */
+    void setAuthenticationSelected() {
+        synchronized (mLock) {
+            mEventHistory.addEvent(new Event(Event.TYPE_AUTHENTICATION_SELECTED, null));
+        }
+    }
+
+    /**
+     * Updates the last fill selection when an dataset authentication was selected.
+     */
+    void setDatasetAuthenticationSelected(@Nullable String selectedDataset) {
+        synchronized (mLock) {
+            mEventHistory.addEvent(
+                    new Event(Event.TYPE_DATASET_AUTHENTICATION_SELECTED, selectedDataset));
+        }
+    }
+
+    /**
+     * Updates the last fill selection when an save Ui is shown.
+     */
+    void setSaveShown() {
+        synchronized (mLock) {
+            mEventHistory.addEvent(new Event(Event.TYPE_SAVE_SHOWN, null));
+        }
+    }
+
+    /**
+     * Updates the last fill response when a dataset was selected.
+     */
+    void setDatasetSelected(@Nullable String selectedDataset) {
+        synchronized (mLock) {
+            mEventHistory.addEvent(new Event(Event.TYPE_DATASET_SELECTED, selectedDataset));
+        }
+    }
+
+    /**
+     * Gets the fill event history.
+     *
+     * @param callingUid The calling uid
+     *
+     * @return The history or {@code null} if there is none.
+     */
+    FillEventHistory getFillEventHistory(int callingUid) {
+        synchronized (mLock) {
+            if (mEventHistory != null && mEventHistory.getServiceUid() == callingUid) {
+                return mEventHistory;
+            }
+        }
+
+        return null;
     }
 
     void dumpLocked(String prefix, PrintWriter pw) {
@@ -510,12 +514,6 @@ final class AutofillManagerServiceImpl {
             pw.println(mContext.getString(R.string.config_defaultAutofillService));
         pw.print(prefix); pw.print("Disabled: "); pw.println(mDisabled);
 
-        if (VERBOSE && mInfo != null) {
-            // ServiceInfo dump is too noisy and redundant (it can be obtained through other dumps)
-            pw.print(prefix); pw.println("ServiceInfo:");
-            mInfo.getServiceInfo().dump(new PrintWriterPrinter(pw), prefix + prefix);
-        }
-
         final int size = mSessions.size();
         if (size == 0) {
             pw.print(prefix); pw.println("No sessions");
@@ -526,11 +524,26 @@ final class AutofillManagerServiceImpl {
                 mSessions.valueAt(i).dumpLocked(prefix2, pw);
             }
         }
+
+        if (mEventHistory == null || mEventHistory.getEvents() == null
+                || mEventHistory.getEvents().size() == 0) {
+            pw.print(prefix); pw.println("No event on last fill response");
+        } else {
+            pw.print(prefix); pw.println("Events of last fill response:");
+            pw.print(prefix);
+
+            int numEvents = mEventHistory.getEvents().size();
+            for (int i = 0; i < numEvents; i++) {
+                final Event event = mEventHistory.getEvents().get(i);
+                pw.println("  " + i + ": eventType=" + event.getType() + " datasetId="
+                        + event.getDatasetId());
+            }
+        }
     }
 
     void destroySessionsLocked() {
         while (mSessions.size() > 0) {
-            mSessions.valueAt(0).removeSelf();
+            mSessions.valueAt(0).removeSelfLocked();
         }
     }
 
@@ -542,7 +555,7 @@ final class AutofillManagerServiceImpl {
         }
     }
 
-    private void sendStateToClients() {
+    private void sendStateToClients(boolean resetClient) {
         final RemoteCallbackList<IAutoFillManagerClient> clients;
         final int userClientCount;
         synchronized (mLock) {
@@ -556,7 +569,11 @@ final class AutofillManagerServiceImpl {
             for (int i = 0; i < userClientCount; i++) {
                 final IAutoFillManagerClient client = clients.getBroadcastItem(i);
                 try {
-                    client.setState(isEnabled());
+                    final boolean resetSession;
+                    synchronized (mLock) {
+                        resetSession = resetClient || isClientSessionDestroyedLocked(client);
+                    }
+                    client.setState(isEnabled(), resetSession, resetClient);
                 } catch (RemoteException re) {
                     /* ignore */
                 }
@@ -566,7 +583,18 @@ final class AutofillManagerServiceImpl {
         }
     }
 
-    private boolean isEnabled() {
+    private boolean isClientSessionDestroyedLocked(IAutoFillManagerClient client) {
+        final int sessionCount = mSessions.size();
+        for (int i = 0; i < sessionCount; i++) {
+            final Session session = mSessions.valueAt(i);
+            if (session.getClient().equals(client)) {
+                return session.isDestroyed();
+            }
+        }
+        return true;
+    }
+
+    boolean isEnabled() {
         return mInfo != null && !mDisabled;
     }
 

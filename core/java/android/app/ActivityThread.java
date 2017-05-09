@@ -51,7 +51,6 @@ import android.database.sqlite.SQLiteDebug;
 import android.database.sqlite.SQLiteDebug.DbStats;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.graphics.Typeface;
 import android.hardware.display.DisplayManagerGlobal;
 import android.net.ConnectivityManager;
 import android.net.IConnectivityManager;
@@ -90,6 +89,7 @@ import android.provider.CalendarContract;
 import android.provider.CallLog;
 import android.provider.ContactsContract;
 import android.provider.Downloads;
+import android.provider.FontsContract;
 import android.provider.Settings;
 import android.security.NetworkSecurityPolicy;
 import android.security.net.config.NetworkSecurityConfigProvider;
@@ -670,6 +670,7 @@ public final class ActivityThread {
         IBinder requestToken;
         int requestType;
         int sessionId;
+        int flags;
     }
 
     static final class ActivityConfigChangeData {
@@ -1288,12 +1289,13 @@ public final class ActivityThread {
 
         @Override
         public void requestAssistContextExtras(IBinder activityToken, IBinder requestToken,
-                int requestType, int sessionId) {
+                int requestType, int sessionId, int flags) {
             RequestAssistContextExtras cmd = new RequestAssistContextExtras();
             cmd.activityToken = activityToken;
             cmd.requestToken = requestToken;
             cmd.requestType = requestType;
             cmd.sessionId = sessionId;
+            cmd.flags = flags;
             sendMessage(H.REQUEST_ASSIST_CONTEXT_EXTRAS, cmd);
         }
 
@@ -3004,7 +3006,7 @@ public final class ActivityThread {
         // - it needs an IAutoFillCallback
         boolean forAutofill = cmd.requestType == ActivityManager.ASSIST_CONTEXT_AUTOFILL;
 
-        // TODO(b/33197203): decide if lastSessionId logic applies to autofill sessions
+        // TODO: decide if lastSessionId logic applies to autofill sessions
         if (mLastSessionId != cmd.sessionId) {
             // Clear the existing structures
             mLastSessionId = cmd.sessionId;
@@ -3030,10 +3032,8 @@ public final class ActivityThread {
                 referrer = r.activity.onProvideReferrer();
             }
             if (cmd.requestType == ActivityManager.ASSIST_CONTEXT_FULL || forAutofill) {
-                structure = new AssistStructure(r.activity, forAutofill);
+                structure = new AssistStructure(r.activity, forAutofill, cmd.flags);
                 Intent activityIntent = r.activity.getIntent();
-                // TODO(b/33197203): re-evaluate conditions below for autofill. In particular,
-                // FLAG_SECURE might be allowed on AUTO_FILL but not on AUTO_FILL_SAVE)
                 boolean notSecure = r.window == null ||
                         (r.window.getAttributes().flags
                                 & WindowManager.LayoutParams.FLAG_SECURE) == 0;
@@ -3059,7 +3059,7 @@ public final class ActivityThread {
             structure = new AssistStructure();
         }
 
-        // TODO(b/33197203): decide if lastSessionId logic applies to autofill sessions
+        // TODO: decide if lastSessionId logic applies to autofill sessions
 
         structure.setAcquisitionStartTime(startTime);
         structure.setAcquisitionEndTime(SystemClock.uptimeMillis());
@@ -5795,7 +5795,7 @@ public final class ActivityThread {
         }
 
         // Preload fonts resources
-        Typeface.setApplicationContext(appContext);
+        FontsContract.setApplicationContextForResources(appContext);
         try {
             final ApplicationInfo info =
                     getPackageManager().getApplicationInfo(

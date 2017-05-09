@@ -322,6 +322,7 @@ please see styles_device_defaults.xml.
         <item name="scrollbars">vertical</item>
         <item name="fadingEdge">vertical</item>
         <item name="fastScrollStyle">?attr/fastScrollStyle</item>
+        <item name="defaultFocusHighlightEnabled">false</item>
     </style>
 
     <style name="Widget.GestureOverlayView">
@@ -538,6 +539,7 @@ please see styles_device_defaults.xml.
         <item name="gravity">center_vertical</item>
         <item name="breakStrategy">simple</item>
         <item name="hyphenationFrequency">normal</item>
+        <item name="defaultFocusHighlightEnabled">false</item>
     </style>
 
     <style name="Widget.ExpandableListView" parent="Widget.ListView">
@@ -1480,6 +1482,12 @@ please see styles_device_defaults.xml.
         <item name="regularColor">@color/lock_pattern_view_regular_color</item>
         <item name="errorColor">?attr/colorError</item>
         <item name="successColor">@color/lock_pattern_view_success_color</item>
+    </style>
+
+    <!-- @hide -->
+    <style name="AutofillDatasetPicker">
+        <item name="elevation">4dp</item>
+        <item name="background">@drawable/autofill_dataset_picker_background</item>
     </style>
 
 </resources>

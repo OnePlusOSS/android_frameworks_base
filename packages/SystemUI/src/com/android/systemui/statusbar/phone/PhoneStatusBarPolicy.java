@@ -28,6 +28,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.SynchronousUserSwitchObserver;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -50,11 +51,11 @@ import android.telecom.TelecomManager;
 import android.util.ArraySet;
 import android.util.Log;
 import android.util.Pair;
-
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.systemui.Dependency;
+import com.android.systemui.DockedStackExistsListener;
 import com.android.systemui.R;
 import com.android.systemui.SysUiServiceProvider;
 import com.android.systemui.qs.tiles.DndTile;
@@ -73,6 +74,8 @@ import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController.DeviceProvisionedListener;
 import com.android.systemui.statusbar.policy.HotspotController;
 import com.android.systemui.statusbar.policy.KeyguardMonitor;
+import com.android.systemui.statusbar.policy.LocationController;
+import com.android.systemui.statusbar.policy.LocationController.LocationChangeCallback;
 import com.android.systemui.statusbar.policy.NextAlarmController;
 import com.android.systemui.statusbar.policy.RotationLockController;
 import com.android.systemui.statusbar.policy.RotationLockController.RotationLockControllerCallback;
@@ -80,16 +83,21 @@ import com.android.systemui.statusbar.policy.UserInfoController;
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.util.NotificationChannels;
 
+import java.util.List;
+
 /**
  * This class contains all of the policy about which icons are installed in the status
  * bar at boot time.  It goes through the normal API for icons, even though it probably
  * strictly doesn't need to.
  */
 public class PhoneStatusBarPolicy implements Callback, Callbacks,
-        RotationLockControllerCallback, Listener,
+        RotationLockControllerCallback, Listener, LocationChangeCallback,
         ZenModeController.Callback, DeviceProvisionedListener, KeyguardMonitor.Callback {
     private static final String TAG = "PhoneStatusBarPolicy";
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
+
+    public static final int LOCATION_STATUS_ICON_ID = R.drawable.stat_sys_location;
+    public static final int NUM_TASKS_FOR_INSTANT_APP_INFO = 5;
 
     private final String mSlotCast;
     private final String mSlotHotspot;
@@ -102,6 +110,7 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
     private final String mSlotRotate;
     private final String mSlotHeadset;
     private final String mSlotDataSaver;
+    private final String mSlotLocation;
 
     private final Context mContext;
     private final Handler mHandler = new Handler();
@@ -117,6 +126,7 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
     private final ZenModeController mZenController;
     private final DeviceProvisionedController mProvisionedController;
     private final KeyguardMonitor mKeyguardMonitor;
+    private final LocationController mLocationController;
     private final ArraySet<Pair<String, Integer>> mCurrentNotifs = new ArraySet<>();
 
     // Assume it's all good unless we hear otherwise.  We don't always seem
@@ -126,6 +136,7 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
     private boolean mZenVisible;
     private boolean mVolumeVisible;
     private boolean mCurrentUserSetup;
+    private boolean mDockedStackExists;
 
     private boolean mManagedProfileIconVisible = false;
     private boolean mManagedProfileInQuietMode = false;
@@ -147,6 +158,7 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
         mZenController = Dependency.get(ZenModeController.class);
         mProvisionedController = Dependency.get(DeviceProvisionedController.class);
         mKeyguardMonitor = Dependency.get(KeyguardMonitor.class);
+        mLocationController = Dependency.get(LocationController.class);
 
         mSlotCast = context.getString(com.android.internal.R.string.status_bar_cast);
         mSlotHotspot = context.getString(com.android.internal.R.string.status_bar_hotspot);
@@ -160,7 +172,7 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
         mSlotRotate = context.getString(com.android.internal.R.string.status_bar_rotate);
         mSlotHeadset = context.getString(com.android.internal.R.string.status_bar_headset);
         mSlotDataSaver = context.getString(com.android.internal.R.string.status_bar_data_saver);
-
+        mSlotLocation = context.getString(com.android.internal.R.string.status_bar_location);
 
         // listen for broadcasts
         IntentFilter filter = new IntentFilter();
@@ -229,6 +241,7 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
         mNextAlarm.addCallback(mNextAlarmCallback);
         mDataSaver.addCallback(this);
         mKeyguardMonitor.addCallback(this);
+        mLocationController.addCallback(this);
 
         SysUiServiceProvider.getComponent(mContext, CommandQueue.class).addCallbacks(this);
         SystemServicesProxy.getInstance(mContext).registerTaskStackListener(mTaskListener);
@@ -240,6 +253,10 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
                 noMan.cancel(notification.getTag(), notification.getId());
             }
         }
+        DockedStackExistsListener.register(exists -> {
+            mDockedStackExists = exists;
+            updateForegroundInstantApps();
+        });
     }
 
     public void destroy() {
@@ -252,6 +269,7 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
         mNextAlarm.removeCallback(mNextAlarmCallback);
         mDataSaver.removeCallback(this);
         mKeyguardMonitor.removeCallback(this);
+        mLocationController.removeCallback(this);
         SysUiServiceProvider.getComponent(mContext, CommandQueue.class).removeCallbacks(this);
         mContext.unregisterReceiver(mIntentReceiver);
 
@@ -263,6 +281,21 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
     @Override
     public void onZenChanged(int zen) {
         updateVolumeZen();
+    }
+
+    @Override
+    public void onLocationActiveChanged(boolean active) {
+        updateLocation();
+    }
+
+    // Updates the status view based on the current state of location requests.
+    private void updateLocation() {
+        if (mLocationController.isLocationActive()) {
+            mIconController.setIcon(mSlotLocation, LOCATION_STATUS_ICON_ID,
+                    mContext.getString(R.string.accessibility_location_active));
+        } else {
+            mIconController.removeIcon(mSlotLocation);
+        }
     }
 
     private void updateAlarm() {
@@ -471,23 +504,18 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
         IPackageManager pm = AppGlobals.getPackageManager();
         mCurrentNotifs.clear();
         try {
+            ArraySet<Integer> stacksToCheck = new ArraySet<>();
             int[] STACKS_TO_CHECK = new int[]{
                     StackId.FULLSCREEN_WORKSPACE_STACK_ID,
                     StackId.DOCKED_STACK_ID,
             };
-            for (int i = 0; i < STACKS_TO_CHECK.length; i++) {
-                StackInfo info = ActivityManager.getService().getStackInfo(STACKS_TO_CHECK[i]);
-                if (info == null || info.topActivity == null) continue;
-                String pkg = info.topActivity.getPackageName();
-                if (!hasNotif(notifs, pkg, info.userId)) {
-                    // TODO: Optimize by not always needing to get application info.
-                    // Maybe cache non-ephemeral packages?
-                    ApplicationInfo appInfo = pm.getApplicationInfo(pkg,
-                            PackageManager.MATCH_UNINSTALLED_PACKAGES, info.userId);
-                    if (appInfo.isInstantApp()) {
-                        postEphemeralNotif(pkg, info.userId, appInfo, noMan);
-                    }
-                }
+            int focusedId = ActivityManager.getService().getFocusedStackId();
+            if (focusedId == StackId.FULLSCREEN_WORKSPACE_STACK_ID
+                    || focusedId == StackId.FULLSCREEN_WORKSPACE_STACK_ID) {
+                checkStack(StackId.FULLSCREEN_WORKSPACE_STACK_ID, notifs, noMan, pm);
+            }
+            if (mDockedStackExists) {
+                checkStack(StackId.DOCKED_STACK_ID, notifs, noMan, pm);
             }
         } catch (RemoteException e) {
             e.rethrowFromSystemServer();
@@ -497,8 +525,28 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
                 new UserHandle(v.second)));
     }
 
+    private void checkStack(int stackId, ArraySet<Pair<String, Integer>> notifs,
+            NotificationManager noMan, IPackageManager pm) {
+        try {
+            StackInfo info = ActivityManager.getService().getStackInfo(stackId);
+            if (info == null || info.topActivity == null) return;
+            String pkg = info.topActivity.getPackageName();
+            if (!hasNotif(notifs, pkg, info.userId)) {
+                // TODO: Optimize by not always needing to get application info.
+                // Maybe cache non-ephemeral packages?
+                ApplicationInfo appInfo = pm.getApplicationInfo(pkg,
+                        PackageManager.MATCH_UNINSTALLED_PACKAGES, info.userId);
+                if (appInfo.isInstantApp()) {
+                    postEphemeralNotif(pkg, info.userId, appInfo, noMan, info.taskIds[info.taskIds.length - 1]);
+                }
+            }
+        } catch (RemoteException e) {
+            e.rethrowFromSystemServer();
+        }
+    }
+
     private void postEphemeralNotif(String pkg, int userId, ApplicationInfo appInfo,
-            NotificationManager noMan) {
+            NotificationManager noMan, int taskId) {
         final Bundle extras = new Bundle();
         extras.putString(Notification.EXTRA_SUBSTITUTE_APP_NAME,
                 mContext.getString(R.string.instant_apps));
@@ -507,12 +555,41 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
         PendingIntent appInfoAction = PendingIntent.getActivity(mContext, 0,
                 new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                         .setData(Uri.fromParts("package", pkg, null)), 0);
-        // TODO: Add action for go to web as well.
         Action action = new Notification.Action.Builder(null, mContext.getString(R.string.app_info),
                 appInfoAction).build();
 
-        noMan.notifyAsUser(pkg, SystemMessage.NOTE_INSTANT_APPS,
-                new Notification.Builder(mContext, NotificationChannels.GENERAL)
+        Intent browserIntent = getTaskIntent(taskId, userId);
+        Notification.Builder builder = new Notification.Builder(mContext, NotificationChannels.GENERAL);
+        if (browserIntent != null) {
+            // Make sure that this doesn't resolve back to an instant app
+            browserIntent.setComponent(null)
+                    .setPackage(null)
+                    .addFlags(Intent.FLAG_IGNORE_EPHEMERAL)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+            PendingIntent pendingIntent = PendingIntent.getActivity(mContext,
+                    0 /* requestCode */, browserIntent, 0 /* flags */);
+            ComponentName aiaComponent = null;
+            try {
+                aiaComponent = AppGlobals.getPackageManager().getInstantAppInstallerComponent();
+            } catch (RemoteException e) {
+                e.rethrowFromSystemServer();
+            }
+            Intent goToWebIntent = new Intent()
+                    .setComponent(aiaComponent)
+                    .setAction(Intent.ACTION_VIEW)
+                    .addCategory(Intent.CATEGORY_BROWSABLE)
+                    .putExtra(Intent.EXTRA_PACKAGE_NAME, appInfo.packageName)
+                    .putExtra(Intent.EXTRA_VERSION_CODE, appInfo.versionCode)
+                    .putExtra(Intent.EXTRA_EPHEMERAL_FAILURE, pendingIntent);
+
+            PendingIntent webPendingIntent = PendingIntent.getActivity(mContext, 0, goToWebIntent, 0);
+            Action webAction = new Notification.Action.Builder(null, mContext.getString(R.string.go_to_web),
+                    webPendingIntent).build();
+            builder.addAction(webAction);
+        }
+
+        noMan.notifyAsUser(pkg, SystemMessage.NOTE_INSTANT_APPS, builder
                         .addExtras(extras)
                         .addAction(action)
                         .setContentIntent(appInfoAction)
@@ -525,6 +602,17 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
                         .setOngoing(true)
                         .build(),
                 new UserHandle(userId));
+    }
+
+    private Intent getTaskIntent(int taskId, int userId) {
+        List<ActivityManager.RecentTaskInfo> tasks = mContext.getSystemService(ActivityManager.class)
+                .getRecentTasksForUser(NUM_TASKS_FOR_INSTANT_APP_INFO, 0, userId);
+        for (int i = 0; i < tasks.size(); i++) {
+            if (tasks.get(i).id == taskId) {
+                return tasks.get(i).baseIntent;
+            }
+        }
+        return null;
     }
 
     private boolean hasNotif(ArraySet<Pair<String, Integer>> notifs, String pkg, int userId) {

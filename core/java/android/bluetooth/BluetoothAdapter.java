@@ -466,6 +466,30 @@ public final class BluetoothAdapter {
         "android.bluetooth.adapter.action.BLE_STATE_CHANGED";
 
     /**
+     * Intent used to broadcast the change in the Bluetooth address
+     * of the local Bluetooth adapter.
+     * <p>Always contains the extra field {@link
+     * #EXTRA_BLUETOOTH_ADDRESS} containing the Bluetooth address.
+     *
+     * Note: only system level processes are allowed to send this
+     * defined broadcast.
+     *
+     * @hide
+     */
+    public static final String ACTION_BLUETOOTH_ADDRESS_CHANGED =
+        "android.bluetooth.adapter.action.BLUETOOTH_ADDRESS_CHANGED";
+
+    /**
+     * Used as a String extra field in {@link
+     * #ACTION_BLUETOOTH_ADDRESS_CHANGED} intent to store the local
+     * Bluetooth address.
+     *
+     * @hide
+     */
+    public static final String EXTRA_BLUETOOTH_ADDRESS =
+          "android.bluetooth.adapter.extra.BLUETOOTH_ADDRESS";
+
+    /**
      * Broadcast Action: The notifys Bluetooth ACL connected event. This will be
      * by BLE Always on enabled application to know the ACL_CONNECTED event
      * when Bluetooth state in STATE_BLE_ON. This denotes GATT connection
@@ -591,6 +615,7 @@ public final class BluetoothAdapter {
      * @throws IllegalArgumentException if address is invalid
      */
     public BluetoothDevice getRemoteDevice(String address) {
+        android.util.SeempLog.record(62);
         return new BluetoothDevice(address);
     }
 
@@ -606,6 +631,7 @@ public final class BluetoothAdapter {
      * @throws IllegalArgumentException if address is invalid
      */
     public BluetoothDevice getRemoteDevice(byte[] address) {
+        android.util.SeempLog.record(62);
         if (address == null || address.length != 6) {
             throw new IllegalArgumentException("Bluetooth address must have 6 bytes");
         }
@@ -673,7 +699,6 @@ public final class BluetoothAdapter {
      * Return true if Bluetooth is currently enabled and ready for use.
      * <p>Equivalent to:
      * <code>getBluetoothState() == STATE_ON</code>
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
      *
      * @return true if the local adapter is turned on
      */
@@ -811,13 +836,13 @@ public final class BluetoothAdapter {
      * {@link #STATE_TURNING_ON},
      * {@link #STATE_ON},
      * {@link #STATE_TURNING_OFF}.
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
      *
      * @return current state of Bluetooth adapter
      */
     @RequiresPermission(Manifest.permission.BLUETOOTH)
     @AdapterState
     public int getState() {
+        android.util.SeempLog.record(63);
         int state = BluetoothAdapter.STATE_OFF;
 
         try {
@@ -854,7 +879,6 @@ public final class BluetoothAdapter {
      * {@link #STATE_ON},
      * {@link #STATE_TURNING_OFF},
      * {@link #STATE_BLE_TURNING_OFF}.
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
      *
      * @return current state of Bluetooth adapter
      * @hide
@@ -910,14 +934,13 @@ public final class BluetoothAdapter {
      * #STATE_ON}. If this call returns false then there was an
      * immediate problem that will prevent the adapter from being turned on -
      * such as Airplane mode, or the adapter is already turned on.
-     * <p>Requires the {@link android.Manifest.permission#BLUETOOTH_ADMIN}
-     * permission
      *
      * @return true to indicate adapter startup has begun, or false on
      *         immediate error
      */
     @RequiresPermission(Manifest.permission.BLUETOOTH_ADMIN)
     public boolean enable() {
+        android.util.SeempLog.record(56);
         if (isEnabled()) {
             if (DBG) Log.d(TAG, "enable(): BT already enabled!");
             return true;
@@ -946,14 +969,13 @@ public final class BluetoothAdapter {
      * #STATE_ON}. If this call returns false then there was an
      * immediate problem that will prevent the adapter from being turned off -
      * such as the adapter already being turned off.
-     * <p>Requires the {@link android.Manifest.permission#BLUETOOTH_ADMIN}
-     * permission
      *
      * @return true to indicate adapter shutdown has begun, or false on
      *         immediate error
      */
     @RequiresPermission(Manifest.permission.BLUETOOTH_ADMIN)
     public boolean disable() {
+        android.util.SeempLog.record(57);
         try {
             return mManagerService.disable(ActivityThread.currentPackageName(), true);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
@@ -971,6 +993,7 @@ public final class BluetoothAdapter {
      * @hide
      */
     public boolean disable(boolean persist) {
+        android.util.SeempLog.record(57);
 
         try {
             return mManagerService.disable(ActivityThread.currentPackageName(), persist);
@@ -981,7 +1004,6 @@ public final class BluetoothAdapter {
     /**
      * Returns the hardware address of the local Bluetooth adapter.
      * <p>For example, "00:11:22:AA:BB:CC".
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
      *
      * @return Bluetooth hardware address as string
      */
@@ -1085,7 +1107,6 @@ public final class BluetoothAdapter {
      * will return false. After turning on Bluetooth,
      * wait for {@link #ACTION_STATE_CHANGED} with {@link #STATE_ON}
      * to get the updated value.
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN}
      *
      * @param name a valid Bluetooth name
      * @return     true if the name was set, false otherwise
@@ -1116,7 +1137,6 @@ public final class BluetoothAdapter {
      * will return {@link #SCAN_MODE_NONE}. After turning on Bluetooth,
      * wait for {@link #ACTION_STATE_CHANGED} with {@link #STATE_ON}
      * to get the updated value.
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
      *
      * @return scan mode
      */
@@ -1255,12 +1275,12 @@ public final class BluetoothAdapter {
      * will return false. After turning on Bluetooth,
      * wait for {@link #ACTION_STATE_CHANGED} with {@link #STATE_ON}
      * to get the updated value.
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN}.
      *
      * @return true on success, false on error
      */
     @RequiresPermission(Manifest.permission.BLUETOOTH_ADMIN)
     public boolean startDiscovery() {
+        android.util.SeempLog.record(58);
         if (getState() != STATE_ON) return false;
         try {
             mServiceLock.readLock().lock();
@@ -1275,7 +1295,6 @@ public final class BluetoothAdapter {
 
     /**
      * Cancel the current device discovery process.
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN}.
      * <p>Because discovery is a heavyweight procedure for the Bluetooth
      * adapter, this method should always be called before attempting to connect
      * to a remote device with {@link
@@ -1319,7 +1338,6 @@ public final class BluetoothAdapter {
      * will return false. After turning on Bluetooth,
      * wait for {@link #ACTION_STATE_CHANGED} with {@link #STATE_ON}
      * to get the updated value.
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
      *
      * @return true if discovering
      */
@@ -1484,8 +1502,8 @@ public final class BluetoothAdapter {
     }
 
     /**
-     * Return the maximum LE advertising data length,
-     * if LE Extended Advertising feature is supported.
+     * Return the maximum LE advertising data length in bytes,
+     * if LE Extended Advertising feature is supported, 0 otherwise.
      *
      * @return the maximum LE advertising data length.
      */
@@ -1586,12 +1604,12 @@ public final class BluetoothAdapter {
      * will return an empty set. After turning on Bluetooth,
      * wait for {@link #ACTION_STATE_CHANGED} with {@link #STATE_ON}
      * to get the updated value.
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
      *
      * @return unmodifiable set of {@link BluetoothDevice}, or null on error
      */
     @RequiresPermission(Manifest.permission.BLUETOOTH)
     public Set<BluetoothDevice> getBondedDevices() {
+        android.util.SeempLog.record(61);
         if (getState() != STATE_ON) {
             return toDeviceSet(new BluetoothDevice[0]);
         }
@@ -1671,8 +1689,6 @@ public final class BluetoothAdapter {
      * Profile can be one of {@link BluetoothProfile#HEALTH}, {@link BluetoothProfile#HEADSET},
      * {@link BluetoothProfile#A2DP}.
      *
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}.
-     *
      * <p> Return value can be one of
      * {@link BluetoothProfile#STATE_DISCONNECTED},
      * {@link BluetoothProfile#STATE_CONNECTING},
@@ -1681,6 +1697,7 @@ public final class BluetoothAdapter {
      */
     @RequiresPermission(Manifest.permission.BLUETOOTH)
     public int getProfileConnectionState(int profile) {
+        android.util.SeempLog.record(64);
         if (getState() != STATE_ON) return BluetoothProfile.STATE_DISCONNECTED;
         try {
             mServiceLock.readLock().lock();
@@ -1762,7 +1779,6 @@ public final class BluetoothAdapter {
      * closed, or if this application closes unexpectedly.
      * <p>Use {@link BluetoothDevice#createRfcommSocketToServiceRecord} to
      * connect to this socket from another device using the same {@link UUID}.
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
      * @param name service name for SDP record
      * @param uuid uuid for SDP record
      * @return a listening RFCOMM BluetoothServerSocket
@@ -1794,7 +1810,6 @@ public final class BluetoothAdapter {
      * closed, or if this application closes unexpectedly.
      * <p>Use {@link BluetoothDevice#createRfcommSocketToServiceRecord} to
      * connect to this socket from another device using the same {@link UUID}.
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH}
      * @param name service name for SDP record
      * @param uuid uuid for SDP record
      * @return a listening RFCOMM BluetoothServerSocket
@@ -1804,6 +1819,7 @@ public final class BluetoothAdapter {
     @RequiresPermission(Manifest.permission.BLUETOOTH)
     public BluetoothServerSocket listenUsingInsecureRfcommWithServiceRecord(String name, UUID uuid)
             throws IOException {
+        android.util.SeempLog.record(59);
         return createNewRfcommSocketAndRecord(name, uuid, false, false);
     }
 
@@ -2386,8 +2402,6 @@ public final class BluetoothAdapter {
      * <p>Results of the scan are reported using the
      * {@link LeScanCallback#onLeScan} callback.
      *
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN} permission.
-     *
      * @param callback the callback LE scan results are delivered
      * @return true, if the scan was started successfully
      * @deprecated use {@link BluetoothLeScanner#startScan(List, ScanSettings, ScanCallback)}
@@ -2405,8 +2419,6 @@ public final class BluetoothAdapter {
      *
      * <p>Devices which advertise all specified services are reported using the
      * {@link LeScanCallback#onLeScan} callback.
-     *
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN} permission.
      *
      * @param serviceUuids Array of services to look for
      * @param callback the callback LE scan results are delivered
@@ -2494,8 +2506,6 @@ public final class BluetoothAdapter {
 
     /**
      * Stops an ongoing Bluetooth LE device scan.
-     *
-     * <p>Requires {@link android.Manifest.permission#BLUETOOTH_ADMIN} permission.
      *
      * @param callback used to identify which scan to stop
      *        must be the same handle used to start the scan

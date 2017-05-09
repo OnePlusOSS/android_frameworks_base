@@ -40,6 +40,7 @@ applications that come with the platform
 
     <privapp-permissions package="com.android.defcontainer">
         <permission name="android.permission.ACCESS_CACHE_FILESYSTEM"/>
+        <permission name="android.permission.ALLOCATE_AGGRESSIVE"/>
         <permission name="android.permission.INTERACT_ACROSS_USERS"/>
         <permission name="android.permission.WRITE_MEDIA_STORAGE"/>
     </privapp-permissions>
@@ -353,6 +354,10 @@ applications that come with the platform
     <privapp-permissions package="com.android.vpndialogs">
         <permission name="android.permission.CONNECTIVITY_INTERNAL"/>
         <permission name="android.permission.CONTROL_VPN"/>
+    </privapp-permissions>
+
+    <privapp-permissions package="com.google.android.ext.services">
+        <permission name="android.permission.PROVIDE_RESOLVER_RANKER_SERVICE" />
     </privapp-permissions>
 
 </permissions>

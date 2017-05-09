@@ -78,7 +78,6 @@ public class TetherInterfaceStateMachine extends StateMachine {
     public static final int CMD_IPV6_TETHER_UPDATE          = BASE_IFACE + 13;
 
     private final State mInitialState;
-    private final State mServingState;
     private final State mLocalHotspotState;
     private final State mTetheredState;
     private final State mUnavailableState;
@@ -107,22 +106,22 @@ public class TetherInterfaceStateMachine extends StateMachine {
         mLastError = ConnectivityManager.TETHER_ERROR_NO_ERROR;
 
         mInitialState = new InitialState();
-        mServingState = new ServingState();
         mLocalHotspotState = new LocalHotspotState();
         mTetheredState = new TetheredState();
         mUnavailableState = new UnavailableState();
         addState(mInitialState);
-        addState(mServingState);
-            addState(mLocalHotspotState, mServingState);
-            addState(mTetheredState, mServingState);
+        addState(mLocalHotspotState);
+        addState(mTetheredState);
         addState(mUnavailableState);
 
         setInitialState(mInitialState);
     }
 
-    public int interfaceType() {
-        return mInterfaceType;
-    }
+    public String interfaceName() { return mIfaceName; }
+
+    public int interfaceType() { return mInterfaceType; }
+
+    public int lastError() { return mLastError; }
 
     // configured when we start tethering and unconfig'd on error or conclusion
     private boolean configureIfaceIp(boolean enabled) {
@@ -197,7 +196,7 @@ public class TetherInterfaceStateMachine extends StateMachine {
                 case CMD_TETHER_REQUESTED:
                     mLastError = ConnectivityManager.TETHER_ERROR_NO_ERROR;
                     switch (message.arg1) {
-                        case IControlsTethering.STATE_LOCAL_HOTSPOT:
+                        case IControlsTethering.STATE_LOCAL_ONLY:
                             transitionTo(mLocalHotspotState);
                             break;
                         case IControlsTethering.STATE_TETHERED:
@@ -222,12 +221,11 @@ public class TetherInterfaceStateMachine extends StateMachine {
         }
     }
 
-    class ServingState extends State {
+    class BaseServingState extends State {
         @Override
         public void enter() {
             if (!configureIfaceIp(true)) {
                 mLastError = ConnectivityManager.TETHER_ERROR_IFACE_CFG_ERROR;
-                transitionTo(mInitialState);
                 return;
             }
 
@@ -236,12 +234,13 @@ public class TetherInterfaceStateMachine extends StateMachine {
             } catch (Exception e) {
                 Log.e(TAG, "Error Tethering: " + e.toString());
                 mLastError = ConnectivityManager.TETHER_ERROR_TETHER_IFACE_ERROR;
-                transitionTo(mInitialState);
                 return;
             }
 
             if (!mIPv6TetherSvc.start()) {
                 Log.e(TAG, "Failed to start IPv6TetheringInterfaceServices");
+                // TODO: Make this a fatal error once Bluetooth IPv6 is sorted.
+                return;
             }
         }
 
@@ -254,9 +253,9 @@ public class TetherInterfaceStateMachine extends StateMachine {
 
             try {
                 mNMService.untetherInterface(mIfaceName);
-            } catch (Exception ee) {
+            } catch (Exception e) {
                 mLastError = ConnectivityManager.TETHER_ERROR_UNTETHER_IFACE_ERROR;
-                Log.e(TAG, "Failed to untether interface: " + ee.toString());
+                Log.e(TAG, "Failed to untether interface: " + e.toString());
             }
 
             configureIfaceIp(false);
@@ -293,15 +292,27 @@ public class TetherInterfaceStateMachine extends StateMachine {
         }
     }
 
-    class LocalHotspotState extends State {
+    // Handling errors in BaseServingState.enter() by transitioning is
+    // problematic because transitioning during a multi-state jump yields
+    // a Log.wtf(). Ultimately, there should be only one ServingState,
+    // and forwarding and NAT rules should be handled by a coordinating
+    // functional element outside of TetherInterfaceStateMachine.
+    class LocalHotspotState extends BaseServingState {
         @Override
         public void enter() {
+            super.enter();
+            if (mLastError != ConnectivityManager.TETHER_ERROR_NO_ERROR) {
+                transitionTo(mInitialState);
+            }
+
             if (DBG) Log.d(TAG, "Local hotspot " + mIfaceName);
-            sendInterfaceState(IControlsTethering.STATE_LOCAL_HOTSPOT);
+            sendInterfaceState(IControlsTethering.STATE_LOCAL_ONLY);
         }
 
         @Override
         public boolean processMessage(Message message) {
+            if (super.processMessage(message)) return true;
+
             maybeLogMessage(this, message.what);
             switch (message.what) {
                 case CMD_TETHER_REQUESTED:
@@ -317,9 +328,19 @@ public class TetherInterfaceStateMachine extends StateMachine {
         }
     }
 
-    class TetheredState extends State {
+    // Handling errors in BaseServingState.enter() by transitioning is
+    // problematic because transitioning during a multi-state jump yields
+    // a Log.wtf(). Ultimately, there should be only one ServingState,
+    // and forwarding and NAT rules should be handled by a coordinating
+    // functional element outside of TetherInterfaceStateMachine.
+    class TetheredState extends BaseServingState {
         @Override
         public void enter() {
+            super.enter();
+            if (mLastError != ConnectivityManager.TETHER_ERROR_NO_ERROR) {
+                transitionTo(mInitialState);
+            }
+
             if (DBG) Log.d(TAG, "Tethered " + mIfaceName);
             sendInterfaceState(IControlsTethering.STATE_TETHERED);
         }
@@ -327,6 +348,7 @@ public class TetherInterfaceStateMachine extends StateMachine {
         @Override
         public void exit() {
             cleanupUpstream();
+            super.exit();
         }
 
         private void cleanupUpstream() {
@@ -361,6 +383,8 @@ public class TetherInterfaceStateMachine extends StateMachine {
 
         @Override
         public boolean processMessage(Message message) {
+            if (super.processMessage(message)) return true;
+
             maybeLogMessage(this, message.what);
             boolean retValue = true;
             switch (message.what) {

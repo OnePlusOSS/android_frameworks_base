@@ -41,6 +41,7 @@ import android.content.pm.InstantAppResolveInfo.InstantAppDigest;
 import android.metrics.LogMaker;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.util.Log;
@@ -74,11 +75,11 @@ public abstract class InstantAppResolver {
 
     public static AuxiliaryResolveInfo doInstantAppResolutionPhaseOne(Context context,
             EphemeralResolverConnection connection, InstantAppRequest requestObj) {
-        if (DEBUG_EPHEMERAL) {
-            Log.d(TAG, "Resolving phase 1");
-        }
         final long startTime = System.currentTimeMillis();
         final String token = UUID.randomUUID().toString();
+        if (DEBUG_EPHEMERAL) {
+            Log.d(TAG, "[" + token + "] Resolving phase 1");
+        }
         final Intent intent = requestObj.origIntent;
         final InstantAppDigest digest =
                 new InstantAppDigest(intent.getData().getHost(), 5 /*maxDigests*/);
@@ -89,7 +90,7 @@ public abstract class InstantAppResolver {
         if (instantAppResolveInfoList == null || instantAppResolveInfoList.size() == 0) {
             // No hash prefix match; there are no instant apps for this domain.
             if (DEBUG_EPHEMERAL) {
-                Log.d(TAG, "No results returned");
+                Log.d(TAG, "[" + token + "] No results returned");
             }
             return null;
         }
@@ -98,21 +99,24 @@ public abstract class InstantAppResolver {
                 intent.getPackage(), digest, token);
         logMetrics(ACTION_INSTANT_APP_RESOLUTION_PHASE_ONE, startTime, token,
                 RESOLUTION_SUCCESS);
+        if (DEBUG_EPHEMERAL && resolveInfo == null) {
+            Log.d(TAG, "[" + token + "] No results matched");
+        }
         return resolveInfo;
     }
 
     public static void doInstantAppResolutionPhaseTwo(Context context,
             EphemeralResolverConnection connection, InstantAppRequest requestObj,
             ActivityInfo instantAppInstaller, Handler callbackHandler) {
-        if (DEBUG_EPHEMERAL) {
-            Log.d(TAG, "Resolving phase 2");
-        }
         final long startTime = System.currentTimeMillis();
+        final String token = requestObj.responseObj.token;
+        if (DEBUG_EPHEMERAL) {
+            Log.d(TAG, "[" + token + "] Resolving phase 2");
+        }
         final Intent intent = requestObj.origIntent;
         final String hostName = intent.getData().getHost();
         final InstantAppDigest digest = new InstantAppDigest(hostName, 5 /*maxDigests*/);
         final int[] shaPrefix = digest.getDigestPrefix();
-        final String token = requestObj.responseObj.token;
 
         final PhaseTwoCallback callback = new PhaseTwoCallback() {
             @Override
@@ -144,6 +148,7 @@ public abstract class InstantAppResolver {
                 final Intent installerIntent = buildEphemeralInstallerIntent(
                         requestObj.origIntent,
                         requestObj.callingPackage,
+                        requestObj.verificationBundle,
                         requestObj.resolvedType,
                         requestObj.userId,
                         packageName,
@@ -169,6 +174,7 @@ public abstract class InstantAppResolver {
      */
     public static Intent buildEphemeralInstallerIntent(@NonNull Intent origIntent,
             @NonNull String callingPackage,
+            @Nullable Bundle verificationBundle,
             @NonNull String resolvedType,
             int userId,
             @NonNull String instantAppPackageName,
@@ -231,6 +237,10 @@ public abstract class InstantAppResolver {
             intent.putExtra(Intent.EXTRA_PACKAGE_NAME, instantAppPackageName);
             intent.putExtra(Intent.EXTRA_SPLIT_NAME, instantAppSplitName);
             intent.putExtra(Intent.EXTRA_VERSION_CODE, versionCode);
+            intent.putExtra(Intent.EXTRA_CALLING_PACKAGE, callingPackage);
+            if (verificationBundle != null) {
+                intent.putExtra(Intent.EXTRA_VERIFICATION_BUNDLE, verificationBundle);
+            }
         }
 
         return intent;
@@ -285,12 +295,16 @@ public abstract class InstantAppResolver {
                 if (!matchedResolveInfoList.isEmpty()) {
                     if (DEBUG_EPHEMERAL) {
                         final AuxiliaryResolveInfo info = matchedResolveInfoList.get(0);
-                        Log.d(TAG, "Found match;"
+                        Log.d(TAG, "[" + token + "] Found match;"
                                 + " package: " + info.packageName
                                 + ", split: " + info.splitName
                                 + ", versionCode: " + info.versionCode);
                     }
                     return matchedResolveInfoList.get(0);
+                } else if (DEBUG_EPHEMERAL) {
+                    Log.d(TAG, "[" + token + "] No matches found"
+                            + " package: " + instantAppInfo.getPackageName()
+                            + ", versionCode: " + instantAppInfo.getVersionCode());
                 }
             }
         }

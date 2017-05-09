@@ -16,7 +16,8 @@
 
 package android.service.autofill;
 
-import static android.view.autofill.Helper.DEBUG;
+import static android.service.autofill.FillRequest.INVALID_REQUEST_ID;
+import static android.view.autofill.Helper.sDebug;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -29,11 +30,11 @@ import android.view.autofill.AutofillManager;
 import android.widget.RemoteViews;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * Response for a {@link
- * AutofillService#onFillRequest(android.app.assist.AssistStructure,
- * Bundle, int, android.os.CancellationSignal, FillCallback)}.
+ * AutofillService#onFillRequest(FillRequest, android.os.CancellationSignal, FillCallback)}.
  *
  * <p>The response typically contains one or more {@link Dataset}s, each representing a set of
  * fields that can be autofilled together, and the Android system displays a dataset picker UI
@@ -132,25 +133,29 @@ import java.util.ArrayList;
  */
 public final class FillResponse implements Parcelable {
 
-    private final ArrayList<Dataset> mDatasets;
-    private final SaveInfo mSaveInfo;
-    private final Bundle mExtras;
-    private final RemoteViews mPresentation;
-    private final IntentSender mAuthentication;
-    private AutofillId[] mAuthenticationIds;
+    private final @Nullable ArrayList<Dataset> mDatasets;
+    private final @Nullable SaveInfo mSaveInfo;
+    private final @Nullable Bundle mClientState;
+    private final @Nullable RemoteViews mPresentation;
+    private final @Nullable IntentSender mAuthentication;
+    private final @Nullable AutofillId[] mAuthenticationIds;
+    private final @Nullable AutofillId[] mIgnoredIds;
+    private int mRequestId;
 
     private FillResponse(@NonNull Builder builder) {
         mDatasets = builder.mDatasets;
         mSaveInfo = builder.mSaveInfo;
-        mExtras = builder.mExtras;
+        mClientState = builder.mCLientState;
         mPresentation = builder.mPresentation;
         mAuthentication = builder.mAuthentication;
         mAuthenticationIds = builder.mAuthenticationIds;
+        mIgnoredIds = builder.mIgnoredIds;
+        mRequestId = INVALID_REQUEST_ID;
     }
 
     /** @hide */
-    public @Nullable Bundle getExtras() {
-        return mExtras;
+    public @Nullable Bundle getClientState() {
+        return mClientState;
     }
 
     /** @hide */
@@ -178,6 +183,29 @@ public final class FillResponse implements Parcelable {
         return mAuthenticationIds;
     }
 
+    /** @hide */
+    public @Nullable AutofillId[] getIgnoredIds() {
+        return mIgnoredIds;
+    }
+
+    /**
+     * Associates a {@link FillResponse} to a request.
+     *
+     * <p>Set inside of the {@link FillCallback} code, not the {@link AutofillService}.
+     *
+     * @param requestId The id of the request to associate the response to.
+     *
+     * @hide
+     */
+    public void setRequestId(int requestId) {
+        mRequestId = requestId;
+    }
+
+    /** @hide */
+    public int getRequestId() {
+        return mRequestId;
+    }
+
     /**
      * Builder for {@link FillResponse} objects. You must to provide at least
      * one dataset or set an authentication intent with a presentation view.
@@ -185,10 +213,11 @@ public final class FillResponse implements Parcelable {
     public static final class Builder {
         private ArrayList<Dataset> mDatasets;
         private SaveInfo mSaveInfo;
-        private Bundle mExtras;
+        private Bundle mCLientState;
         private RemoteViews mPresentation;
         private IntentSender mAuthentication;
         private AutofillId[] mAuthenticationIds;
+        private AutofillId[] mIgnoredIds;
         private boolean mDestroyed;
 
         /**
@@ -230,12 +259,17 @@ public final class FillResponse implements Parcelable {
          * @param ids id of Views that when focused will display the authentication UI affordance.
          *
          * @return This builder.
+         * @throw {@link IllegalArgumentException} if {@code ids} is {@code null} or empty, or if
+         * neither {@code authentication} nor {@code presentation} is non-{@code null}.
+         *
          * @see android.app.PendingIntent#getIntentSender()
          */
         public @NonNull Builder setAuthentication(@NonNull AutofillId[] ids,
                 @Nullable IntentSender authentication, @Nullable RemoteViews presentation) {
             throwIfDestroyed();
-            // TODO(b/33197203): assert ids is not null nor empty once old version is removed
+            if (ids == null || ids.length == 0) {
+                throw new IllegalArgumentException("ids cannot be null or empry");
+            }
             if (authentication == null ^ presentation == null) {
                 throw new IllegalArgumentException("authentication and presentation"
                         + " must be both non-null or null");
@@ -247,14 +281,16 @@ public final class FillResponse implements Parcelable {
         }
 
         /**
-         * TODO(b/33197203): will be removed once clients use the version that takes ids
-         * @hide
-         * @deprecated
+         * Specifies views that should not trigger new
+         * {@link AutofillService#onFillRequest(FillRequest, android.os.CancellationSignal,
+         * FillCallback)} requests.
+         *
+         * <p>This is typically used when the service cannot autofill the view; for example, an
+         * {@code EditText} representing a captcha.
          */
-        @Deprecated
-        public @NonNull Builder setAuthentication(@Nullable IntentSender authentication,
-                @Nullable RemoteViews presentation) {
-            return setAuthentication(null, authentication, presentation);
+        public Builder setIgnoredIds(AutofillId...ids) {
+            mIgnoredIds = ids;
+            return this;
         }
 
         /**
@@ -290,25 +326,38 @@ public final class FillResponse implements Parcelable {
         }
 
         /**
-         * Sets a {@link Bundle} that will be passed to subsequent APIs that
+         * @deprecated Use {@link #setClientState(Bundle)} instead.
+         * @hide
+         */
+        @Deprecated
+        public Builder setExtras(@Nullable Bundle extras) {
+            throwIfDestroyed();
+            mCLientState = extras;
+            return this;
+        }
+
+        /**
+         * Sets a {@link Bundle state} that will be passed to subsequent APIs that
          * manipulate this response. For example, they are passed to subsequent
-         * calls to {@link AutofillService#onFillRequest(
-         * android.app.assist.AssistStructure, Bundle, int,
-         * android.os.CancellationSignal, FillCallback)} and {@link AutofillService#onSaveRequest(
-         * android.app.assist.AssistStructure, Bundle, SaveCallback)}.
+         * calls to {@link AutofillService#onFillRequest(FillRequest, android.os.CancellationSignal,
+         * FillCallback)} and {@link AutofillService#onSaveRequest(SaveRequest, SaveCallback)}.
+         * You can use this to store intermediate state that is persistent across multiple
+         * fill requests and the subsequent save request.
          *
          * <p>If this method is called on multiple {@link FillResponse} objects for the same
          * activity, just the latest bundle is passed back to the service.
          *
-         * @param extras The response extras.
+         * <p>Once a {@link AutofillService#onSaveRequest(SaveRequest, SaveCallback)
+         * save request} is made the client state is cleared.
+         *
+         * @param clientState The custom client state.
          * @return This builder.
          */
-        public Builder setExtras(Bundle extras) {
+        public Builder setClientState(@Nullable Bundle clientState) {
             throwIfDestroyed();
-            mExtras = extras;
+            mCLientState = clientState;
             return this;
         }
-
 
         /**
          * Builds a new {@link FillResponse} instance. You must provide at least
@@ -340,16 +389,19 @@ public final class FillResponse implements Parcelable {
     /////////////////////////////////////
     @Override
     public String toString() {
-        if (!DEBUG) return super.toString();
+        if (!sDebug) return super.toString();
 
+        // TODO: create a dump() method instead
         return new StringBuilder(
-                "FillResponse: [datasets=").append(mDatasets)
+                "FillResponse : [mRequestId=" + mRequestId)
+                .append(", datasets=").append(mDatasets)
                 .append(", saveInfo=").append(mSaveInfo)
-                .append(", hasExtras=").append(mExtras != null)
+                .append(", clientState=").append(mClientState != null)
                 .append(", hasPresentation=").append(mPresentation != null)
                 .append(", hasAuthentication=").append(mAuthentication != null)
-                .append(", authenticationSize=").append(mAuthenticationIds != null
-                        ? mAuthenticationIds.length : "N/A")
+                .append(", authenticationIds=").append(Arrays.toString(mAuthenticationIds))
+                .append(", ignoredIds=").append(Arrays.toString(mIgnoredIds))
+                .append("]")
                 .toString();
     }
 
@@ -366,10 +418,12 @@ public final class FillResponse implements Parcelable {
     public void writeToParcel(Parcel parcel, int flags) {
         parcel.writeTypedArrayList(mDatasets, flags);
         parcel.writeParcelable(mSaveInfo, flags);
-        parcel.writeParcelable(mExtras, flags);
+        parcel.writeParcelable(mClientState, flags);
         parcel.writeParcelableArray(mAuthenticationIds, flags);
         parcel.writeParcelable(mAuthentication, flags);
         parcel.writeParcelable(mPresentation, flags);
+        parcel.writeParcelableArray(mIgnoredIds, flags);
+        parcel.writeInt(mRequestId);
     }
 
     public static final Parcelable.Creator<FillResponse> CREATOR =
@@ -386,10 +440,23 @@ public final class FillResponse implements Parcelable {
                 builder.addDataset(datasets.get(i));
             }
             builder.setSaveInfo(parcel.readParcelable(null));
-            builder.setExtras(parcel.readParcelable(null));
-            builder.setAuthentication(parcel.readParcelableArray(null, AutofillId.class),
-                    parcel.readParcelable(null), parcel.readParcelable(null));
-            return builder.build();
+            builder.setClientState(parcel.readParcelable(null));
+
+            // Sets authentication state.
+            final AutofillId[] authenticationIds = parcel.readParcelableArray(null,
+                    AutofillId.class);
+            final IntentSender authentication = parcel.readParcelable(null);
+            final RemoteViews presentation = parcel.readParcelable(null);
+            if (authenticationIds != null) {
+                builder.setAuthentication(authenticationIds, authentication, presentation);
+            }
+
+            builder.setIgnoredIds(parcel.readParcelableArray(null, AutofillId.class));
+            final FillResponse response = builder.build();
+
+            response.setRequestId(parcel.readInt());
+
+            return response;
         }
 
         @Override

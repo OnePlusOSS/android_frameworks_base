@@ -303,7 +303,7 @@ public final class Settings {
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_MANAGE_UNKNOWN_APP_SOURCES =
-            "android.settings.action.MANAGE_UNKNOWN_APP_SOURCES";
+            "android.settings.MANAGE_UNKNOWN_APP_SOURCES";
 
     /**
      * Activity Action: Show trusted credentials settings, opening to the user tab,
@@ -722,6 +722,19 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_APPLICATION_DETAILS_SETTINGS =
             "android.settings.APPLICATION_DETAILS_SETTINGS";
+
+    /**
+     * Activity Action: Show list of applications that have been running
+     * foreground services (to the user "running in the background").
+     * <p>
+     * Input: Extras "packages" is a string array of package names.
+     * <p>
+     * Output: Nothing.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_FOREGROUND_SERVICES_SETTINGS =
+            "android.settings.FOREGROUND_SERVICES_SETTINGS";
 
     /**
      * Activity Action: Show screen for controlling which apps can ignore battery optimizations.
@@ -1397,6 +1410,26 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_ENTERPRISE_PRIVACY_SETTINGS
             = "android.settings.ENTERPRISE_PRIVACY_SETTINGS";
+
+    /**
+     * Activity Action: Show screen that let user select its Autofill Service.
+     * <p>
+     * Input: Intent's data URI set with an application name, using the
+     * "package" schema (like "package:com.my.app").
+     *
+     * <p>
+     * Output: {@link android.app.Activity#RESULT_OK} if user selected an Autofill Service belonging
+     * to the caller package.
+     *
+     * <p>
+     * <b>NOTE: </b> applications should call
+     * {@link android.view.autofill.AutofillManager#hasEnabledAutofillServices()} and
+     * {@link android.view.autofill.AutofillManager#isAutofillSupported()} first, and only
+     * broadcast this intent if they return {@code false} and {@code true} respectively.
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_REQUEST_SET_AUTOFILL_SERVICE =
+            "android.settings.REQUEST_SET_AUTOFILL_SERVICE";
 
     // End of Intent actions for Settings
 
@@ -2162,6 +2195,7 @@ public final class Settings {
         /** @hide */
         public static String getStringForUser(ContentResolver resolver, String name,
                 int userHandle) {
+            android.util.SeempLog.record(android.util.SeempLog.getSeempGetApiIdFromValue(name));
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, returning read-only value.");
@@ -2189,6 +2223,7 @@ public final class Settings {
         /** @hide */
         public static boolean putStringForUser(ContentResolver resolver, String name, String value,
                 int userHandle) {
+            android.util.SeempLog.record(android.util.SeempLog.getSeempPutApiIdFromValue(name));
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, value is unchanged.");
@@ -3150,6 +3185,13 @@ public final class Settings {
         public static final String VOLUME_BLUETOOTH_SCO = "volume_bluetooth_sco";
 
         /**
+         * @hide
+         * Acessibility volume. This is used internally, changing this
+         * value will not change the volume.
+         */
+        public static final String VOLUME_ACCESSIBILITY = "volume_a11y";
+
+        /**
          * Master volume (float in the range 0.0f to 1.0f).
          *
          * @hide
@@ -3210,6 +3252,22 @@ public final class Settings {
             VOLUME_VOICE, VOLUME_SYSTEM, VOLUME_RING, VOLUME_MUSIC,
             VOLUME_ALARM, VOLUME_NOTIFICATION, VOLUME_BLUETOOTH_SCO
         };
+
+        /**
+         * @hide
+         * The mapping of stream type (integer) to its setting.
+         * Unlike the VOLUME_SETTINGS array, this one contains as many entries as
+         * AudioSystem.NUM_STREAM_TYPES, and has empty strings for stream types whose volumes
+         * are never persisted.
+         */
+        public static final String[] VOLUME_SETTINGS_INT = {
+                VOLUME_VOICE, VOLUME_SYSTEM, VOLUME_RING, VOLUME_MUSIC,
+                VOLUME_ALARM, VOLUME_NOTIFICATION, VOLUME_BLUETOOTH_SCO,
+                "" /*STREAM_SYSTEM_ENFORCED, no setting for this stream*/,
+                "" /*STREAM_DTMF, no setting for this stream*/,
+                "" /*STREAM_TTS, no setting for this stream*/,
+                VOLUME_ACCESSIBILITY
+            };
 
         /**
          * Appended to various volume related settings to record the previous
@@ -4125,6 +4183,7 @@ public final class Settings {
             INSTANT_APP_SETTINGS.add(HAPTIC_FEEDBACK_ENABLED);
             INSTANT_APP_SETTINGS.add(TIME_12_24);
             INSTANT_APP_SETTINGS.add(SOUND_EFFECTS_ENABLED);
+            INSTANT_APP_SETTINGS.add(ACCELEROMETER_ROTATION);
         }
 
         /**
@@ -5058,6 +5117,10 @@ public final class Settings {
          * (available on certain devices running Android 4.2 or higher), each user appears as a
          * completely separate device, so the {@code ANDROID_ID} value is unique to each
          * user.</p>
+         *
+         * <p class="note"><strong>Note:</strong> If the caller is an Instant App the id is scoped
+         * to the Instant App, it is generated when the Instant App is first installed and reset if
+         * the user clears the Instant App.
          */
         public static final String ANDROID_ID = "android_id";
 
@@ -5525,76 +5588,6 @@ public final class Settings {
          */
         public static final String ACCESSIBILITY_HIGH_TEXT_CONTRAST_ENABLED =
                 "high_text_contrast_enabled";
-
-        /**
-         * If injection of accessibility enhancing JavaScript screen-reader
-         * is enabled.
-         * <p>
-         *   Note: The JavaScript based screen-reader is served by the
-         *   Google infrastructure and enable users with disabilities to
-         *   efficiently navigate in and explore web content.
-         * </p>
-         * <p>
-         *   This property represents a boolean value.
-         * </p>
-         * @hide
-         */
-        public static final String ACCESSIBILITY_SCRIPT_INJECTION =
-            "accessibility_script_injection";
-
-        /**
-         * The URL for the injected JavaScript based screen-reader used
-         * for providing accessibility of content in WebView.
-         * <p>
-         *   Note: The JavaScript based screen-reader is served by the
-         *   Google infrastructure and enable users with disabilities to
-         *   efficiently navigate in and explore web content.
-         * </p>
-         * <p>
-         *   This property represents a string value.
-         * </p>
-         * @hide
-         */
-        public static final String ACCESSIBILITY_SCREEN_READER_URL =
-            "accessibility_script_injection_url";
-
-        /**
-         * Key bindings for navigation in built-in accessibility support for web content.
-         * <p>
-         *   Note: These key bindings are for the built-in accessibility navigation for
-         *   web content which is used as a fall back solution if JavaScript in a WebView
-         *   is not enabled or the user has not opted-in script injection from Google.
-         * </p>
-         * <p>
-         *   The bindings are separated by semi-colon. A binding is a mapping from
-         *   a key to a sequence of actions (for more details look at
-         *   android.webkit.AccessibilityInjector). A key is represented as the hexademical
-         *   string representation of an integer obtained from a meta state (optional) shifted
-         *   sixteen times left and bitwise ored with a key code. An action is represented
-         *   as a hexademical string representation of an integer where the first two digits
-         *   are navigation action index, the second, the third, and the fourth digit pairs
-         *   represent the action arguments. The separate actions in a binding are colon
-         *   separated. The key and the action sequence it maps to are separated by equals.
-         * </p>
-         * <p>
-         *   For example, the binding below maps the DPAD right button to traverse the
-         *   current navigation axis once without firing an accessibility event and to
-         *   perform the same traversal again but to fire an event:
-         *   <code>
-         *     0x16=0x01000100:0x01000101;
-         *   </code>
-         * </p>
-         * <p>
-         *   The goal of this binding is to enable dynamic rebinding of keys to
-         *   navigation actions for web content without requiring a framework change.
-         * </p>
-         * <p>
-         *   This property represents a string value.
-         * </p>
-         * @hide
-         */
-        public static final String ACCESSIBILITY_WEB_CONTENT_KEY_BINDINGS =
-            "accessibility_web_content_key_bindings";
 
         /**
          * Setting that specifies whether the display magnification is enabled via a system-wide
@@ -6644,6 +6637,13 @@ public final class Settings {
         public static final String PAYMENT_SERVICE_SEARCH_URI = "payment_service_search_uri";
 
         /**
+         * This is the query URI for finding a auto fill service to install.
+         *
+         * @hide
+         */
+        public static final String AUTOFILL_SERVICE_SEARCH_URI = "autofill_service_search_uri";
+
+        /**
          * If enabled, apps should try to skip any introductory hints on first launch. This might
          * apply to users that are already familiar with the environment or temporary users.
          * <p>
@@ -6922,7 +6922,8 @@ public final class Settings {
          *
          * @hide
          */
-        public static final String WEB_ACTION_ENABLED = "web_action_enabled";
+        @SystemApi
+        public static final String INSTANT_APPS_ENABLED = "instant_apps_enabled";
 
         /**
          * Has this pairable device been paired or upgraded from a previously paired system.
@@ -6964,9 +6965,8 @@ public final class Settings {
             ACCESSIBILITY_DISPLAY_DALTONIZER_ENABLED,
             ACCESSIBILITY_DISPLAY_MAGNIFICATION_ENABLED,
             ACCESSIBILITY_DISPLAY_MAGNIFICATION_NAVBAR_ENABLED,
+            AUTOFILL_SERVICE,
             ACCESSIBILITY_DISPLAY_MAGNIFICATION_SCALE,
-            ACCESSIBILITY_SCRIPT_INJECTION,
-            ACCESSIBILITY_WEB_CONTENT_KEY_BINDINGS,
             ENABLED_ACCESSIBILITY_SERVICES,
             ENABLED_NOTIFICATION_LISTENERS,
             ENABLED_VR_LISTENERS,
@@ -7052,6 +7052,7 @@ public final class Settings {
             CLONE_TO_MANAGED_PROFILE.add(ACCESSIBILITY_ENABLED);
             CLONE_TO_MANAGED_PROFILE.add(ALLOW_MOCK_LOCATION);
             CLONE_TO_MANAGED_PROFILE.add(ALLOWED_GEOLOCATION_ORIGINS);
+            CLONE_TO_MANAGED_PROFILE.add(AUTOFILL_SERVICE);
             CLONE_TO_MANAGED_PROFILE.add(DEFAULT_INPUT_METHOD);
             CLONE_TO_MANAGED_PROFILE.add(ENABLED_ACCESSIBILITY_SERVICES);
             CLONE_TO_MANAGED_PROFILE.add(ENABLED_INPUT_METHODS);
@@ -7086,6 +7087,12 @@ public final class Settings {
             INSTANT_APP_SETTINGS.add(ACCESSIBILITY_CAPTIONING_FOREGROUND_COLOR);
             INSTANT_APP_SETTINGS.add(ACCESSIBILITY_CAPTIONING_TYPEFACE);
             INSTANT_APP_SETTINGS.add(ACCESSIBILITY_CAPTIONING_FONT_SCALE);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_CAPTIONING_WINDOW_COLOR);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_DISPLAY_DALTONIZER_ENABLED);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_DISPLAY_DALTONIZER);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_AUTOCLICK_DELAY);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_AUTOCLICK_ENABLED);
+            INSTANT_APP_SETTINGS.add(ACCESSIBILITY_LARGE_POINTER_ICON);
 
             INSTANT_APP_SETTINGS.add(DEFAULT_INPUT_METHOD);
             INSTANT_APP_SETTINGS.add(ENABLED_INPUT_METHODS);
@@ -7093,6 +7100,7 @@ public final class Settings {
             INSTANT_APP_SETTINGS.add(ANDROID_ID);
 
             INSTANT_APP_SETTINGS.add(PACKAGE_VERIFIER_USER_CONSENT);
+            INSTANT_APP_SETTINGS.add(ALLOW_MOCK_LOCATION);
         }
 
         /**
@@ -7731,13 +7739,36 @@ public final class Settings {
                 "location_background_throttle_interval_ms";
 
         /**
+         * Most frequent location update interval in milliseconds that proximity alert is allowed
+         * to request.
+         * @hide
+         */
+        public static final String LOCATION_BACKGROUND_THROTTLE_PROXIMITY_ALERT_INTERVAL_MS =
+                "location_background_throttle_proximity_alert_interval_ms";
+
+        /**
          * Packages that are whitelisted for background throttling (throttling will not be applied).
          * @hide
          */
         public static final String LOCATION_BACKGROUND_THROTTLE_PACKAGE_WHITELIST =
             "location_background_throttle_package_whitelist";
 
-       /**
+        /**
+         * The interval in milliseconds at which wifi scan requests will be throttled when they are
+         * coming from the background.
+         * @hide
+         */
+        public static final String WIFI_SCAN_BACKGROUND_THROTTLE_INTERVAL_MS =
+                "wifi_scan_background_throttle_interval_ms";
+
+        /**
+         * Packages that are whitelisted to be exempt for wifi background throttling.
+         * @hide
+         */
+        public static final String WIFI_SCAN_BACKGROUND_THROTTLE_PACKAGE_WHITELIST =
+                "wifi_scan_background_throttle_package_whitelist";
+
+        /**
         * Whether TV will switch to MHL port when a mobile device is plugged in.
         * (0 = false, 1 = true)
         * @hide
@@ -8304,7 +8335,6 @@ public final class Settings {
          * enabled state.
          * @hide
          */
-        @SystemApi
         public static final String NETWORK_RECOMMENDATIONS_ENABLED =
                 "network_recommendations_enabled";
 
@@ -8322,16 +8352,6 @@ public final class Settings {
                 "network_recommendations_package";
 
         /**
-         * Value to specify if the Wi-Fi Framework should defer to
-         * {@link com.android.server.NetworkScoreService} for evaluating saved open networks.
-         *
-         * Type: int (0 for false, 1 for true)
-         * @hide
-         */
-        @SystemApi
-        public static final String CURATE_SAVED_OPEN_NETWORKS = "curate_saved_open_networks";
-
-        /**
          * The package name of the application that connect and secures high quality open wifi
          * networks automatically.
          *
@@ -8346,6 +8366,7 @@ public final class Settings {
          *
          * Type: long
          * @hide
+         * @deprecated to be removed
          */
         public static final String NETWORK_RECOMMENDATION_REQUEST_TIMEOUT_MS =
                 "network_recommendation_request_timeout_ms";
@@ -8818,6 +8839,15 @@ public final class Settings {
         public static final String CAPTIVE_PORTAL_FALLBACK_URL = "captive_portal_fallback_url";
 
         /**
+         * A comma separated list of URLs used for captive portal detection in addition to the
+         * fallback HTTP url associated with the CAPTIVE_PORTAL_FALLBACK_URL settings.
+         *
+         * @hide
+         */
+        public static final String CAPTIVE_PORTAL_OTHER_FALLBACK_URLS =
+                "captive_portal_other_fallback_urls";
+
+        /**
          * Whether to use HTTPS for network validation. This is enabled by default and the setting
          * needs to be set to 0 to disable it. This setting is a misnomer because captive portals
          * don't actually use HTTPS, but it's consistent with the other settings.
@@ -8965,13 +8995,30 @@ public final class Settings {
          * Activity manager specific settings.
          * This is encoded as a key=value list, separated by commas. Ex:
          *
-         * "enforce_bg_check=true,max_cached_processes=24"
+         * "gc_timeout=5000,max_cached_processes=24"
          *
          * The following keys are supported:
          *
          * <pre>
-         * enforce_bg_check                     (boolean)
          * max_cached_processes                 (int)
+         * background_settle_time               (long)
+         * foreground_service_ui_min_time       (long)
+         * content_provider_retain_time         (long)
+         * gc_timeout                           (long)
+         * gc_min_interval                      (long)
+         * full_pss_min_interval                (long)
+         * full_pss_lowered_interval            (long)
+         * power_check_delay                    (long)
+         * wake_lock_min_check_duration         (long)
+         * cpu_min_check_duration               (long)
+         * service_usage_interaction_time       (long)
+         * usage_stats_interaction_interval     (long)
+         * service_restart_duration             (long)
+         * service_reset_run_duration           (long)
+         * service_restart_duration_factor      (int)
+         * service_min_restart_time_between     (long)
+         * service_max_inactivity               (long)
+         * service_bg_start_timeout             (long)
          * </pre>
          *
          * <p>
@@ -9482,6 +9529,32 @@ public final class Settings {
                 "intent_firewall_metadata_url";
 
         /**
+         * URL for lang id model updates
+         * @hide
+         */
+        public static final String LANG_ID_UPDATE_CONTENT_URL = "lang_id_content_url";
+
+        /**
+         * URL for lang id model update metadata
+         * @hide
+         */
+        public static final String LANG_ID_UPDATE_METADATA_URL = "lang_id_metadata_url";
+
+        /**
+         * URL for smart selection model updates
+         * @hide
+         */
+        public static final String SMART_SELECTION_UPDATE_CONTENT_URL =
+                "smart_selection_content_url";
+
+        /**
+         * URL for smart selection model update metadata
+         * @hide
+         */
+        public static final String SMART_SELECTION_UPDATE_METADATA_URL =
+                "smart_selection_metadata_url";
+
+        /**
          * SELinux enforcement status. If 0, permissive; if 1, enforcing.
          * @hide
          */
@@ -9812,7 +9885,6 @@ public final class Settings {
             CHARGING_SOUNDS_ENABLED,
             USB_MASS_STORAGE_ENABLED,
             NETWORK_RECOMMENDATIONS_ENABLED,
-            CURATE_SAVED_OPEN_NETWORKS,
             WIFI_WAKEUP_ENABLED,
             WIFI_NETWORKS_AVAILABLE_NOTIFICATION_ON,
             USE_OPEN_WIFI_PACKAGE,
@@ -10330,6 +10402,7 @@ public final class Settings {
             INSTANT_APP_SETTINGS.add(TRANSITION_ANIMATION_SCALE);
             INSTANT_APP_SETTINGS.add(ANIMATOR_DURATION_SCALE);
             INSTANT_APP_SETTINGS.add(DEBUG_VIEW_ATTRIBUTES);
+            INSTANT_APP_SETTINGS.add(WTF_IS_FATAL);
         }
 
         /**

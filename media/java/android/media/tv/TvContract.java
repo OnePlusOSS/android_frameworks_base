@@ -19,11 +19,15 @@ package android.media.tv;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SdkConstant;
 import android.annotation.StringDef;
 import android.annotation.SystemApi;
+import android.annotation.SdkConstant.SdkConstantType;
+import android.app.Activity;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.ContentUris;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -75,8 +79,9 @@ public final class TvContract {
     private static final String PATH_PASSTHROUGH = "passthrough";
 
     /**
-     * Activity Action: sent by an application telling the system to set the given channel as
-     * browsable. This is only relevant to channels with {@link Channels#TYPE_PREVIEW} type.
+     * Broadcast Action: sent when an application requests the system to make the given channel
+     * browsable.  The operation is performed in the background without user interaction. This
+     * is only relevant to channels with {@link Channels#TYPE_PREVIEW} type.
      *
      * <p>The intent must contain the following bundle parameters:
      * <ul>
@@ -84,9 +89,28 @@ public final class TvContract {
      *     integer.</li>
      *     <li>{@link #EXTRA_PACKAGE_NAME}: the package name of the requesting application.</li>
      * </ul>
+     * @hide
      */
-    public static final String ACTION_MAKE_CHANNEL_BROWSABLE =
-            "android.media.tv.action.MAKE_CHANNEL_BROWSABLE";
+    @SystemApi
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_CHANNEL_BROWSABLE_REQUESTED =
+            "android.media.tv.action.CHANNEL_BROWSABLE_REQUESTED";
+
+    /**
+     * Activity Action: sent by an application telling the system to make the given channel
+     * browsable with user interaction. The system may show UI to ask user to approve the channel.
+     * This is only relevant to channels with {@link Channels#TYPE_PREVIEW} type. Use
+     * {@link Activity#startActivityForResult} to get the result of the request.
+     *
+     * <p>The intent must contain the following bundle parameters:
+     * <ul>
+     *     <li>{@link #EXTRA_CHANNEL_ID}: ID for the {@link Channels#TYPE_PREVIEW} channel as a long
+     *     integer.</li>
+     * </ul>
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_REQUEST_CHANNEL_BROWSABLE =
+            "android.media.tv.action.REQUEST_CHANNEL_BROWSABLE";
 
     /**
      * Broadcast Action: sent by the system to tell the target TV input that one of its preview
@@ -99,6 +123,7 @@ public final class TvContract {
      *     <li>{@link #EXTRA_PREVIEW_PROGRAM_ID}: the disabled preview program ID.</li>
      * </ul>
      */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_PREVIEW_PROGRAM_BROWSABLE_DISABLED =
             "android.media.tv.action.PREVIEW_PROGRAM_BROWSABLE_DISABLED";
 
@@ -113,6 +138,7 @@ public final class TvContract {
      *     <li>{@link #EXTRA_WATCH_NEXT_PROGRAM_ID}: the disabled "watch next" program ID.</li>
      * </ul>
      */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_WATCH_NEXT_PROGRAM_BROWSABLE_DISABLED =
             "android.media.tv.action.WATCH_NEXT_PROGRAM_BROWSABLE_DISABLED";
 
@@ -126,6 +152,7 @@ public final class TvContract {
      *     <li>{@link #EXTRA_WATCH_NEXT_PROGRAM_ID}: the ID of the new watch next program.</li>
      * </ul>
      */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_PREVIEW_PROGRAM_ADDED_TO_WATCH_NEXT =
             "android.media.tv.action.PREVIEW_PROGRAM_ADDED_TO_WATCH_NEXT";
 
@@ -143,13 +170,20 @@ public final class TvContract {
      *         <code>AndroidManifest.xml</code>.</li>
      * </ul>
      */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_INITIALIZE_PROGRAMS =
             "android.media.tv.action.INITIALIZE_PROGRAMS";
 
-    /** The key for a bundle parameter containing a channel ID as a long integer */
+    /**
+     * The key for a bundle parameter containing a channel ID as a long integer
+     */
     public static final String EXTRA_CHANNEL_ID = "android.media.tv.extra.CHANNEL_ID";
 
-    /** The key for a bundle parameter containing a package name as a string. */
+    /**
+     * The key for a bundle parameter containing a package name as a string.
+     * @hide
+     */
+    @SystemApi
     public static final String EXTRA_PACKAGE_NAME = "android.media.tv.extra.PACKAGE_NAME";
 
     /** The key for a bundle parameter containing a program ID as a long integer. */
@@ -159,6 +193,38 @@ public final class TvContract {
     /** The key for a bundle parameter containing a watch next program ID as a long integer. */
     public static final String EXTRA_WATCH_NEXT_PROGRAM_ID =
             "android.media.tv.extra.WATCH_NEXT_PROGRAM_ID";
+
+    /**
+     * The key for a bundle parameter containing the result code of a method call as an integer.
+     *
+     * @see #RESULT_OK
+     * @see #RESULT_ERROR_IO
+     * @see #RESULT_ERROR_INVALID_ARGUMENT
+     * @hide
+     */
+    @SystemApi
+    public static final String EXTRA_RESULT_CODE = "android.media.tv.extra.RESULT_CODE";
+
+    /**
+     * The result code for a successful execution without error.
+     * @hide
+     */
+    @SystemApi
+    public static final int RESULT_OK = 0;
+
+    /**
+     * The result code for a failure from I/O operation.
+     * @hide
+     */
+    @SystemApi
+    public static final int RESULT_ERROR_IO = 1;
+
+    /**
+     * The result code for a failure from invalid argument.
+     * @hide
+     */
+    @SystemApi
+    public static final int RESULT_ERROR_INVALID_ARGUMENT = 2;
 
     /**
      * The method name to get existing columns in the given table of the specified content provider.
@@ -209,6 +275,78 @@ public final class TvContract {
     public static final String METHOD_ADD_COLUMN = "add_column";
 
     /**
+     * The method name to get all the blocked packages. When a package is blocked, all the data for
+     * preview programs/channels and watch next programs belonging to this package in the content
+     * provider will be cleared. Once a package is blocked, {@link SecurityException} will be thrown
+     * for all the requests to preview programs/channels and watch next programs via
+     * {@link android.content.ContentProvider} from it.
+     *
+     * <p>The returned {@link android.os.Bundle} will include all the blocked package names with the
+     * key {@link #EXTRA_BLOCKED_PACKAGES}.
+     *
+     * @see ContentResolver#call(Uri, String, String, Bundle)
+     * @see #EXTRA_BLOCKED_PACKAGES
+     * @see #METHOD_BLOCK_PACKAGE
+     * @see #METHOD_UNBLOCK_PACKAGE
+     * @hide
+     */
+    @SystemApi
+    public static final String METHOD_GET_BLOCKED_PACKAGES = "get_blocked_packages";
+
+    /**
+     * The method name to block the access from the given package. When a package is blocked, all
+     * the data for preview programs/channels and watch next programs belonging to this package in
+     * the content provider will be cleared. Once a package is blocked, {@link SecurityException}
+     * will be thrown for all the requests to preview programs/channels and watch next programs via
+     * {@link android.content.ContentProvider} from it.
+     *
+     * <p>The method caller must provide the following parameter:
+     * <ul>
+     *     <li>{@code arg}: The package name to be added as blocked package {@link String}.</li>
+     * </ul>
+     *
+     * <p>The returned {@link android.os.Bundle} will include an integer code denoting whether the
+     * execution is successful or not with the key {@link #EXTRA_RESULT_CODE}. If {@code arg} is
+     * empty, the result code will be {@link #RESULT_ERROR_INVALID_ARGUMENT}. If success, the result
+     * code will be {@link #RESULT_OK}. Otherwise, the result code will be {@link #RESULT_ERROR_IO}.
+     *
+     * @see ContentResolver#call(Uri, String, String, Bundle)
+     * @see #EXTRA_RESULT_CODE
+     * @see #METHOD_GET_BLOCKED_PACKAGES
+     * @see #METHOD_UNBLOCK_PACKAGE
+     * @hide
+     */
+    @SystemApi
+    public static final String METHOD_BLOCK_PACKAGE = "block_package";
+
+    /**
+     * The method name to unblock the access from the given package. When a package is blocked, all
+     * the data for preview programs/channels and watch next programs belonging to this package in
+     * the content provider will be cleared. Once a package is blocked, {@link SecurityException}
+     * will be thrown for all the requests to preview programs/channels and watch next programs via
+     * {@link android.content.ContentProvider} from it.
+     *
+     * <p>The method caller must provide the following parameter:
+     * <ul>
+     *     <li>{@code arg}: The package name to be removed from blocked list as a {@link String}.
+     *     </li>
+     * </ul>
+     *
+     * <p>The returned {@link android.os.Bundle} will include an integer code denoting whether the
+     * execution is successful or not with the key {@link #EXTRA_RESULT_CODE}. If {@code arg} is
+     * empty, the result code will be {@link #RESULT_ERROR_INVALID_ARGUMENT}. If success, the result
+     * code will be {@link #RESULT_OK}. Otherwise, the result code will be {@link #RESULT_ERROR_IO}.
+     *
+     * @see ContentResolver#call(Uri, String, String, Bundle)
+     * @see #EXTRA_RESULT_CODE
+     * @see #METHOD_GET_BLOCKED_PACKAGES
+     * @see #METHOD_BLOCK_PACKAGE
+     * @hide
+     */
+    @SystemApi
+    public static final String METHOD_UNBLOCK_PACKAGE = "unblock_package";
+
+    /**
      * The key for a returned {@link Bundle} value containing existing column names in the given
      * table as an {@link ArrayList} of {@link String}.
      *
@@ -253,6 +391,16 @@ public final class TvContract {
     public static final String EXTRA_DEFAULT_VALUE = "android.media.tv.extra.DEFAULT_VALUE";
 
     /**
+     * The key for a returned {@link Bundle} value containing all the blocked package names as an
+     * {@link ArrayList} of {@link String}.
+     *
+     * @see #METHOD_GET_BLOCKED_PACKAGES
+     * @hide
+     */
+    @SystemApi
+    public static final String EXTRA_BLOCKED_PACKAGES = "android.media.tv.extra.BLOCKED_PACKAGES";
+
+    /**
      * An optional query, update or delete URI parameter that allows the caller to specify TV input
      * ID to filter channels.
      * @hide
@@ -289,11 +437,26 @@ public final class TvContract {
     public static final String PARAM_BROWSABLE_ONLY = "browsable_only";
 
     /**
-     * A optional query, update or delete URI parameter that allows the caller to specify canonical
+     * An optional query, update or delete URI parameter that allows the caller to specify canonical
      * genre to filter programs.
      * @hide
      */
     public static final String PARAM_CANONICAL_GENRE = "canonical_genre";
+
+    /**
+     * A query, update or delete URI parameter that allows the caller to operate only on preview or
+     * non-preview channels. If set to "true", the operation affects the rows for preview channels
+     * only. If set to "false", the operation affects the rows for non-preview channels only.
+     * @hide
+     */
+    public static final String PARAM_PREVIEW = "preview";
+
+    /**
+     * An optional query, update or delete URI parameter that allows the caller to specify package
+     * name to filter channels.
+     * @hide
+     */
+    public static final String PARAM_PACKAGE = "package";
 
     /**
      * Builds an ID that uniquely identifies a TV input service.
@@ -565,6 +728,24 @@ public final class TvContract {
         return isTvUri(uri) && isTwoSegmentUriStartingWith(uri, PATH_PROGRAM);
     }
 
+    /**
+     * Requests to make a channel browsable.
+     *
+     * <p>Once called, the system will review the request and make the channel browsable based on
+     * its policy. The first request from a package is guaranteed to be approved. This is only
+     * relevant to channels with {@link Channels#TYPE_PREVIEW} type.
+     *
+     * @param context The context for accessing content provider.
+     * @param channelId The channel ID to be browsable.
+     * @see Channels#COLUMN_BROWSABLE
+     */
+    public static void requestChannelBrowsable(Context context, long channelId) {
+        TvInputManager manager = (TvInputManager) context.getSystemService(
+            Context.TV_INPUT_SERVICE);
+        if (manager != null) {
+            manager.requestChannelBrowsable(buildChannelUri(channelId));
+        }
+    }
 
     private TvContract() {}
 
@@ -589,6 +770,36 @@ public final class TvContract {
      * @hide
      */
     interface ProgramColumns {
+        /** @hide */
+        @IntDef({
+                REVIEW_RATING_STYLE_STARS,
+                REVIEW_RATING_STYLE_THUMBS_UP_DOWN,
+                REVIEW_RATING_STYLE_PERCENTAGE,
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        @interface ReviewRatingStyle {}
+
+        /**
+         * The review rating style for five star rating.
+         *
+         * @see #COLUMN_REVIEW_RATING_STYLE
+         */
+        int REVIEW_RATING_STYLE_STARS = 0;
+
+        /**
+         * The review rating style for thumbs-up and thumbs-down rating.
+         *
+         * @see #COLUMN_REVIEW_RATING_STYLE
+         */
+        int REVIEW_RATING_STYLE_THUMBS_UP_DOWN = 1;
+
+        /**
+         * The review rating style for 0 to 100 point system.
+         *
+         * @see #COLUMN_REVIEW_RATING_STYLE
+         */
+        int REVIEW_RATING_STYLE_PERCENTAGE = 2;
+
         /**
          * The title of this TV program.
          *
@@ -851,6 +1062,33 @@ public final class TvContract {
          * <p>Type: INTEGER
          */
         String COLUMN_VERSION_NUMBER = "version_number";
+
+        /**
+         * The review rating score style used for {@link #COLUMN_REVIEW_RATING}.
+         *
+         * <p> The value should match one of the followings: {@link #REVIEW_RATING_STYLE_STARS},
+         * {@link #REVIEW_RATING_STYLE_THUMBS_UP_DOWN}, and {@link #REVIEW_RATING_STYLE_PERCENTAGE}.
+         *
+         * <p>Type: INTEGER
+         * @see #COLUMN_REVIEW_RATING
+         */
+        String COLUMN_REVIEW_RATING_STYLE = "review_rating_style";
+
+        /**
+         * The review rating score for this program.
+         *
+         * <p>The format of the value is dependent on {@link #COLUMN_REVIEW_RATING_STYLE}. If the
+         * style is {@link #REVIEW_RATING_STYLE_STARS}, the value should be a real number between
+         * 0.0 and 5.0. (e.g. "4.5") If the style is {@link #REVIEW_RATING_STYLE_THUMBS_UP_DOWN},
+         * the value should be two integers, one for thumbs-up count and the other for thumbs-down
+         * count, with a comma between them. (e.g. "200,40") If the style is
+         * {@link #REVIEW_RATING_STYLE_PERCENTAGE}, the value shoule be a real number between 0 and
+         * 100. (e.g. "99.9")
+         *
+         * <p>Type: TEXT
+         * @see #COLUMN_REVIEW_RATING_STYLE
+         */
+        String COLUMN_REVIEW_RATING = "review_rating";
     }
 
     /**
@@ -967,6 +1205,7 @@ public final class TvContract {
                 ASPECT_RATIO_3_2,
                 ASPECT_RATIO_1_1,
                 ASPECT_RATIO_2_3,
+                ASPECT_RATIO_4_3,
         })
         @Retention(RetentionPolicy.SOURCE)
         public @interface AspectRatio {}
@@ -988,12 +1227,20 @@ public final class TvContract {
         int ASPECT_RATIO_3_2 = 1;
 
         /**
+         * The aspect ratio for 4:3.
+         *
+         * @see #COLUMN_POSTER_ART_ASPECT_RATIO
+         * @see #COLUMN_THUMBNAIL_ASPECT_RATIO
+         */
+        int ASPECT_RATIO_4_3 = 2;
+
+        /**
          * The aspect ratio for 1:1.
          *
          * @see #COLUMN_POSTER_ART_ASPECT_RATIO
          * @see #COLUMN_THUMBNAIL_ASPECT_RATIO
          */
-        int ASPECT_RATIO_1_1 = 2;
+        int ASPECT_RATIO_1_1 = 3;
 
         /**
          * The aspect ratio for 2:3.
@@ -1001,7 +1248,7 @@ public final class TvContract {
          * @see #COLUMN_POSTER_ART_ASPECT_RATIO
          * @see #COLUMN_THUMBNAIL_ASPECT_RATIO
          */
-        int ASPECT_RATIO_2_3 = 3;
+        int ASPECT_RATIO_2_3 = 4;
 
         /** @hide */
         @IntDef({
@@ -1096,36 +1343,6 @@ public final class TvContract {
          */
         int INTERACTION_TYPE_VIEWERS = 6;
 
-        /** @hide */
-        @IntDef({
-                REVIEW_RATING_STYLE_STARS,
-                REVIEW_RATING_STYLE_THUMBS_UP_DOWN,
-                REVIEW_RATING_STYLE_PERCENTAGE,
-        })
-        @Retention(RetentionPolicy.SOURCE)
-        public @interface ReviewRatingStyle {}
-
-        /**
-         * The review rating style for five star rating.
-         *
-         * @see #COLUMN_REVIEW_RATING_STYLE
-         */
-        int REVIEW_RATING_STYLE_STARS = 0;
-
-        /**
-         * The review rating style for thumbs-up and thumbs-down rating.
-         *
-         * @see #COLUMN_REVIEW_RATING_STYLE
-         */
-        int REVIEW_RATING_STYLE_THUMBS_UP_DOWN = 1;
-
-        /**
-         * The review rating style for 0 to 100 point system.
-         *
-         * @see #COLUMN_REVIEW_RATING_STYLE
-         */
-        int REVIEW_RATING_STYLE_PERCENTAGE = 2;
-
         /**
          * The type of this program content.
          *
@@ -1156,6 +1373,7 @@ public final class TvContract {
          * <p>The value should match one of the followings:
          * {@link #ASPECT_RATIO_16_9},
          * {@link #ASPECT_RATIO_3_2},
+         * {@link #ASPECT_RATIO_4_3},
          * {@link #ASPECT_RATIO_1_1}, and
          * {@link #ASPECT_RATIO_2_3}.
          *
@@ -1169,6 +1387,7 @@ public final class TvContract {
          * <p>The value should match one of the followings:
          * {@link #ASPECT_RATIO_16_9},
          * {@link #ASPECT_RATIO_3_2},
+         * {@link #ASPECT_RATIO_4_3},
          * {@link #ASPECT_RATIO_1_1}, and
          * {@link #ASPECT_RATIO_2_3}.
          *
@@ -1276,8 +1495,7 @@ public final class TvContract {
         /**
          * The URI for the preview video.
          *
-         * <p>This is only relevant to {@link Channels#TYPE_PREVIEW}. The data in the column must be
-         * a URL, or a URI in one of the following formats:
+         * <p>The data in the column must be a URL, or a URI in one of the following formats:
          *
          * <ul>
          * <li>content ({@link android.content.ContentResolver#SCHEME_CONTENT})</li>
@@ -1293,9 +1511,8 @@ public final class TvContract {
         String COLUMN_PREVIEW_VIDEO_URI = "preview_video_uri";
 
         /**
-         * The last playback position (in milliseconds) of the preview video.
-         *
-         * <p>This is only relevant to {@link Channels#TYPE_PREVIEW}.
+         * The last playback position (in milliseconds) of the original content of this preview
+         * program.
          *
          * <p>Can be empty.
          *
@@ -1305,9 +1522,7 @@ public final class TvContract {
                 "last_playback_position_millis";
 
         /**
-         * The duration (in milliseconds) of the preview video.
-         *
-         * <p>This is only relevant to {@link Channels#TYPE_PREVIEW}.
+         * The duration (in milliseconds) of the original content of this preview program.
          *
          * <p>Can be empty.
          *
@@ -1373,33 +1588,6 @@ public final class TvContract {
          * <p>Type: TEXT
          */
         String COLUMN_AUTHOR = "author";
-
-        /**
-         * The review rating score style used for {@link #COLUMN_REVIEW_RATING}.
-         *
-         * <p> The value should match one of the followings: {@link #REVIEW_RATING_STYLE_STARS},
-         * {@link #REVIEW_RATING_STYLE_THUMBS_UP_DOWN}, and {@link #REVIEW_RATING_STYLE_PERCENTAGE}.
-         *
-         * <p>Type: INTEGER
-         * @see #COLUMN_REVIEW_RATING
-         */
-        String COLUMN_REVIEW_RATING_STYLE = "review_rating_style";
-
-        /**
-         * The review rating score for this program.
-         *
-         * <p>The format of the value is dependent on {@link #COLUMN_REVIEW_RATING_STYLE}. If the
-         * style is {@link #REVIEW_RATING_STYLE_STARS}, the value should be a real number between
-         * 0.0 and 5.0. (e.g. "4.5") If the style is {@link #REVIEW_RATING_STYLE_THUMBS_UP_DOWN},
-         * the value should be two integers, one for thumbs-up count and the other for thumbs-down
-         * count, with a comma between them. (e.g. "200,40") If the style is
-         * {@link #REVIEW_RATING_STYLE_PERCENTAGE}, the value shoule be a real number between 0 and
-         * 100. (e.g. "99.9")
-         *
-         * <p>Type: TEXT
-         * @see #COLUMN_REVIEW_RATING_STYLE
-         */
-        String COLUMN_REVIEW_RATING = "review_rating";
 
         /**
          * The flag indicating whether this TV program is browsable or not.
@@ -2184,19 +2372,6 @@ public final class TvContract {
          */
         public static final String COLUMN_TRANSIENT = "transient";
 
-        /**
-         * The flag indicating whether this TV channel is approved to be shown by the system.
-         *
-         * <p>A value of 1 indicates that the channel is approved to be shown by the system, and a
-         * value of 0 indicates that the channel is blocked by system. If not specified, this value
-         * is set to 0 (not approved) by default.
-         *
-         * <p>Type: INTEGER (boolean)
-         * @hide
-         */
-        @SystemApi
-        public static final String COLUMN_SYSTEM_APPROVED = "system_approved";
-
         private Channels() {}
 
         /**
@@ -2577,8 +2752,6 @@ public final class TvContract {
          *
          * <p>This is a part of the channel URI and matches to {@link BaseColumns#_ID}.
          *
-         * <p>This is a required field.
-         *
          * <p>Type: INTEGER (long)
          */
         public static final String COLUMN_CHANNEL_ID = "channel_id";
@@ -2825,6 +2998,8 @@ public final class TvContract {
          */
         public static final String COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS =
                 "last_engagement_time_utc_millis";
+
+        private WatchNextPrograms() {}
     }
 
     /**

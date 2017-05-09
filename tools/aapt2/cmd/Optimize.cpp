@@ -59,6 +59,14 @@ struct OptimizeOptions {
 
 class OptimizeContext : public IAaptContext {
  public:
+  OptimizeContext() = default;
+
+  PackageType GetPackageType() override {
+    // Not important here. Using anything other than kApp adds EXTRA validation, which we want to
+    // avoid.
+    return PackageType::kApp;
+  }
+
   IDiagnostics* GetDiagnostics() override {
     return &diagnostics_;
   }
@@ -99,6 +107,8 @@ class OptimizeContext : public IAaptContext {
   }
 
  private:
+  DISALLOW_COPY_AND_ASSIGN(OptimizeContext);
+
   StdErrDiagnostics diagnostics_;
   bool verbose_ = false;
   int sdk_version_ = 0;
@@ -203,10 +213,10 @@ class OptimizeCommand {
 
             if (file_ref->file == nullptr) {
               ResourceNameRef name(pkg->name, type->type, entry->name);
-              context_->GetDiagnostics()->Error(DiagMessage(file_ref->GetSource())
+              context_->GetDiagnostics()->Warn(DiagMessage(file_ref->GetSource())
                                                 << "file for resource " << name << " with config '"
                                                 << config_value->config << "' not found");
-              return false;
+              continue;
             }
 
             const StringPiece entry_name = entry->name;
@@ -302,7 +312,8 @@ int Optimize(const std::vector<StringPiece>& args) {
                             &configs)
           .OptionalFlagList("--split",
                             "Split resources matching a set of configs out to a "
-                            "Split APK.\nSyntax: path/to/output.apk:<config>[,<config>[...]].",
+                            "Split APK.\nSyntax: path/to/output.apk;<config>[,<config>[...]].\n"
+                            "On Windows, use a semicolon ';' separator instead.",
                             &split_args)
           .OptionalSwitch("--enable-sparse-encoding",
                           "Enables encoding sparse entries using a binary search tree.\n"

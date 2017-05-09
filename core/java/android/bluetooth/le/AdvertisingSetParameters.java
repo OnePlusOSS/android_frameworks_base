@@ -17,6 +17,7 @@
 package android.bluetooth.le;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -28,21 +29,6 @@ import android.os.Parcelable;
  * instance of this class.
  */
 public final class AdvertisingSetParameters implements Parcelable {
-
-    /**
-     * 1M advertiser PHY.
-     */
-    public static final int PHY_LE_1M = 1;
-
-    /**
-     * 2M advertiser PHY.
-     */
-    public static final int PHY_LE_2M = 2;
-
-    /**
-     * LE Coded advertiser PHY.
-     */
-    public static final int PHY_LE_CODED = 3;
 
     /**
     * Advertise on low frequency, around every 1000ms. This is the default and
@@ -246,8 +232,8 @@ public final class AdvertisingSetParameters implements Parcelable {
         private boolean isLegacy = false;
         private boolean isAnonymous = false;
         private boolean includeTxPower = false;
-        private int primaryPhy = PHY_LE_1M;
-        private int secondaryPhy = PHY_LE_1M;
+        private int primaryPhy = BluetoothDevice.PHY_LE_1M;
+        private int secondaryPhy = BluetoothDevice.PHY_LE_1M;
         private int interval = INTERVAL_LOW;
         private int txPowerLevel = TX_POWER_MEDIUM;
 
@@ -256,7 +242,7 @@ public final class AdvertisingSetParameters implements Parcelable {
          * non-connectable.
          * Legacy advertisements can be both connectable and scannable. Non-legacy
          * advertisements can be only scannable or only connectable.
-         * @param connectable Controls whether the advertisment type will be
+         * @param connectable Controls whether the advertisement type will be
          * connectable (true) or non-connectable (false).
          */
         public Builder setConnectable(boolean connectable) {
@@ -268,7 +254,7 @@ public final class AdvertisingSetParameters implements Parcelable {
          * Set whether the advertisement type should be scannable.
          * Legacy advertisements can be both connectable and scannable. Non-legacy
          * advertisements can be only scannable or only connectable.
-         * @param scannable Controls whether the advertisment type will be
+         * @param scannable Controls whether the advertisement type will be
          * scannable (true) or non-scannable (false).
          */
         public Builder setScannable(boolean scannable) {
@@ -321,12 +307,13 @@ public final class AdvertisingSetParameters implements Parcelable {
          * Use {@link BluetoothAdapter#isLeCodedPhySupported} to determine if LE Coded PHY is
          * supported on this device.
          * @param primaryPhy Primary advertising physical channel, can only be
-         *            {@link AdvertisingSetParameters#PHY_LE_1M} or
-         *            {@link AdvertisingSetParameters#PHY_LE_CODED}.
+         *            {@link BluetoothDevice#PHY_LE_1M} or
+         *            {@link BluetoothDevice#PHY_LE_CODED}.
          * @throws IllegalArgumentException If the primaryPhy is invalid.
          */
         public Builder setPrimaryPhy(int primaryPhy) {
-            if (primaryPhy != PHY_LE_1M && primaryPhy != PHY_LE_CODED) {
+            if (primaryPhy != BluetoothDevice.PHY_LE_1M &&
+                primaryPhy != BluetoothDevice.PHY_LE_CODED) {
                throw new IllegalArgumentException("bad primaryPhy " + primaryPhy);
             }
             this.primaryPhy = primaryPhy;
@@ -343,14 +330,15 @@ public final class AdvertisingSetParameters implements Parcelable {
          * supported on this device.
          *
          * @param secondaryPhy Secondary advertising physical channel, can only be
-         *            one of {@link AdvertisingSetParameters#PHY_LE_1M},
-         *            {@link AdvertisingSetParameters#PHY_LE_2M} or
-         *            {@link AdvertisingSetParameters#PHY_LE_CODED}.
+         *            one of {@link BluetoothDevice#PHY_LE_1M},
+         *            {@link BluetoothDevice#PHY_LE_2M} or
+         *            {@link BluetoothDevice#PHY_LE_CODED}.
          * @throws IllegalArgumentException If the secondaryPhy is invalid.
          */
         public Builder setSecondaryPhy(int secondaryPhy) {
-            if (secondaryPhy != PHY_LE_1M && secondaryPhy !=PHY_LE_2M &&
-                secondaryPhy != PHY_LE_CODED) {
+            if (secondaryPhy != BluetoothDevice.PHY_LE_1M &&
+                secondaryPhy != BluetoothDevice.PHY_LE_2M &&
+                secondaryPhy != BluetoothDevice.PHY_LE_CODED) {
                throw new IllegalArgumentException("bad secondaryPhy " + secondaryPhy);
             }
             this.secondaryPhy = secondaryPhy;
@@ -398,6 +386,7 @@ public final class AdvertisingSetParameters implements Parcelable {
 
         /**
          * Build the {@link AdvertisingSetParameters} object.
+         * @throws IllegalStateException if invalid combination of parameters is used.
          */
         public AdvertisingSetParameters build() {
             if (isLegacy) {
@@ -406,22 +395,22 @@ public final class AdvertisingSetParameters implements Parcelable {
                 }
 
                 if (connectable == true && scannable == false) {
-                    throw new IllegalArgumentException(
+                    throw new IllegalStateException(
                         "Legacy advertisement can't be connectable and non-scannable");
                 }
 
                 if (includeTxPower) {
-                    throw new IllegalArgumentException(
+                    throw new IllegalStateException(
                         "Legacy advertising can't include TX power level in header");
                 }
             } else {
                 if (connectable && scannable) {
-                    throw new IllegalArgumentException(
+                    throw new IllegalStateException(
                         "Advertising can't be both connectable and scannable");
                 }
 
                 if (isAnonymous && connectable) {
-                    throw new IllegalArgumentException(
+                    throw new IllegalStateException(
                         "Advertising can't be both connectable and anonymous");
                 }
             }

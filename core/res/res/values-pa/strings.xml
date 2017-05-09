@@ -91,14 +91,21 @@
     <string name="CLIRPermanent" msgid="3377371145926835671">"ਤੁਸੀਂ ਕਾਲਰ ID ਸੈਟਿੰਗ ਨਹੀਂ ਬਦਲ ਸਕਦੇ।"</string>
     <string name="RestrictedOnDataTitle" msgid="1322504692764166532">"ਕੋਈ ਡੈਟਾ ਸੇਵਾ ਨਹੀਂ"</string>
     <string name="RestrictedOnEmergencyTitle" msgid="1236071219598685236">"ਕੋਈ ਸੰਕਟਕਾਲੀਨ ਸੇਵਾ ਨਹੀਂ"</string>
-    <string name="RestrictedOnNormalTitle" msgid="3179574012752700984">"ਕੋਈ ਅਵਾਜ਼ੀ ਸੇਵਾ ਨਹੀਂ"</string>
-    <string name="RestrictedOnAllVoiceTitle" msgid="158800171499150681">"ਕੋਈ ਅਵਾਜ਼ੀ/ਸੰਕਟਕਾਲੀਨ ਸੇਵਾ ਨਹੀਂ"</string>
+    <string name="RestrictedOnNormalTitle" msgid="3179574012752700984">"ਕੋਈ ਆਵਾਜ਼ੀ ਸੇਵਾ ਨਹੀਂ"</string>
+    <string name="RestrictedOnAllVoiceTitle" msgid="158800171499150681">"ਕੋਈ ਆਵਾਜ਼ੀ/ਸੰਕਟਕਾਲੀਨ ਸੇਵਾ ਨਹੀਂ"</string>
     <string name="RestrictedOnDataContent" msgid="8997474569390996587">"ਤੁਹਾਡੇ ਕੈਰੀਅਰ ਵੱਲੋਂ ਇਸ ਟਿਕਾਣੇ \'ਤੇ ਡੈਟਾ ਸੇਵਾ ਨੂੰ ਅਸਥਾਈ ਤੌਰ \'ਤੇ ਮੁਅੱਤਲ ਕੀਤਾ ਗਿਆ ਹੈ"</string>
     <string name="RestrictedOnEmergencyContent" msgid="4573217945494650061">"ਤੁਹਾਡੇ ਕੈਰੀਅਰ ਵੱਲੋਂ ਇਸ ਟਿਕਾਣੇ \'ਤੇ ਸੰਕਟਕਾਲੀਨ ਕਾਲਾਂ ਨੂੰ ਅਸਥਾਈ ਤੌਰ \'ਤੇ ਮੁਅੱਤਲ ਕੀਤਾ ਗਿਆ ਹੈ"</string>
-    <string name="RestrictedOnNormalContent" msgid="1579434198284512182">"ਤੁਹਾਡੇ ਕੈਰੀਅਰ ਵੱਲੋਂ ਇਸ ਟਿਕਾਣੇ \'ਤੇ ਅਵਾਜ਼ੀ ਕਾਲਾਂ ਨੂੰ ਅਸਥਾਈ ਤੌਰ \'ਤੇ ਮੁਅੱਤਲ ਕੀਤਾ ਗਿਆ ਹੈ"</string>
-    <string name="RestrictedOnAllVoiceContent" msgid="5243580774142557047">"ਤੁਹਾਡੇ ਕੈਰੀਅਰ ਵੱਲੋਂ ਇਸ ਟਿਕਾਣੇ \'ਤੇ ਅਵਾਜ਼ੀ ਅਤੇ ਸੰਕਟਕਾਲੀਨ ਕਾਲਾਂ ਨੂੰ ਅਸਥਾਈ ਤੌਰ \'ਤੇ ਮੁਅੱਤਲ ਕੀਤਾ ਗਿਆ ਹੈ"</string>
+    <string name="RestrictedOnNormalContent" msgid="1579434198284512182">"ਤੁਹਾਡੇ ਕੈਰੀਅਰ ਵੱਲੋਂ ਇਸ ਟਿਕਾਣੇ \'ਤੇ ਆਵਾਜ਼ੀ ਕਾਲਾਂ ਨੂੰ ਅਸਥਾਈ ਤੌਰ \'ਤੇ ਮੁਅੱਤਲ ਕੀਤਾ ਗਿਆ ਹੈ"</string>
+    <string name="RestrictedOnAllVoiceContent" msgid="5243580774142557047">"ਤੁਹਾਡੇ ਕੈਰੀਅਰ ਵੱਲੋਂ ਇਸ ਟਿਕਾਣੇ \'ਤੇ ਆਵਾਜ਼ੀ ਅਤੇ ਸੰਕਟਕਾਲੀਨ ਕਾਲਾਂ ਨੂੰ ਅਸਥਾਈ ਤੌਰ \'ਤੇ ਮੁਅੱਤਲ ਕੀਤਾ ਗਿਆ ਹੈ"</string>
     <string name="NetworkPreferenceSwitchTitle" msgid="4008877505368566980">"ਨੈੱਟਵਰਕ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ"</string>
     <string name="NetworkPreferenceSwitchSummary" msgid="4164230263214915351">"ਸਿਗਨਲ ਪ੍ਰਾਪਤੀ ਨੂੰ ਬਿਹਤਰ ਬਣਾਉਣ ਲਈ, ਸਿਸਟਮ &gt; ਨੈੱਟਵਰਕ ਅਤੇ ਇੰਟਰਨੈੱਟ &gt; ਮੋਬਾਈਲ ਨੈੱਟਵਰਕ &gt; ਤਰਜੀਹੀ ਨੈੱਟਵਰਕ ਦੀ ਕਿਸਮ \'ਤੇ ਚੁਣੀ ਗਈ ਕਿਸਮ ਨੂੰ ਬਦਲਣ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"</string>
+    <string name="notification_channel_network_alert" msgid="4427736684338074967">"ਸੁਚੇਤਨਾਵਾਂ"</string>
+    <string name="notification_channel_call_forward" msgid="2419697808481833249">"ਕਾਲ ਫਾਰਵਾਰਡਿੰਗ"</string>
+    <string name="notification_channel_emergency_callback" msgid="6686166232265733921">"ਸੰਕਟਕਾਲੀਨ ਕਾਲਬੈਕ ਮੋਡ"</string>
+    <string name="notification_channel_mobile_data_alert" msgid="6130875231721406231">"ਮੋਬਾਈਲ ਡੈਟਾ ਸੁਚੇਤਨਾਵਾਂ"</string>
+    <string name="notification_channel_sms" msgid="3441746047346135073">"SMS ਸੁਨੇਹੇ"</string>
+    <string name="notification_channel_voice_mail" msgid="3954099424160511919">"ਵੌਇਸਮੇਲ ਸੁਨੇਹੇ"</string>
+    <string name="notification_channel_wfc" msgid="2130802501654254801">"Wi‑Fi ਕਾਲਿੰਗ"</string>
     <string name="peerTtyModeFull" msgid="6165351790010341421">"ਪੀਅਰ ਨੇ TTY Mode FULL ਦੀ ਬੇਨਤੀ ਕੀਤੀ"</string>
     <string name="peerTtyModeHco" msgid="5728602160669216784">"ਪੀਅਰ ਨੇ TTY Mode HCO ਦੀ ਬੇਨਤੀ ਕੀਤੀ"</string>
     <string name="peerTtyModeVco" msgid="1742404978686538049">"ਪੀਅਰ ਨੇ TTY Mode VCO ਦੀ ਬੇਨਤੀ ਕੀਤੀ"</string>
@@ -179,8 +186,8 @@
     <string name="ssl_ca_cert_noti_by_administrator" msgid="3541729986326153557">"ਤੁਹਾਡੇ ਕਾਰਜ ਪ੍ਰੋਫਾਈਲ ਪ੍ਰਸ਼ਾਸਕ ਵੱਲੋਂ"</string>
     <string name="ssl_ca_cert_noti_managed" msgid="4030263497686867141">"<xliff:g id="MANAGING_DOMAIN">%s</xliff:g> ਮੁਤਾਬਕ"</string>
     <string name="work_profile_deleted" msgid="5005572078641980632">"ਕੰਮ ਪ੍ਰੋਫਾਈਲ ਮਿਟਾਈ ਗਈ"</string>
-    <string name="work_profile_deleted_description" msgid="1100529432509639864">"ਪ੍ਰਸ਼ਾਸਕ ਐਪ ਗੁੰਮ ਹੋਣ ਕਾਰਨ ਕਾਰਜ ਪ੍ਰੋਫਾਈਲ ਮਿਟਾਇਆ ਗਿਆ"</string>
-    <string name="work_profile_deleted_details" msgid="6307630639269092360">"ਕਾਰਜ ਪ੍ਰੋਫਾਈਲ ਪ੍ਰਸ਼ਾਸਕ ਐਪ ਜਾਂ ਤਾਂ ਗੁੰਮ ਹੈ ਜਾਂ ਖਰਾਬ ਹੈ। ਨਤੀਜੇ ਵਜੋਂ, ਤੁਹਾਡਾ ਕਾਰਜ ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਸਬੰਧਿਤ ਡੈਟਾ ਮਿਟਾਇਆ ਗਿਆ ਹੈ। ਸਹਾਇਤਾ ਲਈ ਆਪਣੇ ਪ੍ਰਸ਼ਾਸਕ ਨਾਲ ਸੰਪਰਕ ਕਰੋ।"</string>
+    <string name="work_profile_deleted_description" msgid="1100529432509639864">"ਗੁੰਮਸ਼ੁਦਾ ਪ੍ਰਸ਼ਾਸਕ ਐਪ ਦੇ ਕਾਰਨ ਕਾਰਜ ਪ੍ਰੋਫਾਈਲ ਮਿਟਾਇਆ ਗਿਆ"</string>
+    <string name="work_profile_deleted_details" msgid="6307630639269092360">"ਕਾਰਜ ਪ੍ਰੋਫਾਈਲ ਪ੍ਰਸ਼ਾਸਕ ਐਪ ਜਾਂ ਤਾਂ ਗੁੰਮਸ਼ੁਦਾ ਹੈ ਜਾਂ ਖਰਾਬ ਹੈ। ਨਤੀਜੇ ਵਜੋਂ, ਤੁਹਾਡਾ ਕਾਰਜ ਪ੍ਰੋਫਾਈਲ ਅਤੇ ਸਬੰਧਿਤ ਡੈਟਾ ਮਿਟਾਇਆ ਗਿਆ ਹੈ। ਸਹਾਇਤਾ ਲਈ ਆਪਣੇ ਪ੍ਰਸ਼ਾਸਕ ਨਾਲ ਸੰਪਰਕ ਕਰੋ।"</string>
     <string name="work_profile_deleted_description_dpm_wipe" msgid="8823792115612348820">"ਤੁਹਾਡਾ ਕਾਰਜ ਪ੍ਰੋਫਾਈਲ ਹੁਣ ਇਸ ਡੀਵਾਈਸ \'ਤੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ"</string>
     <string name="network_logging_notification_title" msgid="6399790108123704477">"ਡੀਵਾਈਸ ਪ੍ਰਬੰਧਨ ਅਧੀਨ ਹੈ"</string>
     <string name="network_logging_notification_text" msgid="7930089249949354026">"ਤੁਹਾਡਾ ਸੰਗਠਨ ਇਸ ਡੀਵਾਈਸ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰਦਾ ਹੈ ਅਤੇ ਨੈੱਟਵਰਕ ਟਰੈਫਿਕ ਦੀ ਨਿਗਰਾਨੀ ਕਰ ਸਕਦਾ ਹੈ। ਵੇਰਵਿਆਂ ਲਈ ਟੈਪ ਕਰੋ।"</string>
@@ -258,6 +265,16 @@
     <string name="notification_channel_alerts" msgid="4496839309318519037">"ਸੁਚੇਤਨਾਵਾਂ"</string>
     <string name="notification_channel_retail_mode" msgid="6088920674914038779">"ਪ੍ਰਚੂਨ ਸਟੋਰਾਂ ਲਈ ਡੈਮੋ"</string>
     <string name="notification_channel_usb" msgid="9006850475328924681">"USB ਕਨੈਕਸ਼ਨ"</string>
+    <!-- no translation found for notification_channel_foreground_service (6665375982962336520) -->
+    <skip />
+    <!-- no translation found for foreground_service_app_in_background (6826789589341671842) -->
+    <skip />
+    <!-- no translation found for foreground_service_apps_in_background (7150914856893450380) -->
+    <skip />
+    <!-- no translation found for foreground_service_tap_for_details (372046743534354644) -->
+    <skip />
+    <!-- no translation found for foreground_service_multiple_separator (4021901567939866542) -->
+    <skip />
     <string name="safeMode" msgid="2788228061547930246">"ਸੁਰੱਖਿਅਤ ਮੋਡ"</string>
     <string name="android_system_label" msgid="6577375335728551336">"Android System"</string>
     <string name="user_owner_label" msgid="1119010402169916617">"ਨਿੱਜੀ \'ਤੇ ਸਵਿੱਚ ਕਰੋ"</string>
@@ -284,8 +301,6 @@
     <string name="capability_desc_canRetrieveWindowContent" msgid="3772225008605310672">"ਇੱਕ ਵਿੰਡੋ ਦੀ ਸਮੱਗਰੀ ਦੀ ਜਾਂਚ ਕਰੋ, ਜਿਸ ਨਾਲ ਤੁਸੀਂ ਇੰਟਰੈਕਟ ਕਰ ਰਹੇ ਹੋ।"</string>
     <string name="capability_title_canRequestTouchExploration" msgid="3108723364676667320">"ਐਕਸਪਲੋਰ ਬਾਇ ਟਚ ਚਾਲੂ ਕਰੋ"</string>
     <string name="capability_desc_canRequestTouchExploration" msgid="7543249041581408313">"ਟੈਪ ਕੀਤੀਆਂ ਆਈਟਮਾਂ ਨੂੰ ਉੱਚੀ ਆਵਾਜ਼ ਵਿੱਚ ਬੋਲਿਆ ਜਾਵੇਗਾ ਅਤੇ ਸਕ੍ਰੀਨ ਦੀ ਸੰਕੇਤਾਂ ਦੀ ਵਰਤੋਂ ਨਾਲ ਪੜਚੋਲ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।"</string>
-    <string name="capability_title_canRequestEnhancedWebAccessibility" msgid="1739881766522594073">"ਵਧੀ ਹੋਈ ਵੈਬ ਪਹੁੰਚਯੋਗਤਾ ਚਾਲੂ ਕਰੋ"</string>
-    <string name="capability_desc_canRequestEnhancedWebAccessibility" msgid="7881063961507511765">"ਐਪ ਸਮੱਗਰੀ ਨੂੰ ਵੱਧ ਪਹੁੰਚਯੋਗ ਬਣਾਉਣ ਲਈ ਸਕ੍ਰਿਪਟਾਂ ਇੰਸਟੌਲ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕਦੀਆਂ।"</string>
     <string name="capability_title_canRequestFilterKeyEvents" msgid="2103440391902412174">"ਜੋ ਟੈਕਸਟ ਤੁਸੀਂ ਟਾਈਪ ਕਰਦੇ ਹੋ, ਉਸਦਾ ਨਿਰੀਖਣ ਕਰੋ"</string>
     <string name="capability_desc_canRequestFilterKeyEvents" msgid="7463135292204152818">"ਇਸ ਵਿੱਚ ਨਿੱਜੀ ਡੈਟਾ ਸ਼ਾਮਲ ਹੈ ਜਿਵੇਂ ਕ੍ਰੈਡਿਟ ਕਾਰਡ ਨੰਬਰ ਅਤੇ ਪਾਸਵਰਡ।"</string>
     <string name="capability_title_canControlMagnification" msgid="3593493281059424855">"ਡਿਸਪਲੇ ਵੱਡਦਰਸ਼ੀ ਨੂੰ ਨਿਯੰਤ੍ਰਿਤ ਕਰੋ"</string>
@@ -1466,7 +1481,7 @@
     <string name="leave_accessibility_shortcut_on" msgid="7653111894438512680">"ਸ਼ਾਰਟਕੱਟ ਦੀ ਵਰਤੋਂ ਕਰੋ"</string>
     <string name="accessibility_shortcut_enabling_service" msgid="7771852911861522636">"ਪਹੁੰਚਯੋਗਤਾ ਸ਼ਾਰਟਕੱਟ ਨੇ <xliff:g id="SERVICE_NAME">%1$s</xliff:g> ਨੂੰ ਚਾਲੂ ਕੀਤਾ"</string>
     <string name="accessibility_shortcut_disabling_service" msgid="2747243438223109821">"ਪਹੁੰਚਯੋਗਤਾ ਸ਼ਾਰਟਕੱਟ ਨੇ <xliff:g id="SERVICE_NAME">%1$s</xliff:g> ਨੂੰ ਬੰਦ ਕੀਤਾ"</string>
-    <string name="accessibility_button_prompt_text" msgid="4234556536456854251">"ਤੁਹਾਡੇ ਵੱਲੋਂ ਪਹੁੰਚਯੋਗਤਾ ਬਟਨ \'ਤੇ ਟੈਪ ਕੀਤੇ ਜਾਣ \'ਤੇ ਵਰਤਣ ਲਈ ਕੋਈ ਵਿਸ਼ੇਸ਼ਤਾ ਚੁਣੋ:"</string>
+    <string name="accessibility_button_prompt_text" msgid="4234556536456854251">"ਤੁਹਾਡੇ ਵੱਲੋਂ ਪਹੁੰਚਯੋਗਤਾ ਬਟਨ ਨੂੰ ਟੈਪ ਕੀਤੇ ਜਾਣ \'ਤੇ ਵਰਤਣ ਲਈ ਕੋਈ ਵਿਸ਼ੇਸ਼ਤਾ ਚੁਣੋ:"</string>
     <string name="accessibility_button_instructional_text" msgid="6942300463612999993">"ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਨੂੰ ਬਦਲਣ ਲਈ, ਪਹੁੰਚਯੋਗਤਾ ਬਟਨ ਨੂੰ ਸਪੱਰਸ਼ ਕਰੋ ਅਤੇ ਦਬਾਈ ਰੱਖੋ।"</string>
     <string name="accessibility_magnification_chooser_text" msgid="1227146738764986237">"ਵੱਡਦਰਸ਼ੀਕਰਨ"</string>
     <string name="user_switched" msgid="3768006783166984410">"ਮੌਜੂਦਾ ਉਪਭੋਗਤਾ <xliff:g id="NAME">%1$s</xliff:g>।"</string>
@@ -1733,26 +1748,26 @@
     <string name="time_picker_text_input_mode_description" msgid="4148166758173708199">"ਸਮਾਂ ਇਨਪੁੱਟ ਕਰਨ ਲਈ ਲਿਖਤ ਇਨਪੁੱਟ ਮੋਡ \'ਤੇ ਬਦਲੀ ਕਰੋ।"</string>
     <string name="time_picker_radial_mode_description" msgid="4953403779779557198">"ਸਮਾਂ ਇਨਪੁੱਟ ਕਰਨ ਲਈ ਘੜੀ ਮੋਡ \'ਤੇ ਬਦਲੀ ਕਰੋ।"</string>
     <string name="autofill_picker_accessibility_title" msgid="8469043291648711535">"ਆਟੋਫਿਲ ਵਿਕਲਪ"</string>
-    <!-- no translation found for autofill_error_cannot_autofill (7402758580060110371) -->
-    <skip />
-    <string name="autofill_save_title" msgid="7081244500504163245">"<xliff:g id="LABEL">%1$s</xliff:g> ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੀਏ?"</string>
-    <string name="autofill_save_title_with_type" msgid="4977385733042555659">"<xliff:g id="TYPE">%1$s</xliff:g> ਨੂੰ <xliff:g id="LABEL">%2$s</xliff:g> ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੀਏ?"</string>
+    <string name="autofill_save_accessibility_title" msgid="7244365268417107822">"ਆਟੋਫਿਲ ਲਈ ਰੱਖਿਅਤ ਕਰੋ"</string>
+    <string name="autofill_error_cannot_autofill" msgid="7402758580060110371">"ਸਮੱਗਰੀਆਂ ਨੂੰ ਆਟੋਫਿਲ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ"</string>
+    <string name="autofill_save_title" msgid="3345527308992082601">"&lt;b&gt;<xliff:g id="LABEL">%1$s</xliff:g>&lt;/b&gt; ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੀਏ?"</string>
+    <string name="autofill_save_title_with_type" msgid="8637809388029313305">"<xliff:g id="TYPE">%1$s</xliff:g> ਨੂੰ &lt;b&gt;<xliff:g id="LABEL">%2$s</xliff:g>&lt;/b&gt; ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੀਏ?"</string>
+    <string name="autofill_save_title_with_2types" msgid="5214035651838265325">"<xliff:g id="TYPE_0">%1$s</xliff:g> ਅਤੇ <xliff:g id="TYPE_1">%2$s</xliff:g> ਨੂੰ &lt;b&gt;<xliff:g id="LABEL">%3$s</xliff:g>&lt;/b&gt; ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੀਏ?"</string>
+    <string name="autofill_save_title_with_3types" msgid="6943161834231458441">"<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, ਅਤੇ <xliff:g id="TYPE_2">%3$s</xliff:g> ਨੂੰ &lt;b&gt;<xliff:g id="LABEL">%4$s</xliff:g>&lt;/b&gt; ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੀਏ?"</string>
     <string name="autofill_save_yes" msgid="6398026094049005921">"ਰੱਖਿਅਤ ਕਰੋ"</string>
     <string name="autofill_save_no" msgid="2625132258725581787">"ਨਹੀਂ ਧੰਨਵਾਦ"</string>
     <string name="autofill_save_type_password" msgid="5288448918465971568">"ਪਾਸਵਰਡ"</string>
     <string name="autofill_save_type_address" msgid="4936707762193009542">"ਪਤਾ"</string>
     <string name="autofill_save_type_credit_card" msgid="7127694776265563071">"ਕ੍ਰੈਡਿਟ ਕਾਰਡ"</string>
-    <!-- no translation found for autofill_save_type_username (239040540379769562) -->
-    <skip />
-    <!-- no translation found for autofill_save_type_email_address (5752949432129262174) -->
-    <skip />
+    <string name="autofill_save_type_username" msgid="239040540379769562">"ਵਰਤੋਂਕਾਰ ਨਾਮ"</string>
+    <string name="autofill_save_type_email_address" msgid="5752949432129262174">"ਈਮੇਲ ਪਤਾ"</string>
     <string name="etws_primary_default_message_earthquake" msgid="5541962250262769193">"ਸ਼ਾਂਤ ਰਹੋ ਅਤੇ ਆਸ-ਪਾਸ ਪਨਾਹ ਮੰਗੋ।"</string>
     <string name="etws_primary_default_message_tsunami" msgid="1887685943498368548">"ਤੁਰੰਤ ਤੱਟੀ ਖੇਤਰਾਂ ਅਤੇ ਨਦੀ ਦੇ ਕਿਨਾਰੇ ਵਾਲੇ ਖੇਤਰਾਂ ਨੂੰ ਖਾਲੀ ਕਰ ਕੇ ਕਿਸੇ ਸੁਰੱਖਿਅਤ ਸਥਾਨ \'ਤੇ ਚਲੇ ਜਾਓ ਜਿਵੇਂ ਕਿ ਉੱਚੀ ਜ਼ਮੀਨ।"</string>
     <string name="etws_primary_default_message_earthquake_and_tsunami" msgid="998797956848445862">"ਸ਼ਾਂਤ ਰਹੋ ਅਤੇ ਆਸ-ਪਾਸ ਪਨਾਹ ਮੰਗੋ।"</string>
     <string name="etws_primary_default_message_test" msgid="2709597093560037455">"ਸੰਕਟਕਾਲੀਨ ਸੰਦੇਸ਼ ਟੈਸਟ"</string>
     <string name="etws_primary_default_message_others" msgid="6293148756130398971"></string>
     <string name="mmcc_authentication_reject" msgid="7729819349669603406">"SIM ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ"</string>
-    <string name="mmcc_imsi_unknown_in_hlr" msgid="6321202257374418726">"SIM ਅਨੁਕੂਲਿਤ ਨਹੀਂ ਹੈ"</string>
+    <string name="mmcc_imsi_unknown_in_hlr" msgid="6321202257374418726">"SIM ਦੀ ਵਿਵਸਥਾ ਨਹੀਂ ਹੈ"</string>
     <string name="mmcc_illegal_ms" msgid="2769452751852211112">"SIM ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ"</string>
     <string name="mmcc_illegal_me" msgid="4438696681169345015">"ਫ਼ੋਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ"</string>
 </resources>

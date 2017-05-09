@@ -33,6 +33,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.PersistableBundle;
 import android.os.Process;
 import android.os.PowerManager;
 import android.os.SystemProperties;
@@ -48,7 +49,6 @@ import android.graphics.SurfaceTexture;
 import android.media.AudioManager;
 import android.media.MediaDrm;
 import android.media.MediaFormat;
-import android.media.MediaMetricsSet;
 import android.media.MediaTimeProvider;
 import android.media.PlaybackParams;
 import android.media.SubtitleController;
@@ -140,7 +140,7 @@ import java.util.Vector;
  *         {@link #getVideoWidth()}, {@link #setAudioAttributes(AudioAttributes)},
  *         {@link #setLooping(boolean)},
  *         {@link #setVolume(float, float)}, {@link #pause()}, {@link #start()},
- *         {@link #stop()}, {@link #seekTo(int, int)}, {@link #prepare()} or
+ *         {@link #stop()}, {@link #seekTo(long, int)}, {@link #prepare()} or
  *         {@link #prepareAsync()} in the <em>Idle</em> state for both cases. If any of these
  *         methods is called right after a MediaPlayer object is constructed,
  *         the user supplied callback method OnErrorListener.onError() won't be
@@ -286,9 +286,9 @@ import java.util.Vector;
  *         </ul>
  *         </li>
  *     <li>The playback position can be adjusted with a call to
- *         {@link #seekTo(int, int)}.
+ *         {@link #seekTo(long, int)}.
  *         <ul>
- *         <li>Although the asynchronuous {@link #seekTo(int, int)}
+ *         <li>Although the asynchronuous {@link #seekTo(long, int)}
  *         call returns right away, the actual seek operation may take a while to
  *         finish, especially for audio/video being streamed. When the actual
  *         seek operation completes, the internal player engine calls a user
@@ -296,9 +296,9 @@ import java.util.Vector;
  *         has been registered beforehand via
  *         {@link #setOnSeekCompleteListener(OnSeekCompleteListener)}.</li>
  *         <li>Please
- *         note that {@link #seekTo(int, int)} can also be called in the other states,
+ *         note that {@link #seekTo(long, int)} can also be called in the other states,
  *         such as <em>Prepared</em>, <em>Paused</em> and <em>PlaybackCompleted
- *         </em> state. When {@link #seekTo(int, int)} is called in those states,
+ *         </em> state. When {@link #seekTo(long, int)} is called in those states,
  *         one video frame will be displayed if the stream has video and the requested
  *         position is valid.
  *         </li>
@@ -1007,17 +1007,28 @@ public class MediaPlayer extends PlayerBase
      * @param context the Context to use when resolving the Uri
      * @param uri the Content URI of the data you want to play
      * @param headers the headers to be sent together with the request for the data
-     *                Note that the cross domain redirection is allowed by default, but that can be
-     *                changed with key/value pairs through the headers parameter with
-     *                "android-allow-cross-domain-redirect" as the key and "0" or "1" as the value
-     *                to disallow or allow cross domain redirection.
      *                The headers must not include cookies. Instead, use the cookies param.
      * @param cookies the cookies to be sent together with the request
      * @throws IllegalStateException if it is called in an invalid state
+     * @throws NullPointerException  if context or uri is null
+     * @throws IOException           if uri has a file scheme and an I/O error occurs
+     *
+     * <p><strong>Note</strong> that the cross domain redirection is allowed by default,
+     * but that can be changed with key/value pairs through the headers parameter with
+     * "android-allow-cross-domain-redirect" as the key and "0" or "1" as the value to
+     * disallow or allow cross domain redirection.
      */
     public void setDataSource(@NonNull Context context, @NonNull Uri uri,
             @Nullable Map<String, String> headers, @Nullable List<HttpCookie> cookies)
-            throws IOException, IllegalArgumentException, SecurityException, IllegalStateException {
+            throws IOException {
+        if (context == null) {
+            throw new NullPointerException("context param can not be null.");
+        }
+
+        if (uri == null) {
+            throw new NullPointerException("uri param can not be null.");
+        }
+
         // The context and URI usually belong to the calling user. Get a resolver for that user
         // and strip out the userId from the URI if present.
         final ContentResolver resolver = context.getContentResolver();
@@ -1056,11 +1067,12 @@ public class MediaPlayer extends PlayerBase
      * @param context the Context to use when resolving the Uri
      * @param uri the Content URI of the data you want to play
      * @param headers the headers to be sent together with the request for the data
-     *                Note that the cross domain redirection is allowed by default, but that can be
-     *                changed with key/value pairs through the headers parameter with
-     *                "android-allow-cross-domain-redirect" as the key and "0" or "1" as the value
-     *                to disallow or allow cross domain redirection.
      * @throws IllegalStateException if it is called in an invalid state
+     *
+     * <p><strong>Note</strong> that the cross domain redirection is allowed by default,
+     * but that can be changed with key/value pairs through the headers parameter with
+     * "android-allow-cross-domain-redirect" as the key and "0" or "1" as the value to
+     * disallow or allow cross domain redirection.
      */
     public void setDataSource(@NonNull Context context, @NonNull Uri uri,
             @Nullable Map<String, String> headers)
@@ -1491,20 +1503,19 @@ public class MediaPlayer extends PlayerBase
     /**
      * Return Metrics data about the current player.
      *
-     * @return a MediaMetricsSet containing the set of attributes and values
+     * @return a {@link PersistableBundle} containing the set of attributes and values
      * available for the media being handled by this instance of MediaPlayer
-     * The attributes are descibed in {@link MediaMetricsSet.MediaPlayer}.
+     * The attributes are descibed in {@link MetricsConstants}.
      *
      *  Additional vendor-specific fields may also be present in
      *  the return value.
      */
-    public MediaMetricsSet getMetrics() {
-        Bundle bundle = native_getMetrics();
-	MediaMetricsSet mSet = new MediaMetricsSet(bundle);
-	return mSet;
+    public PersistableBundle getMetrics() {
+        PersistableBundle bundle = native_getMetrics();
+        return bundle;
     }
 
-    private native Bundle native_getMetrics();
+    private native PersistableBundle native_getMetrics();
 
     /**
      * Checks whether the MediaPlayer is playing.
@@ -1693,42 +1704,42 @@ public class MediaPlayer extends PlayerBase
     public native SyncParams getSyncParams();
 
     /**
-     * Seek modes used in method seekTo(int, int) to move media position
+     * Seek modes used in method seekTo(long, int) to move media position
      * to a specified location.
      *
      * Do not change these mode values without updating their counterparts
      * in include/media/IMediaSource.h!
      */
     /**
-     * This mode is used with {@link #seekTo(int, int)} to move media position to
+     * This mode is used with {@link #seekTo(long, int)} to move media position to
      * a sync (or key) frame associated with a data source that is located
      * right before or at the given time.
      *
-     * @see #seekTo(int, int)
+     * @see #seekTo(long, int)
      */
     public static final int SEEK_PREVIOUS_SYNC    = 0x00;
     /**
-     * This mode is used with {@link #seekTo(int, int)} to move media position to
+     * This mode is used with {@link #seekTo(long, int)} to move media position to
      * a sync (or key) frame associated with a data source that is located
      * right after or at the given time.
      *
-     * @see #seekTo(int, int)
+     * @see #seekTo(long, int)
      */
     public static final int SEEK_NEXT_SYNC        = 0x01;
     /**
-     * This mode is used with {@link #seekTo(int, int)} to move media position to
+     * This mode is used with {@link #seekTo(long, int)} to move media position to
      * a sync (or key) frame associated with a data source that is located
      * closest to (in time) or at the given time.
      *
-     * @see #seekTo(int, int)
+     * @see #seekTo(long, int)
      */
     public static final int SEEK_CLOSEST_SYNC     = 0x02;
     /**
-     * This mode is used with {@link #seekTo(int, int)} to move media position to
+     * This mode is used with {@link #seekTo(long, int)} to move media position to
      * a frame (not necessarily a key frame) associated with a data source that
      * is located closest to or at the given time.
      *
-     * @see #seekTo(int, int)
+     * @see #seekTo(long, int)
      */
     public static final int SEEK_CLOSEST          = 0x03;
 
@@ -1743,7 +1754,7 @@ public class MediaPlayer extends PlayerBase
     @Retention(RetentionPolicy.SOURCE)
     public @interface SeekMode {}
 
-    private native final void _seekTo(int msec, int mode);
+    private native final void _seekTo(long msec, int mode);
 
     /**
      * Moves the media to specified time position by considering the given mode.
@@ -1775,17 +1786,25 @@ public class MediaPlayer extends PlayerBase
      * initialized
      * @throws IllegalArgumentException if the mode is invalid.
      */
-    public void seekTo(int msec, @SeekMode int mode) throws IllegalStateException {
+    public void seekTo(long msec, @SeekMode int mode) {
         if (mode < SEEK_PREVIOUS_SYNC || mode > SEEK_CLOSEST) {
             final String msg = "Illegal seek mode: " + mode;
             throw new IllegalArgumentException(msg);
+        }
+        // TODO: pass long to native, instead of truncating here.
+        if (msec > Integer.MAX_VALUE) {
+            Log.w(TAG, "seekTo offset " + msec + " is too large, cap to " + Integer.MAX_VALUE);
+            msec = Integer.MAX_VALUE;
+        } else if (msec < Integer.MIN_VALUE) {
+            Log.w(TAG, "seekTo offset " + msec + " is too small, cap to " + Integer.MIN_VALUE);
+            msec = Integer.MIN_VALUE;
         }
         _seekTo(msec, mode);
     }
 
     /**
      * Seeks to specified time position.
-     * Same as {@link #seekTo(int, int)} with {@code mode = SEEK_PREVIOUS_SYNC}.
+     * Same as {@link #seekTo(long, int)} with {@code mode = SEEK_PREVIOUS_SYNC}.
      *
      * @param msec the offset in milliseconds from the start to seek to
      * @throws IllegalStateException if the internal player engine has not been
@@ -1982,7 +2001,7 @@ public class MediaPlayer extends PlayerBase
         mOnSubtitleDataListener = null;
 
         // Modular DRM clean up
-        mOnDrmConfigListener = null;
+        mOnDrmConfigHelper = null;
         mOnDrmInfoHandlerDelegate = null;
         mOnDrmPreparedHandlerDelegate = null;
         resetDrmState();
@@ -3906,11 +3925,11 @@ public class MediaPlayer extends PlayerBase
      * 'securityLevel', which has to be set after DRM scheme creation but
      * before the DRM session is opened.
      *
-     * The only allowed DRM calls in this listener are getDrmPropertyString
-     * and setDrmPropertyString.
+     * The only allowed DRM calls in this listener are {@code getDrmPropertyString}
+     * and {@code setDrmPropertyString}.
      *
      */
-    public interface OnDrmConfigListener
+    public interface OnDrmConfigHelper
     {
         /**
          * Called to give the app the opportunity to configure DRM before the session is created
@@ -3923,19 +3942,19 @@ public class MediaPlayer extends PlayerBase
     /**
      * Register a callback to be invoked for configuration of the DRM object before
      * the session is created.
-     * The callback will be invoked synchronously half-way into the execution
+     * The callback will be invoked synchronously during the execution
      * of {@link #prepareDrm(UUID uuid)}.
      *
      * @param listener the callback that will be run
      */
-    public void setOnDrmConfigListener(OnDrmConfigListener listener)
+    public void setOnDrmConfigHelper(OnDrmConfigHelper listener)
     {
         synchronized (mDrmLock) {
-            mOnDrmConfigListener = listener;
+            mOnDrmConfigHelper = listener;
         } // synchronized
     }
 
-    private OnDrmConfigListener mOnDrmConfigListener;
+    private OnDrmConfigHelper mOnDrmConfigHelper;
 
     /**
      * Interface definition of a callback to be invoked when the
@@ -3947,7 +3966,7 @@ public class MediaPlayer extends PlayerBase
          * Called to indicate DRM info is available
          *
          * @param mp the {@code MediaPlayer} associated with this callback
-         * @param drmInfo DRM info of the source including PSSH, mimes, and subset
+         * @param drmInfo DRM info of the source including PSSH, and subset
          *                of crypto schemes supported by this device
          */
         public void onDrmInfo(MediaPlayer mp, DrmInfo drmInfo);
@@ -3983,6 +4002,41 @@ public class MediaPlayer extends PlayerBase
 
     private OnDrmInfoHandlerDelegate mOnDrmInfoHandlerDelegate;
 
+
+    /**
+     * The status codes for {@link OnDrmPreparedListener#onDrmPrepared} listener.
+     * <p>
+     *
+     * DRM preparation has succeeded.
+     */
+    public static final int PREPARE_DRM_STATUS_SUCCESS = 0;
+
+    /**
+     * The device required DRM provisioning but couldn't reach the provisioning server.
+     */
+    public static final int PREPARE_DRM_STATUS_PROVISIONING_NETWORK_ERROR = 1;
+
+    /**
+     * The device required DRM provisioning but the provisioning server denied the request.
+     */
+    public static final int PREPARE_DRM_STATUS_PROVISIONING_SERVER_ERROR = 2;
+
+    /**
+     * The DRM preparation has failed .
+     */
+    public static final int PREPARE_DRM_STATUS_PREPARATION_ERROR = 3;
+
+
+    /** @hide */
+    @IntDef({
+        PREPARE_DRM_STATUS_SUCCESS,
+        PREPARE_DRM_STATUS_PROVISIONING_NETWORK_ERROR,
+        PREPARE_DRM_STATUS_PROVISIONING_SERVER_ERROR,
+        PREPARE_DRM_STATUS_PREPARATION_ERROR,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface PrepareDrmStatusCode {}
+
     /**
      * Interface definition of a callback to notify the app when the
      * DRM is ready for key request/response
@@ -3993,9 +4047,13 @@ public class MediaPlayer extends PlayerBase
          * Called to notify the app that prepareDrm is finished and ready for key request/response
          *
          * @param mp the {@code MediaPlayer} associated with this callback
-         * @param success the result of DRM preparation
+         * @param status the result of DRM preparation which can be
+         * {@link #PREPARE_DRM_STATUS_SUCCESS},
+         * {@link #PREPARE_DRM_STATUS_PROVISIONING_NETWORK_ERROR},
+         * {@link #PREPARE_DRM_STATUS_PROVISIONING_SERVER_ERROR}, or
+         * {@link #PREPARE_DRM_STATUS_PREPARATION_ERROR}.
          */
-        public void onDrmPrepared(MediaPlayer mp, boolean success);
+        public void onDrmPrepared(MediaPlayer mp, @PrepareDrmStatusCode int status);
     }
 
     /**
@@ -4039,30 +4097,28 @@ public class MediaPlayer extends PlayerBase
             mOnDrmInfoListener = listener;
 
             // find the looper for our new event handler
-            Looper looper = null;
             if (handler != null) {
-                looper = handler.getLooper();
-            }
-
-            // construct the event handler with this looper
-            if (looper != null) {
-                // implement the event handler delegate
-                mHandler = new Handler(looper) {
-                    public void handleMessage(Message msg) {
-                        DrmInfo drmInfo = (DrmInfo)msg.obj;
-                        mOnDrmInfoListener.onDrmInfo(mMediaPlayer, drmInfo);
-                    }
-                };
+                mHandler = handler;
+            } else {
+                // handler == null
+                // Will let OnDrmInfoListener be called in mEventHandler similar to other
+                // legacy notifications. This is because MEDIA_DRM_INFO's notification has to be
+                // sent before MEDIA_PREPARED's (i.e., in the same order they are issued by
+                // mediaserver). As a result, the callback has to be called directly by
+                // EventHandler.handleMessage similar to onPrepared.
             }
         }
 
         void notifyClient(DrmInfo drmInfo) {
-            if ( mHandler != null ) {
-                Message msg = new Message();  // no message type needed
-                msg.obj = drmInfo;
-                mHandler.sendMessage(msg);
+            if (mHandler != null) {
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                       mOnDrmInfoListener.onDrmInfo(mMediaPlayer, drmInfo);
+                    }
+                });
             }
-            else {  // no handler: direct call
+            else {  // no handler: direct call by mEventHandler
                 mOnDrmInfoListener.onDrmInfo(mMediaPlayer, drmInfo);
             }
         }
@@ -4079,31 +4135,26 @@ public class MediaPlayer extends PlayerBase
             mOnDrmPreparedListener = listener;
 
             // find the looper for our new event handler
-            Looper looper = null;
             if (handler != null) {
-                looper = handler.getLooper();
-            }
-
-            // construct the event handler with this looper
-            if (looper != null) {
-                // implement the event handler delegate
-                mHandler = new Handler(looper) {
-                    public void handleMessage(Message msg) {
-                        boolean success = (msg.arg1 == 0) ? false : true;
-                        mOnDrmPreparedListener.onDrmPrepared(mMediaPlayer, success);
-                    }
-                };
+                mHandler = handler;
+            } else if (mEventHandler != null) {
+                // Otherwise, use mEventHandler
+                mHandler = mEventHandler;
+            } else {
+                Log.e(TAG, "OnDrmPreparedHandlerDelegate: Unexpected null mEventHandler");
             }
         }
 
-        void notifyClient(boolean success) {
-            if ( mHandler != null ) {
-                Message msg = new Message();  // no message type needed
-                msg.arg1 = success ? 1 : 0;
-                mHandler.sendMessage(msg);
-            }
-            else {  // no handler: direct call
-                mOnDrmPreparedListener.onDrmPrepared(mMediaPlayer, success);
+        void notifyClient(int status) {
+            if (mHandler != null) {
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        mOnDrmPreparedListener.onDrmPrepared(mMediaPlayer, status);
+                    }
+                });
+            } else {
+                Log.e(TAG, "OnDrmPreparedHandlerDelegate:notifyClient: Unexpected null mHandler");
             }
         }
     }
@@ -4138,7 +4189,7 @@ public class MediaPlayer extends PlayerBase
     /**
      * Prepares the DRM for the current source
      * <p>
-     * If {@code OnDrmConfigListener} is registered, it will be called half-way into
+     * If {@code OnDrmConfigHelper} is registered, it will be called during
      * preparation to allow configuration of the DRM properties before opening the
      * DRM session. Note that the callback is called synchronously in the thread that called
      * {@code prepareDrm}. It should be used only for a series of {@code getDrmPropertyString}
@@ -4149,9 +4200,9 @@ public class MediaPlayer extends PlayerBase
      * complete depending on the network connectivity.
      * If {@code OnDrmPreparedListener} is registered, prepareDrm() runs in non-blocking
      * mode by launching the provisioning in the background and returning. The listener
-     * will be called when provisioning and preperation has finished. If a
+     * will be called when provisioning and preparation has finished. If a
      * {@code OnDrmPreparedListener} is not registered, prepareDrm() waits till provisioning
-     * and preperation has finished, i.e., runs in blocking mode.
+     * and preparation has finished, i.e., runs in blocking mode.
      * <p>
      * If {@code OnDrmPreparedListener} is registered, it is called to indicate the DRM
      * session being ready. The application should not make any assumption about its call
@@ -4159,18 +4210,23 @@ public class MediaPlayer extends PlayerBase
      * execute the listener (unless the listener is registered with a handler thread).
      * <p>
      *
-     * @param uuid The UUID of the crypto scheme.
+     * @param uuid The UUID of the crypto scheme. If not known beforehand, it can be retrieved
+     * from the source through {@code getDrmInfo} or registering a {@code onDrmInfoListener}.
      *
-     * @throws IllegalStateException       if called before prepare(), or there exists a Drm already
-     * @throws UnsupportedSchemeException  if the crypto scheme is not supported
-     * @throws ResourceBusyException       if required DRM resources are in use
-     * @throws ProvisioningErrorException  if provisioning is required but an attempt failed
+     * @throws IllegalStateException              if called before prepare(), or the DRM was
+     *                                            prepared already
+     * @throws UnsupportedSchemeException         if the crypto scheme is not supported
+     * @throws ResourceBusyException              if required DRM resources are in use
+     * @throws ProvisioningNetworkErrorException  if provisioning is required but failed due to a
+     *                                            network error
+     * @throws ProvisioningServerErrorException   if provisioning is required but failed due to
+     *                                            the request denied by the provisioning server
      */
     public void prepareDrm(@NonNull UUID uuid)
-            throws UnsupportedSchemeException,
-                   ResourceBusyException, ProvisioningErrorException
+            throws UnsupportedSchemeException, ResourceBusyException,
+                   ProvisioningNetworkErrorException, ProvisioningServerErrorException
     {
-        Log.v(TAG, "prepareDrm: uuid: " + uuid + " mOnDrmConfigListener: " + mOnDrmConfigListener);
+        Log.v(TAG, "prepareDrm: uuid: " + uuid + " mOnDrmConfigHelper: " + mOnDrmConfigHelper);
 
         boolean allDoneWithoutProvisioning = false;
         // get a snapshot as we'll use them outside the lock
@@ -4178,7 +4234,7 @@ public class MediaPlayer extends PlayerBase
 
         synchronized (mDrmLock) {
 
-            // only allowing if tied to a protected source; might releax for releasing offline keys
+            // only allowing if tied to a protected source; might relax for releasing offline keys
             if (mDrmInfo == null) {
                 final String msg = "prepareDrm(): Wrong usage: The player must be prepared and " +
                         "DRM info be retrieved before this call.";
@@ -4227,8 +4283,8 @@ public class MediaPlayer extends PlayerBase
 
 
         // call the callback outside the lock
-        if (mOnDrmConfigListener != null)  {
-            mOnDrmConfigListener.onDrmConfig(this);
+        if (mOnDrmConfigHelper != null)  {
+            mOnDrmConfigHelper.onDrmConfig(this);
         }
 
         synchronized (mDrmLock) {
@@ -4252,15 +4308,33 @@ public class MediaPlayer extends PlayerBase
                 Log.w(TAG, "prepareDrm: NotProvisionedException");
 
                 // handle provisioning internally; it'll reset mPrepareDrmInProgress
-                boolean result = HandleProvisioninig(uuid);
+                int result = HandleProvisioninig(uuid);
 
                 // if blocking mode, we're already done;
                 // if non-blocking mode, we attempted to launch background provisioning
-                if (result == false) {
-                    final String msg = "prepareDrm: Provisioning was required but failed.";
-                    Log.e(TAG, msg);
+                if (result != PREPARE_DRM_STATUS_SUCCESS) {
                     earlyExit = true;
-                    throw new ProvisioningErrorException(msg);
+                    String msg;
+
+                    switch (result) {
+                    case PREPARE_DRM_STATUS_PROVISIONING_NETWORK_ERROR:
+                        msg = "prepareDrm: Provisioning was required but failed " +
+                                "due to a network error.";
+                        Log.e(TAG, msg);
+                        throw new ProvisioningNetworkErrorException(msg);
+
+                    case PREPARE_DRM_STATUS_PROVISIONING_SERVER_ERROR:
+                        msg = "prepareDrm: Provisioning was required but the request " +
+                                "was denied by the server.";
+                        Log.e(TAG, msg);
+                        throw new ProvisioningServerErrorException(msg);
+
+                    case PREPARE_DRM_STATUS_PREPARATION_ERROR:
+                    default: // default for safeguard
+                        msg = "prepareDrm: Post-provisioning preparation failed.";
+                        Log.e(TAG, msg);
+                        throw new IllegalStateException(msg);
+                    }
                 }
                 // nothing else to do;
                 // if blocking or non-blocking, HandleProvisioninig does the re-attempt & cleanup
@@ -4282,7 +4356,7 @@ public class MediaPlayer extends PlayerBase
         // if finished successfully without provisioning, call the callback outside the lock
         if (allDoneWithoutProvisioning) {
             if (onDrmPreparedHandlerDelegate != null)
-                onDrmPreparedHandlerDelegate.notifyClient(true /*success*/);
+                onDrmPreparedHandlerDelegate.notifyClient(PREPARE_DRM_STATUS_SUCCESS);
         }
 
     }
@@ -4292,6 +4366,10 @@ public class MediaPlayer extends PlayerBase
 
     /**
      * Releases the DRM session
+     * <p>
+     * The player has to have an active DRM session and be in stopped, or prepared
+     * state before this call is made.
+     * A {@code reset()} call will release the DRM session implicitly.
      *
      * @throws NoDrmSchemeException if there is no active DRM session to release
      */
@@ -4308,7 +4386,7 @@ public class MediaPlayer extends PlayerBase
 
             try {
                 // we don't have the player's state in this layer. The below call raises
-                // exception if we're in a non-stopped/idle state.
+                // exception if we're in a non-stopped/prepared state.
 
                 // for cleaning native/mediaserver crypto object
                 _releaseDrm();
@@ -4317,9 +4395,11 @@ public class MediaPlayer extends PlayerBase
                 cleanDrmObj();
 
                 mActiveDrmScheme = false;
-            } catch (Exception e) {
+            } catch (IllegalStateException e) {
                 Log.w(TAG, "releaseDrm: Exception ", e);
-                throw e;
+                throw new IllegalStateException("releaseDrm: The player is not in a valid state.");
+            } catch (Exception e) {
+                Log.e(TAG, "releaseDrm: Exception ", e);
             }
         }   // synchronized
     }
@@ -4338,21 +4418,23 @@ public class MediaPlayer extends PlayerBase
      * it should deliver to the response to the DRM engine plugin using the method
      * {@link #provideKeyResponse}.
      *
-     * @param scope may be a container-specific initialization data or a keySetId,
-     * depending on the specified keyType.
-     * When the keyType is KEY_TYPE_STREAMING or KEY_TYPE_OFFLINE, scope should be set to
-     * the container-specific initialization data. Its meaning is interpreted based on the
-     * mime type provided in the mimeType parameter.  It could contain, for example,
-     * the content ID, key ID or other data obtained from the content metadata that is
-     * required in generating the key request.
-     * When the keyType is KEY_TYPE_RELEASE, scope should be set to the keySetId of
-     * the keys being released.
+     * @param keySetId is the key-set identifier of the offline keys being released when keyType is
+     * {@link MediaDrm#KEY_TYPE_RELEASE}. It should be set to null for other key requests, when
+     * keyType is {@link MediaDrm#KEY_TYPE_STREAMING} or {@link MediaDrm#KEY_TYPE_OFFLINE}.
+     *
+     * @param initData is the container-specific initialization data when the keyType is
+     * {@link MediaDrm#KEY_TYPE_STREAMING} or {@link MediaDrm#KEY_TYPE_OFFLINE}. Its meaning is
+     * interpreted based on the mime type provided in the mimeType parameter.  It could
+     * contain, for example, the content ID, key ID or other data obtained from the content
+     * metadata that is required in generating the key request.
+     * When the keyType is {@link MediaDrm#KEY_TYPE_RELEASE}, it should be set to null.
      *
      * @param mimeType identifies the mime type of the content
      *
-     * @param keyType specifes the type of the request. The request may be to acquire
-     * keys for streaming or offline content, or to release previously acquired
-     * keys, which are identified by a keySetId.
+     * @param keyType specifies the type of the request. The request may be to acquire
+     * keys for streaming, {@link MediaDrm#KEY_TYPE_STREAMING}, or for offline content
+     * {@link MediaDrm#KEY_TYPE_OFFLINE}, or to release previously acquired
+     * keys ({@link MediaDrm#KEY_TYPE_RELEASE}), which are identified by a keySetId.
      *
      * @param optionalParameters are included in the key request message to
      * allow a client application to provide additional message parameters to the server.
@@ -4361,12 +4443,13 @@ public class MediaPlayer extends PlayerBase
      * @throws NoDrmSchemeException if there is no active DRM session
      */
     @NonNull
-    public MediaDrm.KeyRequest getKeyRequest(@NonNull byte[] scope, @Nullable String mimeType,
-            @MediaDrm.KeyType int keyType, @Nullable Map<String, String> optionalParameters)
+    public MediaDrm.KeyRequest getKeyRequest(@Nullable byte[] keySetId, @Nullable byte[] initData,
+            @Nullable String mimeType, @MediaDrm.KeyType int keyType,
+            @Nullable Map<String, String> optionalParameters)
             throws NoDrmSchemeException
     {
         Log.v(TAG, "getKeyRequest: " +
-                " scope: " + scope + " mimeType: " + mimeType +
+                " keySetId: " + keySetId + " initData:" + initData + " mimeType: " + mimeType +
                 " keyType: " + keyType + " optionalParameters: " + optionalParameters);
 
         synchronized (mDrmLock) {
@@ -4376,20 +4459,16 @@ public class MediaPlayer extends PlayerBase
             }
 
             try {
-                byte[] scopeOut = (keyType != MediaDrm.KEY_TYPE_RELEASE) ?
-                                  mDrmSessionId : // sessionId for KEY_TYPE_STREAMING/OFFLINE
-                                  scope;          // keySetId for KEY_TYPE_RELEASE
-
-                byte[] initData = (keyType != MediaDrm.KEY_TYPE_RELEASE) ?
-                                  scope :         // initData for KEY_TYPE_STREAMING/OFFLINE
-                                  null;           // not used for KEY_TYPE_RELEASE
+                byte[] scope = (keyType != MediaDrm.KEY_TYPE_RELEASE) ?
+                        mDrmSessionId : // sessionId for KEY_TYPE_STREAMING/OFFLINE
+                        keySetId;       // keySetId for KEY_TYPE_RELEASE
 
                 HashMap<String, String> hmapOptionalParameters =
                                                 (optionalParameters != null) ?
                                                 new HashMap<String, String>(optionalParameters) :
                                                 null;
 
-                MediaDrm.KeyRequest request = mDrmObj.getKeyRequest(scopeOut, initData, mimeType,
+                MediaDrm.KeyRequest request = mDrmObj.getKeyRequest(scope, initData, mimeType,
                                                               keyType, hmapOptionalParameters);
                 Log.v(TAG, "getKeyRequest:   --> request: " + request);
 
@@ -4500,8 +4579,8 @@ public class MediaPlayer extends PlayerBase
      * @param propertyName the property name
      *
      * Standard fields names are:
-     * {link #PROPERTY_VENDOR}, {link #PROPERTY_VERSION},
-     * {link #PROPERTY_DESCRIPTION}, {link #PROPERTY_ALGORITHMS}
+     * {@link MediaDrm#PROPERTY_VENDOR}, {@link MediaDrm#PROPERTY_VERSION},
+     * {@link MediaDrm#PROPERTY_DESCRIPTION}, {@link MediaDrm#PROPERTY_ALGORITHMS}
      */
     @NonNull
     public String getDrmPropertyString(@NonNull @MediaDrm.StringProperty String propertyName)
@@ -4538,8 +4617,8 @@ public class MediaPlayer extends PlayerBase
      * @param value the property value
      *
      * Standard fields names are:
-     * {link #PROPERTY_VENDOR}, {link #PROPERTY_VERSION},
-     * {link #PROPERTY_DESCRIPTION}, {link #PROPERTY_ALGORITHMS}
+     * {@link MediaDrm#PROPERTY_VENDOR}, {@link MediaDrm#PROPERTY_VERSION},
+     * {@link MediaDrm#PROPERTY_DESCRIPTION}, {@link MediaDrm#PROPERTY_ALGORITHMS}
      */
     public void setDrmPropertyString(@NonNull @MediaDrm.StringProperty String propertyName,
                                      @NonNull String value)
@@ -4563,27 +4642,32 @@ public class MediaPlayer extends PlayerBase
         }   // synchronized
     }
 
+    /**
+     * Encapsulates the DRM properties of the source.
+     */
     public static final class DrmInfo {
         private Map<UUID, byte[]> mapPssh;
         private UUID[] supportedSchemes;
-        // TODO: Won't need this in final release. Only keeping it for the existing test app.
-        private String[] mimes;
 
+        /**
+         * Returns the PSSH info of the data source for each supported DRM scheme.
+         */
         public Map<UUID, byte[]> getPssh() {
             return mapPssh;
         }
+
+        /**
+         * Returns the intersection of the data source and the device DRM schemes.
+         * It effectively identifies the subset of the source's DRM schemes which
+         * are supported by the device too.
+         */
         public UUID[] getSupportedSchemes() {
             return supportedSchemes;
         }
-        // TODO: Won't need this in final release. Only keeping it for the existing test app.
-        public String[] getMimes() {
-            return mimes;
-        }
 
-        private DrmInfo(Map<UUID, byte[]> Pssh, UUID[] SupportedSchemes, String[] Mimes) {
+        private DrmInfo(Map<UUID, byte[]> Pssh, UUID[] SupportedSchemes) {
             mapPssh = Pssh;
             supportedSchemes = SupportedSchemes;
-            mimes = Mimes;
         }
 
         private DrmInfo(Parcel parcel) {
@@ -4609,18 +4693,12 @@ public class MediaPlayer extends PlayerBase
                       supportedSchemes[i]);
             }
 
-            // TODO: Won't need this in final release. Only keeping it for the test app.
-            mimes = parcel.readStringArray();
-            int mimeCount = mimes.length;
-            Log.v(TAG, "DrmInfo() mime: " + Arrays.toString(mimes));
-
             Log.v(TAG, "DrmInfo() Parcel psshsize: " + psshsize +
-                  " supportedDRMsCount: " + supportedDRMsCount +
-                  " mimeCount: " + mimeCount);
+                  " supportedDRMsCount: " + supportedDRMsCount);
         }
 
         private DrmInfo makeCopy() {
-            return new DrmInfo(this.mapPssh, this.supportedSchemes, this.mimes);
+            return new DrmInfo(this.mapPssh, this.supportedSchemes);
         }
 
         private String arrToHex(byte[] bytes) {
@@ -4715,11 +4793,22 @@ public class MediaPlayer extends PlayerBase
 
     /**
      * Thrown when the device requires DRM provisioning but the provisioning attempt has
-     * failed (for example: network timeout, provisioning server error).
+     * failed due to a network error (Internet reachability, timeout, etc.).
      * Extends MediaDrm.MediaDrmException
      */
-    public static final class ProvisioningErrorException extends MediaDrmException {
-        public ProvisioningErrorException(String detailMessage) {
+    public static final class ProvisioningNetworkErrorException extends MediaDrmException {
+        public ProvisioningNetworkErrorException(String detailMessage) {
+            super(detailMessage);
+        }
+    }
+
+    /**
+     * Thrown when the device requires DRM provisioning but the provisioning attempt has
+     * failed due to the provisioning server denying the request.
+     * Extends MediaDrm.MediaDrmException
+     */
+    public static final class ProvisioningServerErrorException extends MediaDrmException {
+        public ProvisioningServerErrorException(String detailMessage) {
             super(detailMessage);
         }
     }
@@ -4771,14 +4860,13 @@ public class MediaPlayer extends PlayerBase
 
         private UUID uuid;
         private String urlStr;
-        private byte[] response;
         private Object drmLock;
         private OnDrmPreparedHandlerDelegate onDrmPreparedHandlerDelegate;
         private MediaPlayer mediaPlayer;
-        private boolean succeeded;
+        private int status;
         private boolean finished;
-        public  boolean succeeded() {
-            return succeeded;
+        public  int status() {
+            return status;
         }
 
         public ProvisioningThread initialize(MediaDrm.ProvisionRequest request,
@@ -4791,12 +4879,15 @@ public class MediaPlayer extends PlayerBase
             urlStr = request.getDefaultUrl() + "&signedRequest=" + new String(request.getData());
             this.uuid = uuid;
 
+            status = PREPARE_DRM_STATUS_PREPARATION_ERROR;
+
             Log.v(TAG, "HandleProvisioninig: Thread is initialised url: " + urlStr);
             return this;
         }
 
         public void run() {
 
+            byte[] response = null;
             boolean provisioningSucceeded = false;
             try {
                 URL url = new URL(urlStr);
@@ -4814,11 +4905,13 @@ public class MediaPlayer extends PlayerBase
                     Log.v(TAG, "HandleProvisioninig: Thread run: response " +
                             response.length + " " + response);
                 } catch (Exception e) {
+                    status = PREPARE_DRM_STATUS_PROVISIONING_NETWORK_ERROR;
                     Log.w(TAG, "HandleProvisioninig: Thread run: connect " + e + " url: " + url);
                 } finally {
                     connection.disconnect();
                 }
             } catch (Exception e)   {
+                status = PREPARE_DRM_STATUS_PROVISIONING_NETWORK_ERROR;
                 Log.w(TAG, "HandleProvisioninig: Thread run: openConnection " + e);
             }
 
@@ -4829,11 +4922,14 @@ public class MediaPlayer extends PlayerBase
                             "provideProvisionResponse SUCCEEDED!");
 
                     provisioningSucceeded = true;
-                } catch (Exception e)   {
+                } catch (Exception e) {
+                    status = PREPARE_DRM_STATUS_PROVISIONING_SERVER_ERROR;
                     Log.w(TAG, "HandleProvisioninig: Thread run: " +
                             "provideProvisionResponse " + e);
                 }
             }
+
+            boolean succeeded = false;
 
             // non-blocking mode needs the lock
             if (onDrmPreparedHandlerDelegate != null) {
@@ -4842,6 +4938,9 @@ public class MediaPlayer extends PlayerBase
                     // continuing with prepareDrm
                     if (provisioningSucceeded) {
                         succeeded = mediaPlayer.resumePrepareDrm(uuid);
+                        status = (succeeded) ?
+                                PREPARE_DRM_STATUS_SUCCESS :
+                                PREPARE_DRM_STATUS_PREPARATION_ERROR;
                     }
                     mediaPlayer.mDrmProvisioningInProgress = false;
                     mediaPlayer.mPrepareDrmInProgress = false;
@@ -4851,12 +4950,15 @@ public class MediaPlayer extends PlayerBase
                 } // synchronized
 
                 // calling the callback outside the lock
-                onDrmPreparedHandlerDelegate.notifyClient(succeeded);
+                onDrmPreparedHandlerDelegate.notifyClient(status);
             } else {   // blocking mode already has the lock
 
                 // continuing with prepareDrm
                 if (provisioningSucceeded) {
                     succeeded = mediaPlayer.resumePrepareDrm(uuid);
+                    status = (succeeded) ?
+                            PREPARE_DRM_STATUS_SUCCESS :
+                            PREPARE_DRM_STATUS_PREPARATION_ERROR;
                 }
                 mediaPlayer.mDrmProvisioningInProgress = false;
                 mediaPlayer.mPrepareDrmInProgress = false;
@@ -4870,19 +4972,19 @@ public class MediaPlayer extends PlayerBase
 
     }   // ProvisioningThread
 
-    private boolean HandleProvisioninig(UUID uuid)
+    private int HandleProvisioninig(UUID uuid)
     {
         // the lock is already held by the caller
 
         if (mDrmProvisioningInProgress) {
             Log.e(TAG, "HandleProvisioninig: Unexpected mDrmProvisioningInProgress");
-            return false;
+            return PREPARE_DRM_STATUS_PREPARATION_ERROR;
         }
 
         MediaDrm.ProvisionRequest provReq = mDrmObj.getProvisionRequest();
         if (provReq == null) {
             Log.e(TAG, "HandleProvisioninig: getProvisionRequest returned null.");
-            return false;
+            return PREPARE_DRM_STATUS_PREPARATION_ERROR;
         }
 
         Log.v(TAG, "HandleProvisioninig provReq " +
@@ -4894,11 +4996,11 @@ public class MediaPlayer extends PlayerBase
         mDrmProvisioningThread = new ProvisioningThread().initialize(provReq, uuid, this);
         mDrmProvisioningThread.start();
 
-        boolean result = false;
+        int result;
 
-        // non-blocking
+        // non-blocking: this is not the final result
         if (mOnDrmPreparedHandlerDelegate != null) {
-            result = true;
+            result = PREPARE_DRM_STATUS_SUCCESS;
         } else {
             // if blocking mode, wait till provisioning is done
             try {
@@ -4906,7 +5008,7 @@ public class MediaPlayer extends PlayerBase
             } catch (Exception e) {
                 Log.w(TAG, "HandleProvisioninig: Thread.join Exception " + e);
             }
-            result = mDrmProvisioningThread.succeeded();
+            result = mDrmProvisioningThread.status();
             // no longer need the thread
             mDrmProvisioningThread = null;
         }
@@ -5417,5 +5519,99 @@ public class MediaPlayer extends PlayerBase
                 }
             }
         }
+    }
+
+    public final static class MetricsConstants
+    {
+        private MetricsConstants() {}
+
+        /**
+         * Key to extract the MIME type of the video track
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is a String.
+         */
+        public static final String MIME_TYPE_VIDEO = "android.media.mediaplayer.video.mime";
+
+        /**
+         * Key to extract the codec being used to decode the video track
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is a String.
+         */
+        public static final String CODEC_VIDEO = "android.media.mediaplayer.video.codec";
+
+        /**
+         * Key to extract the width (in pixels) of the video track
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is an integer.
+         */
+        public static final String WIDTH = "android.media.mediaplayer.width";
+
+        /**
+         * Key to extract the height (in pixels) of the video track
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is an integer.
+         */
+        public static final String HEIGHT = "android.media.mediaplayer.height";
+
+        /**
+         * Key to extract the count of video frames played
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is an integer.
+         */
+        public static final String FRAMES = "android.media.mediaplayer.frames";
+
+        /**
+         * Key to extract the count of video frames dropped
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is an integer.
+         */
+        public static final String FRAMES_DROPPED = "android.media.mediaplayer.dropped";
+
+        /**
+         * Key to extract the MIME type of the audio track
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is a String.
+         */
+        public static final String MIME_TYPE_AUDIO = "android.media.mediaplayer.audio.mime";
+
+        /**
+         * Key to extract the codec being used to decode the audio track
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is a String.
+         */
+        public static final String CODEC_AUDIO = "android.media.mediaplayer.audio.codec";
+
+        /**
+         * Key to extract the duration (in milliseconds) of the
+         * media being played
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is a long.
+         */
+        public static final String DURATION = "android.media.mediaplayer.durationMs";
+
+        /**
+         * Key to extract the playing time (in milliseconds) of the
+         * media being played
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is a long.
+         */
+        public static final String PLAYING = "android.media.mediaplayer.playingMs";
+
+        /**
+         * Key to extract the count of errors encountered while
+         * playing the media
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is an integer.
+         */
+        public static final String ERRORS = "android.media.mediaplayer.err";
+
+        /**
+         * Key to extract an (optional) error code detected while
+         * playing the media
+         * from the {@link MediaPlayer#getMetrics} return value.
+         * The value is an integer.
+         */
+        public static final String ERROR_CODE = "android.media.mediaplayer.errcode";
+
     }
 }

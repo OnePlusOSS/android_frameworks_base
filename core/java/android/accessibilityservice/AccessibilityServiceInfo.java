@@ -95,9 +95,7 @@ public class AccessibilityServiceInfo implements Parcelable {
     public static final int CAPABILITY_CAN_REQUEST_TOUCH_EXPLORATION = 0x00000002;
 
     /**
-     * Capability: This accessibility service can request enhanced web accessibility
-     * enhancements. For example, installing scripts to make app content more accessible.
-     * @see android.R.styleable#AccessibilityService_canRequestEnhancedWebAccessibility
+     * @deprecated No longer used
      */
     public static final int CAPABILITY_CAN_REQUEST_ENHANCED_WEB_ACCESSIBILITY = 0x00000004;
 
@@ -121,9 +119,9 @@ public class AccessibilityServiceInfo implements Parcelable {
 
     /**
      * Capability: This accessibility service can capture gestures from the fingerprint sensor
-     * @see android.R.styleable#AccessibilityService_canCaptureFingerprintGestures
+     * @see android.R.styleable#AccessibilityService_canRequestFingerprintGestures
      */
-    public static final int CAPABILITY_CAN_CAPTURE_FINGERPRINT_GESTURES = 0x00000040;
+    public static final int CAPABILITY_CAN_REQUEST_FINGERPRINT_GESTURES = 0x00000040;
 
     private static SparseArray<CapabilityInfo> sAvailableCapabilityInfos;
 
@@ -237,22 +235,7 @@ public class AccessibilityServiceInfo implements Parcelable {
     public static final int FLAG_REQUEST_TOUCH_EXPLORATION_MODE = 0x0000004;
 
     /**
-     * This flag requests from the system to enable web accessibility enhancing
-     * extensions. Such extensions aim to provide improved accessibility support
-     * for content presented in a {@link android.webkit.WebView}. An example of such
-     * an extension is injecting JavaScript from a secure source. The system will enable
-     * enhanced web accessibility if there is at least one accessibility service
-     * that has this flag set. Hence, clearing this flag does not guarantee that the
-     * device will not have enhanced web accessibility enabled since there may be
-     * another enabled service that requested it.
-     * <p>
-     * Services that want to set this flag have to declare this capability
-     * in their meta-data by setting the attribute {@link android.R.attr
-     * #canRequestEnhancedWebAccessibility canRequestEnhancedWebAccessibility} to
-     * true, otherwise this flag will be ignored. For how to declare the meta-data
-     * of a service refer to {@value AccessibilityService#SERVICE_META_DATA}.
-     * </p>
-     * @see android.R.styleable#AccessibilityService_canRequestEnhancedWebAccessibility
+     * @deprecated No longer used
      */
     public static final int FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY = 0x00000008;
 
@@ -318,7 +301,7 @@ public class AccessibilityServiceInfo implements Parcelable {
      * This flag requests that all fingerprint gestures be sent to the accessibility service.
      * It is handled in {@link FingerprintGestureController}
      */
-    public static final int FLAG_CAPTURE_FINGERPRINT_GESTURES = 0x00000200;
+    public static final int FLAG_REQUEST_FINGERPRINT_GESTURES = 0x00000200;
 
     /** {@hide} */
     public static final int FLAG_FORCE_DIRECT_BOOT_AWARE = 0x00010000;
@@ -526,10 +509,6 @@ public class AccessibilityServiceInfo implements Parcelable {
                 mCapabilities |= CAPABILITY_CAN_REQUEST_TOUCH_EXPLORATION;
             }
             if (asAttributes.getBoolean(com.android.internal.R.styleable
-                        .AccessibilityService_canRequestEnhancedWebAccessibility, false)) {
-                    mCapabilities |= CAPABILITY_CAN_REQUEST_ENHANCED_WEB_ACCESSIBILITY;
-            }
-            if (asAttributes.getBoolean(com.android.internal.R.styleable
                     .AccessibilityService_canRequestFilterKeyEvents, false)) {
                 mCapabilities |= CAPABILITY_CAN_REQUEST_FILTER_KEY_EVENTS;
             }
@@ -542,8 +521,8 @@ public class AccessibilityServiceInfo implements Parcelable {
                 mCapabilities |= CAPABILITY_CAN_PERFORM_GESTURES;
             }
             if (asAttributes.getBoolean(com.android.internal.R.styleable
-                    .AccessibilityService_canCaptureFingerprintGestures, false)) {
-                mCapabilities |= CAPABILITY_CAN_CAPTURE_FINGERPRINT_GESTURES;
+                    .AccessibilityService_canRequestFingerprintGestures, false)) {
+                mCapabilities |= CAPABILITY_CAN_REQUEST_FINGERPRINT_GESTURES;
             }
             TypedValue peekedValue = asAttributes.peekValue(
                     com.android.internal.R.styleable.AccessibilityService_description);
@@ -659,7 +638,6 @@ public class AccessibilityServiceInfo implements Parcelable {
      *
      * @see #CAPABILITY_CAN_RETRIEVE_WINDOW_CONTENT
      * @see #CAPABILITY_CAN_REQUEST_TOUCH_EXPLORATION
-     * @see #CAPABILITY_CAN_REQUEST_ENHANCED_WEB_ACCESSIBILITY
      * @see #CAPABILITY_CAN_REQUEST_FILTER_KEY_EVENTS
      * @see #CAPABILITY_CAN_CONTROL_MAGNIFICATION
      * @see #CAPABILITY_CAN_PERFORM_GESTURES
@@ -676,7 +654,6 @@ public class AccessibilityServiceInfo implements Parcelable {
      *
      * @see #CAPABILITY_CAN_RETRIEVE_WINDOW_CONTENT
      * @see #CAPABILITY_CAN_REQUEST_TOUCH_EXPLORATION
-     * @see #CAPABILITY_CAN_REQUEST_ENHANCED_WEB_ACCESSIBILITY
      * @see #CAPABILITY_CAN_REQUEST_FILTER_KEY_EVENTS
      * @see #CAPABILITY_CAN_CONTROL_MAGNIFICATION
      * @see #CAPABILITY_CAN_PERFORM_GESTURES
@@ -693,9 +670,10 @@ public class AccessibilityServiceInfo implements Parcelable {
      *    <strong>Statically set from
      *    {@link AccessibilityService#SERVICE_META_DATA meta-data}.</strong>
      * </p>
-     * @return The localized summary.
+     * @return The localized summary if available, and {@code null} if a summary
+     * has not been provided.
      */
-    public String loadSummary(PackageManager packageManager) {
+    public CharSequence loadSummary(PackageManager packageManager) {
         if (mSummaryResId == 0) {
             return mNonLocalizedSummary;
         }
@@ -994,8 +972,8 @@ public class AccessibilityServiceInfo implements Parcelable {
                 return "FLAG_ENABLE_ACCESSIBILITY_VOLUME";
             case FLAG_REQUEST_ACCESSIBILITY_BUTTON:
                 return "FLAG_REQUEST_ACCESSIBILITY_BUTTON";
-            case FLAG_CAPTURE_FINGERPRINT_GESTURES:
-                return "FLAG_CAPTURE_FINGERPRINT_GESTURES";
+            case FLAG_REQUEST_FINGERPRINT_GESTURES:
+                return "FLAG_REQUEST_FINGERPRINT_GESTURES";
             default:
                 return null;
         }
@@ -1023,8 +1001,8 @@ public class AccessibilityServiceInfo implements Parcelable {
                 return "CAPABILITY_CAN_CONTROL_MAGNIFICATION";
             case CAPABILITY_CAN_PERFORM_GESTURES:
                 return "CAPABILITY_CAN_PERFORM_GESTURES";
-            case CAPABILITY_CAN_CAPTURE_FINGERPRINT_GESTURES:
-                return "CAPABILITY_CAN_CAPTURE_FINGERPRINT_GESTURES";
+            case CAPABILITY_CAN_REQUEST_FINGERPRINT_GESTURES:
+                return "CAPABILITY_CAN_REQUEST_FINGERPRINT_GESTURES";
             default:
                 return "UNKNOWN";
         }
@@ -1074,10 +1052,6 @@ public class AccessibilityServiceInfo implements Parcelable {
                     new CapabilityInfo(CAPABILITY_CAN_REQUEST_TOUCH_EXPLORATION,
                             R.string.capability_title_canRequestTouchExploration,
                             R.string.capability_desc_canRequestTouchExploration));
-            sAvailableCapabilityInfos.put(CAPABILITY_CAN_REQUEST_ENHANCED_WEB_ACCESSIBILITY,
-                    new CapabilityInfo(CAPABILITY_CAN_REQUEST_ENHANCED_WEB_ACCESSIBILITY,
-                            R.string.capability_title_canRequestEnhancedWebAccessibility,
-                            R.string.capability_desc_canRequestEnhancedWebAccessibility));
             sAvailableCapabilityInfos.put(CAPABILITY_CAN_REQUEST_FILTER_KEY_EVENTS,
                     new CapabilityInfo(CAPABILITY_CAN_REQUEST_FILTER_KEY_EVENTS,
                             R.string.capability_title_canRequestFilterKeyEvents,
@@ -1091,8 +1065,8 @@ public class AccessibilityServiceInfo implements Parcelable {
                             R.string.capability_title_canPerformGestures,
                             R.string.capability_desc_canPerformGestures));
             if ((context == null) || fingerprintAvailable(context)) {
-                sAvailableCapabilityInfos.put(CAPABILITY_CAN_CAPTURE_FINGERPRINT_GESTURES,
-                        new CapabilityInfo(CAPABILITY_CAN_CAPTURE_FINGERPRINT_GESTURES,
+                sAvailableCapabilityInfos.put(CAPABILITY_CAN_REQUEST_FINGERPRINT_GESTURES,
+                        new CapabilityInfo(CAPABILITY_CAN_REQUEST_FINGERPRINT_GESTURES,
                                 R.string.capability_title_canCaptureFingerprintGestures,
                                 R.string.capability_desc_canCaptureFingerprintGestures));
             }

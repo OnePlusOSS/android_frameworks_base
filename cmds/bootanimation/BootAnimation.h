@@ -131,6 +131,7 @@ private:
         Font clockFont;
     };
 
+    const char *getAnimationFileName(const char * defaultfile,bool isShutdown);
     status_t initTexture(Texture* texture, AssetManager& asset, const char* name);
     status_t initTexture(FileMap* map, int* width, int* height);
     status_t initFont(Font* font, const char* fallback);

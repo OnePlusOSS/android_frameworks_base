@@ -22,6 +22,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 import dalvik.annotation.optimization.FastNative;
+import dalvik.system.CloseGuard;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -37,7 +38,7 @@ import libcore.util.NativeAllocationRegistry;
  *
  * For more information, see the NDK documentation for <code>AHardwareBuffer</code>.
  */
-public final class HardwareBuffer implements Parcelable {
+public final class HardwareBuffer implements Parcelable, AutoCloseable {
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({RGBA_8888, RGBA_FP16, RGBA_1010102, RGBX_8888, RGB_888, RGB_565, BLOB})
@@ -65,39 +66,38 @@ public final class HardwareBuffer implements Parcelable {
     // Invoked on destruction
     private Runnable mCleaner;
 
+    private final CloseGuard mCloseGuard = CloseGuard.get();
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
-    @IntDef(flag = true, value = {USAGE0_CPU_READ, USAGE0_CPU_READ_OFTEN, USAGE0_CPU_WRITE,
-            USAGE0_CPU_WRITE_OFTEN, USAGE0_GPU_SAMPLED_IMAGE, USAGE0_GPU_COLOR_OUTPUT,
-            USAGE0_GPU_STORAGE_IMAGE, USAGE0_GPU_CUBEMAP, USAGE0_GPU_DATA_BUFFER,
-            USAGE0_PROTECTED_CONTENT, USAGE0_SENSOR_DIRECT_DATA, USAGE0_VIDEO_ENCODE})
-    public @interface Usage0 {};
+    @IntDef(flag = true, value = {USAGE_CPU_READ_RARELY, USAGE_CPU_READ_OFTEN,
+            USAGE_CPU_WRITE_RARELY, USAGE_CPU_WRITE_OFTEN, USAGE_GPU_SAMPLED_IMAGE,
+            USAGE_GPU_COLOR_OUTPUT, USAGE_PROTECTED_CONTENT, USAGE_VIDEO_ENCODE,
+            USAGE_GPU_DATA_BUFFER, USAGE_SENSOR_DIRECT_DATA})
+    public @interface Usage {};
 
-    /** Usage0: the buffer will sometimes be read by the CPU */
-    public static final long USAGE0_CPU_READ               = (1 << 1);
-    /** Usage0: the buffer will often be read by the CPU*/
-    public static final long USAGE0_CPU_READ_OFTEN         = (1 << 2 | USAGE0_CPU_READ);
-    /** Usage0: the buffer will sometimes be written to by the CPU */
-    public static final long USAGE0_CPU_WRITE              = (1 << 5);
-    /** Usage0: the buffer will often be written to by the CPU */
-    public static final long USAGE0_CPU_WRITE_OFTEN        = (1 << 6 | USAGE0_CPU_WRITE);
-    /** Usage0: the buffer will be read from by the GPU */
-    public static final long USAGE0_GPU_SAMPLED_IMAGE      = (1 << 10);
-    /** Usage0: the buffer will be written to by the GPU */
-    public static final long USAGE0_GPU_COLOR_OUTPUT       = (1 << 11);
-    /** Usage0: the buffer will be read from and written to by the GPU */
-    public static final long USAGE0_GPU_STORAGE_IMAGE      = (USAGE0_GPU_SAMPLED_IMAGE |
-            USAGE0_GPU_COLOR_OUTPUT);
-    /** Usage0: the buffer will be used as a cubemap texture */
-    public static final long USAGE0_GPU_CUBEMAP            = (1 << 13);
-    /** Usage0: the buffer will be used as a shader storage or uniform buffer object*/
-    public static final long USAGE0_GPU_DATA_BUFFER        = (1 << 14);
-    /** Usage0: the buffer must not be used outside of a protected hardware path */
-    public static final long USAGE0_PROTECTED_CONTENT      = (1 << 18);
-    /** Usage0: the buffer will be used for sensor direct data */
-    public static final long USAGE0_SENSOR_DIRECT_DATA     = (1 << 29);
-    /** Usage0: the buffer will be read by a hardware video encoder */
-    public static final long USAGE0_VIDEO_ENCODE           = (1 << 21);
+    /** Usage: The buffer will sometimes be read by the CPU */
+    public static final long USAGE_CPU_READ_RARELY       = 2;
+    /** Usage: The buffer will often be read by the CPU */
+    public static final long USAGE_CPU_READ_OFTEN        = 3;
+
+    /** Usage: The buffer will sometimes be written to by the CPU */
+    public static final long USAGE_CPU_WRITE_RARELY      = 2 << 4;
+    /** Usage: The buffer will often be written to by the CPU */
+    public static final long USAGE_CPU_WRITE_OFTEN       = 3 << 4;
+
+    /** Usage: The buffer will be read from by the GPU */
+    public static final long USAGE_GPU_SAMPLED_IMAGE      = 1 << 8;
+    /** Usage: The buffer will be written to by the GPU */
+    public static final long USAGE_GPU_COLOR_OUTPUT       = 1 << 9;
+    /** Usage: The buffer must not be used outside of a protected hardware path */
+    public static final long USAGE_PROTECTED_CONTENT      = 1 << 14;
+    /** Usage: The buffer will be read by a hardware video encoder */
+    public static final long USAGE_VIDEO_ENCODE           = 1 << 16;
+    /** Usage: The buffer will be used for sensor direct data */
+    public static final long USAGE_SENSOR_DIRECT_DATA     = 1 << 23;
+    /** Usage: The buffer will be used as a shader storage or uniform buffer object */
+    public static final long USAGE_GPU_DATA_BUFFER        = 1 << 24;
 
     // The approximate size of a native AHardwareBuffer object.
     private static final long NATIVE_HARDWARE_BUFFER_SIZE = 232;
@@ -113,13 +113,11 @@ public final class HardwareBuffer implements Parcelable {
      * {@link #RGBX_8888}, {@link #RGB_565}, {@link #RGB_888}, {@link #RGBA_1010102}, {@link #BLOB}
      * @param layers The number of layers in the buffer
      * @param usage Flags describing how the buffer will be used, one of
-     *     {@link #USAGE0_CPU_READ}, {@link #USAGE0_CPU_READ_OFTEN}, {@link #USAGE0_CPU_WRITE},
-     *     {@link #USAGE0_CPU_WRITE_OFTEN}, {@link #USAGE0_GPU_SAMPLED_IMAGE},
-     *     {@link #USAGE0_GPU_COLOR_OUTPUT},{@link #USAGE0_GPU_STORAGE_IMAGE},
-     *     {@link #USAGE0_GPU_CUBEMAP}, {@link #USAGE0_GPU_DATA_BUFFER},
-     *     {@link #USAGE0_PROTECTED_CONTENT}, {@link #USAGE0_SENSOR_DIRECT_DATA},
-     *     {@link #USAGE0_VIDEO_ENCODE}
-     *
+     *     {@link #USAGE_CPU_READ_RARELY}, {@link #USAGE_CPU_READ_OFTEN},
+     *     {@link #USAGE_CPU_WRITE_RARELY}, {@link #USAGE_CPU_WRITE_OFTEN},
+     *     {@link #USAGE_GPU_SAMPLED_IMAGE}, {@link #USAGE_GPU_COLOR_OUTPUT},
+     *     {@link #USAGE_GPU_DATA_BUFFER}, {@link #USAGE_PROTECTED_CONTENT},
+     *     {@link #USAGE_SENSOR_DIRECT_DATA}, {@link #USAGE_VIDEO_ENCODE}
      * @return A <code>HardwareBuffer</code> instance if successful, or throws an
      *     IllegalArgumentException if the dimensions passed are invalid (either zero, negative, or
      *     too large to allocate), if the format is not supported, if the requested number of layers
@@ -127,7 +125,7 @@ public final class HardwareBuffer implements Parcelable {
      */
     @NonNull
     public static HardwareBuffer create(int width, int height, @Format int format, int layers,
-            @Usage0 long usage) {
+            @Usage long usage) {
         if (!HardwareBuffer.isSupportedFormat(format)) {
             throw new IllegalArgumentException("Invalid pixel format " + format);
         }
@@ -163,14 +161,25 @@ public final class HardwareBuffer implements Parcelable {
         NativeAllocationRegistry registry = new NativeAllocationRegistry(
                 loader, nGetNativeFinalizer(), NATIVE_HARDWARE_BUFFER_SIZE);
         mCleaner = registry.registerNativeAllocation(this, mNativeObject);
+        mCloseGuard.open("close");
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        try {
+            mCloseGuard.warnIfOpen();
+            close();
+        } finally {
+            super.finalize();
+        }
     }
 
     /**
      * Returns the width of this buffer in pixels.
      */
     public int getWidth() {
-        if (mNativeObject == 0) {
-            throw new IllegalStateException("This HardwareBuffer has been destroyed and its width "
+        if (isClosed()) {
+            throw new IllegalStateException("This HardwareBuffer has been closed and its width "
                     + "cannot be obtained.");
         }
         return nGetWidth(mNativeObject);
@@ -180,8 +189,8 @@ public final class HardwareBuffer implements Parcelable {
      * Returns the height of this buffer in pixels.
      */
     public int getHeight() {
-        if (mNativeObject == 0) {
-            throw new IllegalStateException("This HardwareBuffer has been destroyed and its height "
+        if (isClosed()) {
+            throw new IllegalStateException("This HardwareBuffer has been closed and its height "
                     + "cannot be obtained.");
         }
         return nGetHeight(mNativeObject);
@@ -193,8 +202,8 @@ public final class HardwareBuffer implements Parcelable {
      */
     @Format
     public int getFormat() {
-        if (mNativeObject == 0) {
-            throw new IllegalStateException("This HardwareBuffer has been destroyed and its format "
+        if (isClosed()) {
+            throw new IllegalStateException("This HardwareBuffer has been closed and its format "
                     + "cannot be obtained.");
         }
         return nGetFormat(mNativeObject);
@@ -204,8 +213,8 @@ public final class HardwareBuffer implements Parcelable {
      * Returns the number of layers in this buffer.
      */
     public int getLayers() {
-        if (mNativeObject == 0) {
-            throw new IllegalStateException("This HardwareBuffer has been destroyed and its layer "
+        if (isClosed()) {
+            throw new IllegalStateException("This HardwareBuffer has been closed and its layer "
                     + "count cannot be obtained.");
         }
         return nGetLayers(mNativeObject);
@@ -215,11 +224,23 @@ public final class HardwareBuffer implements Parcelable {
      * Returns the usage flags of the usage hints set on this buffer.
      */
     public long getUsage() {
-        if (mNativeObject == 0) {
-            throw new IllegalStateException("This HardwareBuffer has been destroyed and its usage "
+        if (isClosed()) {
+            throw new IllegalStateException("This HardwareBuffer has been closed and its usage "
                     + "cannot be obtained.");
         }
         return nGetUsage(mNativeObject);
+    }
+
+    /** @removed replaced by {@link #close()} */
+    @Deprecated
+    public void destroy() {
+        close();
+    }
+
+    /** @removed replaced by {@link #isClosed()} */
+    @Deprecated
+    public boolean isDestroyed() {
+        return isClosed();
     }
 
     /**
@@ -227,10 +248,12 @@ public final class HardwareBuffer implements Parcelable {
      * underlying native resources. After calling this method, this buffer
      * must not be used in any way.
      *
-     * @see #isDestroyed()
+     * @see #isClosed()
      */
-    public void destroy() {
-        if (mNativeObject != 0) {
+    @Override
+    public void close() {
+        if (!isClosed()) {
+            mCloseGuard.close();
             mNativeObject = 0;
             mCleaner.run();
             mCleaner = null;
@@ -238,15 +261,15 @@ public final class HardwareBuffer implements Parcelable {
     }
 
     /**
-     * Indicates whether this buffer has been destroyed. A destroyed buffer
-     * cannot be used in any way: the buffer cannot be written to a parcel, etc.
+     * Indicates whether this buffer has been closed. A closed buffer cannot
+     * be used in any way: the buffer cannot be written to a parcel, etc.
      *
-     * @return True if this <code>HardwareBuffer</code> is in a destroyed state,
+     * @return True if this <code>HardwareBuffer</code> is in a closed state,
      *         false otherwise.
      *
-     * @see #destroy()
+     * @see #close()
      */
-    public boolean isDestroyed() {
+    public boolean isClosed() {
         return mNativeObject == 0;
     }
 
@@ -259,7 +282,7 @@ public final class HardwareBuffer implements Parcelable {
      * Flatten this object in to a Parcel.
      *
      * <p>Calling this method will throw an <code>IllegalStateException</code> if
-     * {@link #destroy()} has been previously called.</p>
+     * {@link #close()} has been previously called.</p>
      *
      * @param dest The Parcel in which the object should be written.
      * @param flags Additional flags about how the object should be written.
@@ -267,8 +290,8 @@ public final class HardwareBuffer implements Parcelable {
      */
     @Override
     public void writeToParcel(Parcel dest, int flags) {
-        if (mNativeObject == 0) {
-            throw new IllegalStateException("This HardwareBuffer has been destroyed and cannot be "
+        if (isClosed()) {
+            throw new IllegalStateException("This HardwareBuffer has been closed and cannot be "
                     + "written to a parcel.");
         }
         nWriteHardwareBufferToParcel(mNativeObject, dest);

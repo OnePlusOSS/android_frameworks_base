@@ -114,6 +114,7 @@ public class CallbackHandlerTest {
         boolean wide = true;
         int subId = 5;
         boolean roaming = true;
+
         mHandler.setMobileDataIndicators(status, qs, type, qsType, in, out, 0, 0, 0,
                 typeDescription, description, wide, subId, roaming);
         waitForCallbacks();
@@ -130,8 +131,7 @@ public class CallbackHandlerTest {
         ArgumentCaptor<Integer> subIdArg = ArgumentCaptor.forClass(Integer.class);
         Mockito.verify(mSignalCallback).setMobileDataIndicators(statusArg.capture(),
                 qsArg.capture(), typeIconArg.capture(), qsTypeIconArg.capture(), inArg.capture(),
-                outArg.capture(),
-                ArgumentCaptor.forClass(Integer.class).capture(),
+                outArg.capture(), ArgumentCaptor.forClass(Integer.class).capture(),
                 ArgumentCaptor.forClass(Integer.class).capture(),
                 ArgumentCaptor.forClass(Integer.class).capture(),
                 typeContentArg.capture(), descArg.capture(), wideArg.capture(),

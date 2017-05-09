@@ -46,6 +46,7 @@ import java.io.PrintWriter;
 public class DozeTriggers implements DozeMachine.Part {
 
     private static final String TAG = "DozeTriggers";
+    private static final boolean DEBUG = DozeService.DEBUG;
 
     /** adb shell am broadcast -a com.android.systemui.doze.pulse com.android.systemui */
     private static final String PULSE_ACTION = "com.android.systemui.doze.pulse";
@@ -81,7 +82,7 @@ public class DozeTriggers implements DozeMachine.Part {
         mWakeLock = wakeLock;
         mAllowPulseTriggers = allowPulseTriggers;
         mDozeSensors = new DozeSensors(context, mSensorManager, dozeParameters, config,
-                wakeLock, this::onSensor);
+                wakeLock, this::onSensor, this::onProximityFar);
         mUiModeManager = mContext.getSystemService(UiModeManager.class);
     }
 
@@ -98,11 +99,7 @@ public class DozeTriggers implements DozeMachine.Part {
     }
 
     private void onSensor(int pulseReason, boolean sensorPerformedProxCheck) {
-        if (mDozeParameters.getSensorsWakeUpFully()) {
-            mMachine.wakeUp();
-        } else {
-            requestPulse(pulseReason, sensorPerformedProxCheck);
-        }
+        requestPulse(pulseReason, sensorPerformedProxCheck);
 
         if (pulseReason == DozeLog.PULSE_REASON_SENSOR_PICKUP) {
             final long timeSinceNotification =
@@ -110,6 +107,23 @@ public class DozeTriggers implements DozeMachine.Part {
             final boolean withinVibrationThreshold =
                     timeSinceNotification < mDozeParameters.getPickupVibrationThreshold();
             DozeLog.tracePickupPulse(mContext, withinVibrationThreshold);
+        }
+    }
+
+    private void onProximityFar(boolean far) {
+        final boolean near = !far;
+        DozeMachine.State state = mMachine.getState();
+        if (near && state == DozeMachine.State.DOZE_PULSING) {
+            if (DEBUG) Log.i(TAG, "Prox NEAR, ending pulse");
+            DozeLog.tracePulseCanceledByProx(mContext);
+            mMachine.requestState(DozeMachine.State.DOZE_PULSE_DONE);
+        }
+        if (far && state == DozeMachine.State.DOZE_AOD_PAUSED) {
+            if (DEBUG) Log.i(TAG, "Prox FAR, unpausing AOD");
+            mMachine.requestState(DozeMachine.State.DOZE_AOD);
+        } else if (near && state == DozeMachine.State.DOZE_AOD) {
+            if (DEBUG) Log.i(TAG, "Prox NEAR, pausing AOD");
+            mMachine.requestState(DozeMachine.State.DOZE_AOD_PAUSED);
         }
     }
 
@@ -131,15 +145,21 @@ public class DozeTriggers implements DozeMachine.Part {
                 break;
             case DOZE:
             case DOZE_AOD:
+            case DOZE_AOD_PAUSED:
+                mDozeSensors.setProxListening(newState != DozeMachine.State.DOZE);
                 mDozeSensors.setListening(true);
                 if (oldState != DozeMachine.State.INITIALIZED) {
                     mDozeSensors.reregisterAllSensors();
                 }
                 break;
+            case DOZE_PULSING:
+                mDozeSensors.setProxListening(true);
+                break;
             case FINISH:
                 mBroadcastReceiver.unregister(mContext);
                 mDozeHost.removeCallback(mHostCallback);
                 mDozeSensors.setListening(false);
+                mDozeSensors.setProxListening(false);
                 break;
             default:
         }
@@ -156,7 +176,12 @@ public class DozeTriggers implements DozeMachine.Part {
 
     private void requestPulse(final int reason, boolean performedProxCheck) {
         Assert.isMainThread();
+        mDozeHost.extendPulse();
         if (mPulsePending || !mAllowPulseTriggers || !canPulse()) {
+            if (mAllowPulseTriggers) {
+                DozeLog.tracePulseDropped(mContext, mPulsePending, mMachine.getState(),
+                        mDozeHost.isPulsingBlocked());
+            }
             return;
         }
 
@@ -180,6 +205,7 @@ public class DozeTriggers implements DozeMachine.Part {
                 }
                 // avoid pulsing in pockets
                 if (result == RESULT_NEAR) {
+                    mPulsePending = false;
                     return;
                 }
 
@@ -197,6 +223,8 @@ public class DozeTriggers implements DozeMachine.Part {
     private void continuePulseRequest(int reason) {
         mPulsePending = false;
         if (mDozeHost.isPulsingBlocked() || !canPulse()) {
+            DozeLog.tracePulseDropped(mContext, mPulsePending, mMachine.getState(),
+                    mDozeHost.isPulsingBlocked());
             return;
         }
         mMachine.requestState(DozeMachine.State.DOZE_REQUEST_PULSE);
@@ -286,6 +314,8 @@ public class DozeTriggers implements DozeMachine.Part {
     }
 
     private class TriggerReceiver extends BroadcastReceiver {
+        private boolean mRegistered;
+
         @Override
         public void onReceive(Context context, Intent intent) {
             if (PULSE_ACTION.equals(intent.getAction())) {
@@ -301,14 +331,22 @@ public class DozeTriggers implements DozeMachine.Part {
         }
 
         public void register(Context context) {
+            if (mRegistered) {
+                return;
+            }
             IntentFilter filter = new IntentFilter(PULSE_ACTION);
             filter.addAction(UiModeManager.ACTION_ENTER_CAR_MODE);
             filter.addAction(Intent.ACTION_USER_SWITCHED);
             context.registerReceiver(this, filter);
+            mRegistered = true;
         }
 
         public void unregister(Context context) {
+            if (!mRegistered) {
+                return;
+            }
             context.unregisterReceiver(this);
+            mRegistered = false;
         }
     }
 

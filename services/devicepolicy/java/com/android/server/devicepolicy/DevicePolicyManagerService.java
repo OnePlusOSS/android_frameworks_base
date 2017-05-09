@@ -16,6 +16,7 @@
 
 package com.android.server.devicepolicy;
 
+import static android.Manifest.permission.BIND_DEVICE_ADMIN;
 import static android.Manifest.permission.MANAGE_CA_CERTIFICATES;
 import static android.app.admin.DevicePolicyManager.CODE_ACCOUNTS_NOT_EMPTY;
 import static android.app.admin.DevicePolicyManager.CODE_ADD_MANAGED_PROFILE_DISALLOWED;
@@ -662,6 +663,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         private static final String TAG_GLOBAL_PROXY_SPEC = "global-proxy-spec";
         private static final String TAG_SPECIFIES_GLOBAL_PROXY = "specifies-global-proxy";
         private static final String TAG_PERMITTED_IMES = "permitted-imes";
+        private static final String TAG_PERMITTED_NOTIFICATION_LISTENERS =
+                "permitted-notification-listeners";
         private static final String TAG_MAX_FAILED_PASSWORD_WIPE = "max-failed-password-wipe";
         private static final String TAG_MAX_TIME_TO_UNLOCK = "max-time-to-unlock";
         private static final String TAG_STRONG_AUTH_UNLOCK_TIMEOUT = "strong-auth-unlock-timeout";
@@ -742,8 +745,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         boolean forceEphemeralUsers = false; // Can only be set by a device owner.
         boolean isNetworkLoggingEnabled = false; // Can only be set by a device owner.
 
-        // one notification after enabling + 3 more after reboots
-        static final int DEF_MAXIMUM_NETWORK_LOGGING_NOTIFICATIONS_SHOWN = 4;
+        // one notification after enabling + one more after reboots
+        static final int DEF_MAXIMUM_NETWORK_LOGGING_NOTIFICATIONS_SHOWN = 2;
         int numNetworkLoggingNotifications = 0;
         long lastNetworkLoggingNotificationTimeMs = 0; // Time in milliseconds since epoch
 
@@ -768,6 +771,11 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         // Null means all input methods are allowed, empty means none except system imes are
         // allowed.
         List<String> permittedInputMethods;
+
+        // The list of packages allowed to use a NotificationListenerService to receive events for
+        // notifications from this user. Null means that all packages are allowed. Empty list means
+        // that only packages from the system are allowed.
+        List<String> permittedNotificationListeners;
 
         // List of package names to keep cached.
         List<String> keepUninstalledPackages;
@@ -1015,6 +1023,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             writePackageListToXml(out, TAG_PERMITTED_ACCESSIBILITY_SERVICES,
                     permittedAccessiblityServices);
             writePackageListToXml(out, TAG_PERMITTED_IMES, permittedInputMethods);
+            writePackageListToXml(out, TAG_PERMITTED_NOTIFICATION_LISTENERS,
+                    permittedNotificationListeners);
             writePackageListToXml(out, TAG_KEEP_UNINSTALLED_PACKAGES, keepUninstalledPackages);
             if (hasUserRestrictions()) {
                 UserRestrictionsUtils.writeRestrictions(
@@ -1186,6 +1196,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                     permittedAccessiblityServices = readPackageList(parser, tag);
                 } else if (TAG_PERMITTED_IMES.equals(tag)) {
                     permittedInputMethods = readPackageList(parser, tag);
+                } else if (TAG_PERMITTED_NOTIFICATION_LISTENERS.equals(tag)) {
+                    permittedNotificationListeners = readPackageList(parser, tag);
                 } else if (TAG_KEEP_UNINSTALLED_PACKAGES.equals(tag)) {
                     keepUninstalledPackages = readPackageList(parser, tag);
                 } else if (TAG_USER_RESTRICTIONS.equals(tag)) {
@@ -1405,6 +1417,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             if (permittedInputMethods != null) {
                 pw.print(prefix); pw.print("permittedInputMethods=");
                     pw.println(permittedInputMethods);
+            }
+            if (permittedNotificationListeners != null) {
+                pw.print(prefix); pw.print("permittedNotificationListeners=");
+                pw.println(permittedNotificationListeners);
             }
             if (keepUninstalledPackages != null) {
                 pw.print(prefix); pw.print("keepUninstalledPackages=");
@@ -1902,7 +1918,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             setDeviceOwnerSystemPropertyLocked();
             findOwnerComponentIfNecessaryLocked();
             migrateUserRestrictionsIfNecessaryLocked();
-            setDefaultEnabledUserRestrictionsIfNecessaryLocked();
+            maybeSetDefaultDeviceOwnerUserRestrictionsLocked();
 
             // TODO PO may not have a class name either due to b/17652534.  Address that too.
 
@@ -1910,33 +1926,77 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
     }
 
-    private void setDefaultEnabledUserRestrictionsIfNecessaryLocked() {
+    /** Apply default restrictions that haven't been applied to device owners yet. */
+    private void maybeSetDefaultDeviceOwnerUserRestrictionsLocked() {
         final ActiveAdmin deviceOwner = getDeviceOwnerAdminLocked();
-        if (deviceOwner != null
-                && !UserRestrictionsUtils.getDefaultEnabledForDeviceOwner().equals(
-                        deviceOwner.defaultEnabledRestrictionsAlreadySet)) {
-            Slog.i(LOG_TAG,"New user restrictions need to be set by default for the device owner");
+        if (deviceOwner != null) {
+            maybeSetDefaultRestrictionsForAdminLocked(mOwners.getDeviceOwnerUserId(),
+                    deviceOwner, UserRestrictionsUtils.getDefaultEnabledForDeviceOwner());
+        }
+    }
 
-            if (VERBOSE_LOG) {
-                Slog.d(LOG_TAG,"Default enabled restrictions for DO: "
-                        + UserRestrictionsUtils.getDefaultEnabledForDeviceOwner()
-                        + ". Restrictions already enabled: "
-                        + deviceOwner.defaultEnabledRestrictionsAlreadySet);
-            }
-
-            Set<String> restrictionsToSet = new ArraySet<>(
-                    UserRestrictionsUtils.getDefaultEnabledForDeviceOwner());
-            restrictionsToSet.removeAll(deviceOwner.defaultEnabledRestrictionsAlreadySet);
-            if (!restrictionsToSet.isEmpty()) {
-                for (String restriction : restrictionsToSet) {
-                    deviceOwner.ensureUserRestrictions().putBoolean(restriction, true);
+    /** Apply default restrictions that haven't been applied to profile owners yet. */
+    private void maybeSetDefaultProfileOwnerUserRestrictions() {
+        synchronized (this) {
+            for (final int userId : mOwners.getProfileOwnerKeys()) {
+                final ActiveAdmin profileOwner = getProfileOwnerAdminLocked(userId);
+                // The following restrictions used to be applied to managed profiles by different
+                // means (via Settings or by disabling components). Now they are proper user
+                // restrictions so we apply them to managed profile owners. Non-managed secondary
+                // users didn't have those restrictions so we skip them to keep existing behavior.
+                if (profileOwner == null || !mUserManager.isManagedProfile(userId)) {
+                    continue;
                 }
-                deviceOwner.defaultEnabledRestrictionsAlreadySet.addAll(restrictionsToSet);
-                Slog.i(LOG_TAG,
-                        "Enabled the following restrictions by default: " + restrictionsToSet);
-
-                saveUserRestrictionsLocked(mOwners.getDeviceOwnerUserId());
+                maybeSetDefaultRestrictionsForAdminLocked(userId, profileOwner,
+                        UserRestrictionsUtils.getDefaultEnabledForManagedProfiles());
+                ensureUnknownSourcesRestrictionForProfileOwnerLocked(
+                        userId, profileOwner, false /* newOwner */);
             }
+        }
+    }
+
+    /**
+     * Checks whether {@link UserManager#DISALLOW_INSTALL_UNKNOWN_SOURCES} should be added to the
+     * set of restrictions for this profile owner.
+     */
+    private void ensureUnknownSourcesRestrictionForProfileOwnerLocked(int userId,
+            ActiveAdmin profileOwner, boolean newOwner) {
+        if (newOwner || mInjector.settingsSecureGetIntForUser(
+                Settings.Secure.UNKNOWN_SOURCES_DEFAULT_REVERSED, 0, userId) != 0) {
+            profileOwner.ensureUserRestrictions().putBoolean(
+                    UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES, true);
+            saveUserRestrictionsLocked(userId);
+            mInjector.settingsSecurePutIntForUser(
+                    Settings.Secure.UNKNOWN_SOURCES_DEFAULT_REVERSED, 0, userId);
+        }
+    }
+
+    /**
+     * Apply default restrictions that haven't been applied to a given admin yet.
+     */
+    private void maybeSetDefaultRestrictionsForAdminLocked(
+            int userId, ActiveAdmin admin, Set<String> defaultRestrictions) {
+        if (defaultRestrictions.equals(admin.defaultEnabledRestrictionsAlreadySet)) {
+            return; // The same set of default restrictions has been already applied.
+        }
+        Slog.i(LOG_TAG, "New user restrictions need to be set by default for user " + userId);
+
+        if (VERBOSE_LOG) {
+            Slog.d(LOG_TAG,"Default enabled restrictions: "
+                    + defaultRestrictions
+                    + ". Restrictions already enabled: "
+                    + admin.defaultEnabledRestrictionsAlreadySet);
+        }
+
+        final Set<String> restrictionsToSet = new ArraySet<>(defaultRestrictions);
+        restrictionsToSet.removeAll(admin.defaultEnabledRestrictionsAlreadySet);
+        if (!restrictionsToSet.isEmpty()) {
+            for (final String restriction : restrictionsToSet) {
+                admin.ensureUserRestrictions().putBoolean(restriction, true);
+            }
+            admin.defaultEnabledRestrictionsAlreadySet.addAll(restrictionsToSet);
+            Slog.i(LOG_TAG, "Enabled the following restrictions by default: " + restrictionsToSet);
+            saveUserRestrictionsLocked(userId);
         }
     }
 
@@ -2926,41 +2986,11 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
     }
 
-    private void ensureUnknownSourcesRestrictionForProfileOwners() {
-        synchronized (this) {
-            for (int userId : mOwners.getProfileOwnerKeys()) {
-                if (!mUserManager.isManagedProfile(userId) ||
-                        mInjector.settingsSecureGetIntForUser(
-                        Settings.Secure.UNKNOWN_SOURCES_DEFAULT_REVERSED, 0, userId) == 0) {
-                    continue;
-                }
-                setUserRestrictionOnBehalfOfProfileOwnerLocked(
-                        UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES, userId);
-                mInjector.settingsSecurePutIntForUser(
-                        Settings.Secure.UNKNOWN_SOURCES_DEFAULT_REVERSED, 0, userId);
-            }
-        }
-    }
-
-    private void setUserRestrictionOnBehalfOfProfileOwnerLocked(String userRestrictionKey,
-            int userId) {
-        if (UserRestrictionsUtils.isValidRestriction(userRestrictionKey) &&
-                UserRestrictionsUtils.canProfileOwnerChange(userRestrictionKey, userId)) {
-            ActiveAdmin profileOwner = getProfileOwnerAdminLocked(userId);
-            if (profileOwner == null) {
-                return;
-            }
-            Bundle restrictions = profileOwner.ensureUserRestrictions();
-            restrictions.putBoolean(userRestrictionKey, true);
-            saveUserRestrictionsLocked(userId);
-        }
-    }
-
     private void onLockSettingsReady() {
         getUserData(UserHandle.USER_SYSTEM);
         loadOwners();
         cleanUpOldUsers();
-        ensureUnknownSourcesRestrictionForProfileOwners();
+        maybeSetDefaultProfileOwnerUserRestrictions();
         handleStartUser(UserHandle.USER_SYSTEM);
 
         // Register an observer for watching for user setup complete and settings changes.
@@ -4636,19 +4666,20 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             final long ident = mInjector.binderClearCallingIdentity();
             try {
                 // Evict key
-                if ((flags & DevicePolicyManager.FLAG_EVICT_CE_KEY) != 0) {
-                    enforceManagedProfile(callingUserId, "set FLAG_EVICT_CE_KEY");
+                if ((flags & DevicePolicyManager.FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY) != 0) {
+                    enforceManagedProfile(
+                            callingUserId, "set FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY");
                     if (!isProfileOwner(admin.info.getComponent(), callingUserId)) {
-                        throw new SecurityException(
-                               "Only profile owner admins can set FLAG_EVICT_CE_KEY");
+                        throw new SecurityException("Only profile owner admins can set "
+                                + "FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY");
                     }
                     if (parent) {
                         throw new IllegalArgumentException(
-                                "Cannot set FLAG_EVICT_CE_KEY for the parent");
+                                "Cannot set FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY for the parent");
                     }
                     if (!mInjector.storageManagerIsFileBasedEncryptionEnabled()) {
                         throw new UnsupportedOperationException(
-                                "FLAG_EVICT_CE_KEY only applies to FBE devices");
+                                "FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY only applies to FBE devices");
                     }
                     mUserManager.evictCredentialEncryptionKey(callingUserId);
                 }
@@ -6712,8 +6743,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         synchronized (this) {
             enforceCanSetProfileOwnerLocked(who, userHandle, hasIncompatibleAccountsOrNonAdb);
 
-            if (getActiveAdminUncheckedLocked(who, userHandle) == null
-                    || getUserData(userHandle).mRemovingAdmins.contains(who)) {
+            final ActiveAdmin admin = getActiveAdminUncheckedLocked(who, userHandle);
+            if (admin == null || getUserData(userHandle).mRemovingAdmins.contains(who)) {
                 throw new IllegalArgumentException("Not active admin: " + who);
             }
 
@@ -6729,10 +6760,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             final long id = mInjector.binderClearCallingIdentity();
             try {
                 if (mUserManager.isManagedProfile(userHandle)) {
-                    setUserRestrictionOnBehalfOfProfileOwnerLocked(
-                            UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES, userHandle);
-                    mInjector.settingsSecurePutIntForUser(
-                            Settings.Secure.UNKNOWN_SOURCES_DEFAULT_REVERSED, 0, userHandle);
+                    maybeSetDefaultRestrictionsForAdminLocked(userHandle, admin,
+                            UserRestrictionsUtils.getDefaultEnabledForManagedProfiles());
+                    ensureUnknownSourcesRestrictionForProfileOwnerLocked(userHandle, admin,
+                            true /* newOwner */);
                 }
             } finally {
                 mInjector.binderRestoreCallingIdentity(id);
@@ -7791,14 +7822,14 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             if (admin.permittedAccessiblityServices == null) {
                 return true;
             }
-            return checkPackagesInPermittedListOrSystem(Arrays.asList(packageName),
+            return checkPackagesInPermittedListOrSystem(Collections.singletonList(packageName),
                     admin.permittedAccessiblityServices, userHandle);
         }
     }
 
     private boolean checkCallerIsCurrentUserOrProfile() {
-        int callingUserId = UserHandle.getCallingUserId();
-        long token = mInjector.binderClearCallingIdentity();
+        final int callingUserId = UserHandle.getCallingUserId();
+        final long token = mInjector.binderClearCallingIdentity();
         try {
             UserInfo currentUser;
             UserInfo callingUser = getUserInfo(callingUserId);
@@ -7838,6 +7869,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             return false;
         }
 
+        final int callingUserId = mInjector.userHandleGetCallingUserId();
         if (packageList != null) {
             // InputMethodManager fetches input methods for current user.
             // So this can only be set when calling user is the current user
@@ -7852,7 +7884,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                     enabledPackages.add(ime.getPackageName());
                 }
                 if (!checkPackagesInPermittedListOrSystem(enabledPackages, packageList,
-                        mInjector.binderGetCallingUserHandle().getIdentifier())) {
+                        callingUserId)) {
                     Slog.e(LOG_TAG, "Cannot set permitted input methods, "
                             + "because it contains already enabled input method.");
                     return false;
@@ -7864,7 +7896,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             ActiveAdmin admin = getActiveAdminForCallerLocked(who,
                     DeviceAdminInfo.USES_POLICY_PROFILE_OWNER);
             admin.permittedInputMethods = packageList;
-            saveSettingsLocked(UserHandle.getCallingUserId());
+            saveSettingsLocked(callingUserId);
         }
         return true;
     }
@@ -7963,10 +7995,69 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             if (admin.permittedInputMethods == null) {
                 return true;
             }
-            return checkPackagesInPermittedListOrSystem(Arrays.asList(packageName),
+            return checkPackagesInPermittedListOrSystem(Collections.singletonList(packageName),
                     admin.permittedInputMethods, userHandle);
         }
     }
+
+    @Override
+    public boolean setPermittedCrossProfileNotificationListeners(
+            ComponentName who, List<String> packageList) {
+        if (!mHasFeature) {
+            return false;
+        }
+        Preconditions.checkNotNull(who, "ComponentName is null");
+
+        final int callingUserId = mInjector.userHandleGetCallingUserId();
+        if (!isManagedProfile(callingUserId)) {
+            return false;
+        }
+
+        synchronized (this) {
+            ActiveAdmin admin = getActiveAdminForCallerLocked(
+                    who, DeviceAdminInfo.USES_POLICY_PROFILE_OWNER);
+            admin.permittedNotificationListeners = packageList;
+            saveSettingsLocked(callingUserId);
+        }
+        return true;
+    }
+
+    @Override
+    public List<String> getPermittedCrossProfileNotificationListeners(ComponentName who) {
+        if (!mHasFeature) {
+            return null;
+        }
+        Preconditions.checkNotNull(who, "ComponentName is null");
+
+        synchronized (this) {
+            ActiveAdmin admin = getActiveAdminForCallerLocked(
+                    who, DeviceAdminInfo.USES_POLICY_PROFILE_OWNER);
+            return admin.permittedNotificationListeners;
+        }
+    }
+
+    @Override
+    public boolean isNotificationListenerServicePermitted(String packageName, int userId) {
+        if (!mHasFeature) {
+            return true;
+        }
+
+        Preconditions.checkStringNotEmpty(packageName, "packageName is null or empty");
+        if (!isCallerWithSystemUid()) {
+            throw new SecurityException(
+                    "Only the system can query if a notification listener service is permitted");
+        }
+        synchronized (this) {
+            ActiveAdmin profileOwner = getProfileOwnerAdminLocked(userId);
+            if (profileOwner == null || profileOwner.permittedNotificationListeners == null) {
+                return true;
+            }
+            return checkPackagesInPermittedListOrSystem(Collections.singletonList(packageName),
+                    profileOwner.permittedNotificationListeners, userId);
+
+        }
+    }
+
 
     private void sendAdminEnabledBroadcastLocked(int userHandle) {
         DevicePolicyData policyData = getUserData(userHandle);
@@ -10016,14 +10107,16 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         if (!mHasFeature) {
             return;
         }
+        if (ids == null) {
+            throw new IllegalArgumentException("ids must not be null");
+        }
+        for (String id : ids) {
+            if (TextUtils.isEmpty(id)) {
+                throw new IllegalArgumentException("ids must not contain empty string");
+            }
+        }
 
-        Preconditions.checkNotNull(admin);
-        Preconditions.checkCollectionElementsNotNull(ids, "ids");
-
-        final Set<String> affiliationIds = new ArraySet<String>(ids);
-        Preconditions.checkArgument(
-                !affiliationIds.contains(""), "ids must not contain empty strings");
-
+        final Set<String> affiliationIds = new ArraySet<>(ids);
         final int callingUserId = mInjector.userHandleGetCallingUserId();
         synchronized (this) {
             getActiveAdminForCallerLocked(admin, DeviceAdminInfo.USES_POLICY_PROFILE_OWNER);
@@ -10844,8 +10937,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         if (!expectedPackageName.equals(info.serviceInfo.packageName)) {
             throw new SecurityException("Only allow to bind service in " + expectedPackageName);
         }
-        if (info.serviceInfo.exported) {
-            throw new SecurityException("The service must be unexported");
+        // STOPSHIP(b/37624960): Remove info.serviceInfo.exported before release.
+        if (info.serviceInfo.exported && !BIND_DEVICE_ADMIN.equals(info.serviceInfo.permission)) {
+            throw new SecurityException(
+                    "Service must be protected by BIND_DEVICE_ADMIN permission");
         }
         // It is the system server to bind the service, it would be extremely dangerous if it
         // can be exploited to bind any service. Set the component explicitly to make sure we

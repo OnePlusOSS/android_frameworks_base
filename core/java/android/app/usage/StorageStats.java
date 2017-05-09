@@ -16,18 +16,15 @@
 
 package android.app.usage;
 
+import android.annotation.BytesLong;
 import android.content.Context;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.UserHandle;
 
 /**
- * Storage statistics for a UID or {@link UserHandle} on a single storage
- * volume.
- * <p class="note">
- * Note: multiple packages using the same {@code sharedUserId} in their manifest
- * will be merged into a single UID.
- * </p>
+ * Storage statistics for a UID, package, or {@link UserHandle} on a single
+ * storage volume.
  *
  * @see StorageStatsManager
  */
@@ -37,13 +34,22 @@ public final class StorageStats implements Parcelable {
     /** {@hide} */ public long cacheBytes;
 
     /**
-     * Return the size of all code. This includes {@code APK} files and
-     * optimized compiler output.
+     * Return the size of app. This includes {@code APK} files, optimized
+     * compiler output, and unpacked native libraries.
+     * <p>
+     * If the primary external/shared storage is hosted on this storage device,
+     * then this includes files stored under {@link Context#getObbDir()}.
      * <p>
      * Code is shared between all users on a multiuser device.
      */
-    public long getCodeBytes() {
+    public @BytesLong long getAppBytes() {
         return codeBytes;
+    }
+
+    /** @removed */
+    @Deprecated
+    public long getCodeBytes() {
+        return getAppBytes();
     }
 
     /**
@@ -51,9 +57,15 @@ public final class StorageStats implements Parcelable {
      * {@link Context#getDataDir()}, {@link Context#getCacheDir()},
      * {@link Context#getCodeCacheDir()}.
      * <p>
+     * If the primary external/shared storage is hosted on this storage device,
+     * then this includes files stored under
+     * {@link Context#getExternalFilesDir(String)},
+     * {@link Context#getExternalCacheDir()}, and
+     * {@link Context#getExternalMediaDirs()}.
+     * <p>
      * Data is isolated for each user on a multiuser device.
      */
-    public long getDataBytes() {
+    public @BytesLong long getDataBytes() {
         return dataBytes;
     }
 
@@ -61,9 +73,13 @@ public final class StorageStats implements Parcelable {
      * Return the size of all cached data. This includes files stored under
      * {@link Context#getCacheDir()} and {@link Context#getCodeCacheDir()}.
      * <p>
+     * If the primary external/shared storage is hosted on this storage device,
+     * then this includes files stored under
+     * {@link Context#getExternalCacheDir()}.
+     * <p>
      * Cached data is isolated for each user on a multiuser device.
      */
-    public long getCacheBytes() {
+    public @BytesLong long getCacheBytes() {
         return cacheBytes;
     }
 

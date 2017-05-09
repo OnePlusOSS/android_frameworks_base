@@ -34,6 +34,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.android.companiondevicemanager.DeviceDiscoveryService.DeviceFilterPair;
+import com.android.internal.util.Preconditions;
 
 public class DeviceChooserActivity extends Activity {
 
@@ -65,7 +66,7 @@ public class DeviceChooserActivity extends Activity {
         } else {
             setContentView(R.layout.device_chooser);
             setTitle(Html.fromHtml(getString(R.string.chooser_title, getCallingAppName()), 0));
-            mDeviceListView = (ListView) findViewById(R.id.device_list);
+            mDeviceListView = findViewById(R.id.device_list);
             final DeviceDiscoveryService.DevicesAdapter adapter = getService().mDevicesAdapter;
             mDeviceListView.setAdapter(adapter);
             adapter.registerDataSetObserver(new DataSetObserver() {
@@ -78,22 +79,35 @@ public class DeviceChooserActivity extends Activity {
         }
 
         mPairButton = findViewById(R.id.button_pair);
-        mPairButton.setOnClickListener((view) ->
-                onPairTapped(getService().mSelectedDevice));
+        mPairButton.setOnClickListener(v -> onPairTapped(getService().mSelectedDevice));
         updatePairButtonEnabled();
 
         mCancelButton = findViewById(R.id.button_cancel);
-        mCancelButton.setOnClickListener((view) -> {
-            setResult(RESULT_CANCELED);
-            finish();
-        });
+        mCancelButton.setOnClickListener(v -> cancel());
+    }
+
+    private void cancel() {
+        getService().onCancel();
+        setResult(RESULT_CANCELED);
+        finish();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (!isFinishing()) {
+            cancel();
+        }
     }
 
     private CharSequence getCallingAppName() {
         try {
             final PackageManager packageManager = getPackageManager();
+            String callingPackage = Preconditions.checkStringNotEmpty(
+                    getCallingPackage(),
+                    "This activity must be called for result");
             return packageManager.getApplicationLabel(
-                    packageManager.getApplicationInfo(getCallingPackage(), 0));
+                    packageManager.getApplicationInfo(callingPackage, 0));
         } catch (PackageManager.NameNotFoundException e) {
             throw new RuntimeException(e);
         }
@@ -101,7 +115,7 @@ public class DeviceChooserActivity extends Activity {
 
     @Override
     public void setTitle(CharSequence title) {
-        final TextView titleView = (TextView) findViewById(R.id.title);
+        final TextView titleView = findViewById(R.id.title);
         final int padding = getPadding(getResources());
         titleView.setPadding(padding, padding, padding, padding);
         titleView.setText(title);

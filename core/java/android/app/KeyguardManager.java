@@ -169,9 +169,6 @@ public class KeyguardManager {
          * Note: This call has no effect while any {@link android.app.admin.DevicePolicyManager}
          * is enabled that requires a password.
          *
-         * <p>This method requires the caller to hold the permission
-         * {@link android.Manifest.permission#DISABLE_KEYGUARD}.
-         *
          * @see #reenableKeyguard()
          */
         @RequiresPermission(Manifest.permission.DISABLE_KEYGUARD)
@@ -190,9 +187,6 @@ public class KeyguardManager {
          *
          * Note: This call has no effect while any {@link android.app.admin.DevicePolicyManager}
          * is enabled that requires a password.
-         *
-         * <p>This method requires the caller to hold the permission
-         * {@link android.Manifest.permission#DISABLE_KEYGUARD}.
          *
          * @see #disableKeyguard()
          */
@@ -368,6 +362,13 @@ public class KeyguardManager {
         }
     }
 
+    /** @removed */
+    @Deprecated
+    public void dismissKeyguard(@NonNull Activity activity,
+            @Nullable KeyguardDismissCallback callback, @Nullable Handler handler) {
+        requestDismissKeyguard(activity, callback);
+    }
+
     /**
      * If the device is currently locked (see {@link #isKeyguardLocked()}, requests the Keyguard to
      * be dismissed.
@@ -384,30 +385,33 @@ public class KeyguardManager {
      *                 the case, the request will fail immediately and
      *                 {@link KeyguardDismissCallback#onDismissError} will be invoked.
      * @param callback The callback to be called if the request to dismiss Keyguard was successful
-     *                 or {@code null} if the caller isn't interested in knowing the result.
-     * @param handler The handler to invoke the callback on, or {@code null} to use the main
-     *                handler.
+     *                 or {@code null} if the caller isn't interested in knowing the result. The
+     *                 callback will not be invoked if the activity was destroyed before the
+     *                 callback was received.
      */
-    public void dismissKeyguard(@NonNull Activity activity,
-            @Nullable KeyguardDismissCallback callback, @Nullable Handler handler) {
+    public void requestDismissKeyguard(@NonNull Activity activity,
+            @Nullable KeyguardDismissCallback callback) {
         try {
-            final Handler actualHandler = handler != null
-                    ? handler
-                    : new Handler(Looper.getMainLooper());
             mAm.dismissKeyguard(activity.getActivityToken(), new IKeyguardDismissCallback.Stub() {
                 @Override
                 public void onDismissError() throws RemoteException {
-                    actualHandler.post(callback::onDismissError);
+                    if (callback != null && !activity.isDestroyed()) {
+                        activity.mHandler.post(callback::onDismissError);
+                    }
                 }
 
                 @Override
                 public void onDismissSucceeded() throws RemoteException {
-                    actualHandler.post(callback::onDismissSucceeded);
+                    if (callback != null && !activity.isDestroyed()) {
+                        activity.mHandler.post(callback::onDismissSucceeded);
+                    }
                 }
 
                 @Override
                 public void onDismissCancelled() throws RemoteException {
-                    actualHandler.post(callback::onDismissCancelled);
+                    if (callback != null && !activity.isDestroyed()) {
+                        activity.mHandler.post(callback::onDismissCancelled);
+                    }
                 }
             });
         } catch (RemoteException e) {
@@ -430,9 +434,6 @@ public class KeyguardManager {
      *
      * This will, if the keyguard is secure, bring up the unlock screen of
      * the keyguard.
-     *
-     * <p>This method requires the caller to hold the permission
-     * {@link android.Manifest.permission#DISABLE_KEYGUARD}.
      *
      * @param callback Let's you know whether the operation was succesful and
      *   it is safe to launch anything that would normally be considered safe

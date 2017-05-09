@@ -27,6 +27,7 @@ import android.net.NetworkInfo;
 import android.net.NetworkPolicyManager;
 import android.os.Process;
 import android.os.UserHandle;
+import android.util.ArraySet;
 import android.util.Slog;
 
 import com.android.internal.annotations.GuardedBy;
@@ -34,7 +35,6 @@ import com.android.server.job.JobSchedulerService;
 import com.android.server.job.StateChangedListener;
 
 import java.io.PrintWriter;
-import java.util.ArrayList;
 
 /**
  * Handles changes in connectivity.
@@ -54,7 +54,7 @@ public class ConnectivityController extends StateController implements
     private boolean mValidated;
 
     @GuardedBy("mLock")
-    private final ArrayList<JobStatus> mTrackedJobs = new ArrayList<JobStatus>();
+    private final ArraySet<JobStatus> mTrackedJobs = new ArraySet<>();
 
     /** Singleton. */
     private static ConnectivityController mSingleton;
@@ -84,18 +84,17 @@ public class ConnectivityController extends StateController implements
 
     @Override
     public void maybeStartTrackingJobLocked(JobStatus jobStatus, JobStatus lastJob) {
-        if (jobStatus.hasConnectivityConstraint() || jobStatus.hasUnmeteredConstraint()
-                || jobStatus.hasNotRoamingConstraint()) {
+        if (jobStatus.hasConnectivityConstraint()) {
             updateConstraintsSatisfied(jobStatus, null);
             mTrackedJobs.add(jobStatus);
+            jobStatus.setTrackingController(JobStatus.TRACKING_CONNECTIVITY);
         }
     }
 
     @Override
     public void maybeStopTrackingJobLocked(JobStatus jobStatus, JobStatus incomingJob,
             boolean forUpdate) {
-        if (jobStatus.hasConnectivityConstraint() || jobStatus.hasUnmeteredConstraint()
-                || jobStatus.hasNotRoamingConstraint()) {
+        if (jobStatus.clearTrackingController(JobStatus.TRACKING_CONNECTIVITY)) {
             mTrackedJobs.remove(jobStatus);
         }
     }
@@ -114,11 +113,13 @@ public class ConnectivityController extends StateController implements
                 && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
         final boolean connected = info != null && info.isConnected();
         final boolean connectionUsable = connected && validated;
+        final boolean metered = connected && info.isMetered();
         final boolean unmetered = connected && !info.isMetered();
         final boolean notRoaming = connected && !info.isRoaming();
 
         boolean changed = false;
         changed |= jobStatus.setConnectivityConstraintSatisfied(connectionUsable);
+        changed |= jobStatus.setMeteredConstraintSatisfied(metered);
         changed |= jobStatus.setUnmeteredConstraintSatisfied(unmetered);
         changed |= jobStatus.setNotRoamingConstraintSatisfied(notRoaming);
 
@@ -134,6 +135,7 @@ public class ConnectivityController extends StateController implements
                     + " for " + jobStatus + ": usable=" + connectionUsable
                     + " connected=" + connected
                     + " validated=" + validated
+                    + " metered=" + metered
                     + " unmetered=" + unmetered
                     + " notRoaming=" + notRoaming);
         }
@@ -149,8 +151,8 @@ public class ConnectivityController extends StateController implements
     private void updateTrackedJobs(int uid, NetworkCapabilities capabilities) {
         synchronized (mLock) {
             boolean changed = false;
-            for (int i = 0; i < mTrackedJobs.size(); i++) {
-                final JobStatus js = mTrackedJobs.get(i);
+            for (int i = mTrackedJobs.size()-1; i >= 0; i--) {
+                final JobStatus js = mTrackedJobs.valueAt(i);
                 if (uid == -1 || uid == js.getSourceUid()) {
                     changed |= updateConstraintsSatisfied(js, capabilities);
                 }
@@ -167,8 +169,8 @@ public class ConnectivityController extends StateController implements
     @Override
     public void onNetworkActive() {
         synchronized (mLock) {
-            for (int i = 0; i < mTrackedJobs.size(); i++) {
-                final JobStatus js = mTrackedJobs.get(i);
+            for (int i = mTrackedJobs.size()-1; i >= 0; i--) {
+                final JobStatus js = mTrackedJobs.valueAt(i);
                 if (js.isReady()) {
                     if (DEBUG) {
                         Slog.d(TAG, "Running " + js + " due to network activity.");
@@ -238,15 +240,16 @@ public class ConnectivityController extends StateController implements
         pw.print(mTrackedJobs.size());
         pw.println(":");
         for (int i = 0; i < mTrackedJobs.size(); i++) {
-            final JobStatus js = mTrackedJobs.get(i);
+            final JobStatus js = mTrackedJobs.valueAt(i);
             if (js.shouldDump(filterUid)) {
                 pw.print("  #");
                 js.printUniqueId(pw);
                 pw.print(" from ");
                 UserHandle.formatUid(pw, js.getSourceUid());
-                pw.print(": C="); pw.print(js.hasConnectivityConstraint());
-                pw.print(": UM="); pw.print(js.hasUnmeteredConstraint());
-                pw.print(": NR="); pw.println(js.hasNotRoamingConstraint());
+                pw.print(": C="); pw.print(js.needsAnyConnectivity());
+                pw.print(": M="); pw.print(js.needsMeteredConnectivity());
+                pw.print(": UM="); pw.print(js.needsUnmeteredConnectivity());
+                pw.print(": NR="); pw.println(js.needsNonRoamingConnectivity());
             }
         }
     }

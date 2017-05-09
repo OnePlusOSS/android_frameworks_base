@@ -852,6 +852,8 @@
             1 - Go to sleep (doze)
             2 - Really go to sleep (don't doze)
             3 - Really go to sleep and go home (don't doze)
+            4 - Go to home
+            5 - Dismiss IME if shown. Otherwise go to home
     -->
     <integer name="config_shortPressOnPowerBehavior">1</integer>
 
@@ -1884,10 +1886,6 @@
     <!-- Amount of time in ms the user needs to press the relevant key to bring up the global actions dialog -->
     <integer name="config_globalActionsKeyTimeout">500</integer>
 
-    <!-- Default width of a vertical scrollbar and height of a horizontal scrollbar.
-         Takes effect only if the scrollbar drawables have no intrinsic size. -->
-    <dimen name="config_scrollbarSize">4dp</dimen>
-
     <!-- Distance that should be scrolled, per axis value, in response to a horizontal
          {@link MotionEvent#ACTION_SCROLL} event. -->
     <dimen name="config_horizontalScrollFactor">64dp</dimen>
@@ -2274,6 +2272,9 @@
 
     <!-- Flag indicating which package name can access the persistent data partition -->
     <string name="config_persistentDataPackageName" translatable="false"></string>
+
+    <!--  Define optional package verifier name -->
+    <string name="config_optionalPackageVerifierName" translatable="false"></string>
 
     <!-- Flag indicating apps will skip sending hold request before merge. In this case
         IMS service implementation will do both.i.e.hold followed by merge. -->
@@ -2801,7 +2802,7 @@
     <string name="config_defaultCellBroadcastReceiverPkg" translatable="false">com.android.cellbroadcastreceiver</string>
 
     <!-- Specifies the path that is used by AdaptiveIconDrawable class to crop launcher icons. -->
-    <string name="config_icon_mask" translatable="false">"M50,0L100,0 100,100 0,100 0,0z"</string>
+    <string name="config_icon_mask" translatable="false">"M50,0L92,0C96.42,0 100,4.58 100 8L100,92C100, 96.42 96.42 100 92 100L8 100C4.58, 100 0 96.42 0 92L0 8 C 0 4.42 4.42 0 8 0L50 0Z"</string>
 
     <!-- The component name, flattened to a string, for the default accessibility service to be
          enabled by the accessibility shortcut. This service must be trusted, as it can be activated
@@ -2835,4 +2836,52 @@
           specified name exists on the device, autofill will be disabled by default.
     -->
     <string name="config_defaultAutofillService" translatable="false"></string>
+
+    <!-- Whether the device uses the default focus highlight when focus state isn't specified. -->
+    <bool name="config_useDefaultFocusHighlight">true</bool>
+
+    <!-- Configuration for automotive -->
+    <bool name="enable_pbap_pce_profile">false</bool>
+
+    <!-- Default data warning level in mb -->
+    <integer name="default_data_warning_level_mb">2048</integer>
+
+    <!-- Whether to send a custom package name with the PSD.-->
+    <bool name="config_sendPackageName">false</bool>
+
+    <!-- Name for the set of keys associating package names -->
+    <string name="config_helpPackageNameKey" translatable="false"></string>
+
+    <!-- Name for the set of values of package names -->
+    <string name="config_helpPackageNameValue" translatable="false"></string>
+
+    <!-- Intent key for the package name keys -->
+    <string name="config_helpIntentExtraKey" translatable="false"></string>
+
+    <!-- Intent key for package name values -->
+    <string name="config_helpIntentNameKey" translatable="false"></string>
+
+    <!-- Intent key for the package name keys -->
+    <string name="config_feedbackIntentExtraKey" translatable="false"></string>
+
+    <!-- Intent key for package name values -->
+    <string name="config_feedbackIntentNameKey" translatable="false"></string>
+
+    <!-- The apps that need to be hidden when they are disabled -->
+    <string-array name="config_hideWhenDisabled_packageNames"></string-array>
+
+    <!-- The duration (in milliseconds) for the outgoing sms authorization request to timeout.-->
+    <integer name="config_sms_authorization_timeout_ms">0</integer>
+
+    <!-- Enable sms authorization framework-->
+    <bool name="config_sms_authorization_enabled">false</bool>
+
+    <!-- Additional non-platform defined global settings exposed to Instant Apps -->
+    <string-array name="config_allowedGlobalInstantAppSettings"></string-array>
+
+    <!-- Additional non-platform defined system settings exposed to Instant Apps -->
+    <string-array name="config_allowedSystemInstantAppSettings"></string-array>
+
+    <!-- Additional non-platform defined secure settings exposed to Instant Apps -->
+    <string-array name="config_allowedSecureInstantAppSettings"></string-array>
 </resources>

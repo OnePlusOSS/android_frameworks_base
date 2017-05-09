@@ -59,9 +59,6 @@ public class DozeParameters {
         pw.print("    getPickupVibrationThreshold(): "); pw.println(getPickupVibrationThreshold());
         pw.print("    getPickupSubtypePerformsProxCheck(): ");pw.println(
                 dumpPickupSubtypePerformsProxCheck());
-        if (mAmbientDisplayConfiguration.alwaysOnAvailable()) {
-            pw.print("    getSensorsWakeUpFully(): "); pw.println(getSensorsWakeUpFully());
-        }
     }
 
     private String dumpPickupSubtypePerformsProxCheck() {
@@ -122,12 +119,6 @@ public class DozeParameters {
         return mAmbientDisplayConfiguration.alwaysOnEnabled(UserHandle.USER_CURRENT);
     }
 
-    public boolean getSensorsWakeUpFully() {
-        return mAmbientDisplayConfiguration.alwaysOnAvailable()
-                && Settings.Secure.getIntForUser(mContext.getContentResolver(),
-                DOZE_SENSORS_WAKE_UP_FULLY, 0, UserHandle.USER_CURRENT) != 0;
-    }
-
     private boolean getBoolean(String propName, int resId) {
         return SystemProperties.getBoolean(propName, mContext.getResources().getBoolean(resId));
     }
@@ -156,6 +147,10 @@ public class DozeParameters {
         }
 
         return sPickupSubtypePerformsProxMatcher.isIn(subType);
+    }
+
+    public int getPulseVisibleDurationExtended() {
+        return 2 * getPulseVisibleDuration();
     }
 
 

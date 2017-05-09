@@ -23,6 +23,7 @@ import android.os.Debug;
 import android.os.UserHandle;
 import android.util.IntArray;
 import android.util.Log;
+import android.util.SparseArray;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -38,7 +39,7 @@ class MediaSessionStack {
     private static final String TAG = "MediaSessionStack";
 
     /**
-     * Listens the change in the media button session.
+     * Listen the change in the media button session.
      */
     interface OnMediaButtonSessionChangedListener {
         /**
@@ -85,7 +86,12 @@ class MediaSessionStack {
 
     private MediaSessionRecord mCachedDefault;
     private MediaSessionRecord mCachedVolumeDefault;
-    private ArrayList<MediaSessionRecord> mCachedActiveList;
+
+    /**
+     * Cache the result of the {@link #getActiveSessions} per user.
+     */
+    private final SparseArray<ArrayList<MediaSessionRecord>> mCachedActiveLists =
+            new SparseArray<>();
 
     MediaSessionStack(AudioPlaybackMonitor monitor, OnMediaButtonSessionChangedListener listener) {
         mAudioPlaybackMonitor = monitor;
@@ -99,7 +105,7 @@ class MediaSessionStack {
      */
     public void addSession(MediaSessionRecord record) {
         mSessions.add(record);
-        clearCache();
+        clearCache(record.getUserId());
 
         // Update the media button session.
         // The added session could be the session from the package with the audio playback.
@@ -115,11 +121,14 @@ class MediaSessionStack {
     public void removeSession(MediaSessionRecord record) {
         mSessions.remove(record);
         if (mMediaButtonSession == record) {
-            // When the media button session is gone, try to find the alternative media session
-            // in the media button session app.
-            onMediaSessionChangeInMediaButtonSessionApp();
+            // When the media button session is removed, nullify the media button session and do not
+            // search for the alternative media session within the app. It's because the alternative
+            // media session might be a dummy which isn't able to handle the media key events.
+            mOnMediaButtonSessionChangedListener.onMediaButtonSessionChanged(
+                    mMediaButtonSession, null);
+            mMediaButtonSession = null;
         }
-        clearCache();
+        clearCache(record.getUserId());
     }
 
     /**
@@ -140,7 +149,7 @@ class MediaSessionStack {
         if (shouldUpdatePriority(oldState, newState)) {
             mSessions.remove(record);
             mSessions.add(0, record);
-            clearCache();
+            clearCache(record.getUserId());
         } else if (!MediaSession.isActiveState(newState)) {
             // Just clear the volume cache when a state goes inactive
             mCachedVolumeDefault = null;
@@ -151,7 +160,13 @@ class MediaSessionStack {
         // In that case, we pick the media session whose PlaybackState matches
         // the audio playback configuration.
         if (mMediaButtonSession != null && mMediaButtonSession.getUid() == record.getUid()) {
-            onMediaSessionChangeInMediaButtonSessionApp();
+            MediaSessionRecord newMediaButtonSession =
+                    findMediaButtonSession(mMediaButtonSession.getUid());
+            if (newMediaButtonSession != mMediaButtonSession) {
+                mOnMediaButtonSessionChangedListener.onMediaButtonSessionChanged(
+                        mMediaButtonSession, newMediaButtonSession);
+                mMediaButtonSession = newMediaButtonSession;
+            }
         }
     }
 
@@ -163,7 +178,7 @@ class MediaSessionStack {
     public void onSessionStateChange(MediaSessionRecord record) {
         // For now just clear the cache. Eventually we'll selectively clear
         // depending on what changed.
-        clearCache();
+        clearCache(record.getUserId());
     }
 
     /**
@@ -190,22 +205,6 @@ class MediaSessionStack {
                 }
                 return;
             }
-        }
-    }
-
-    /**
-     * Handle the change in a media session in the media button session app.
-     * <p>If the app has multiple media sessions, change in a media sesion in the app may change
-     * the media button session.
-     * @see #findMediaButtonSession
-     */
-    private void onMediaSessionChangeInMediaButtonSessionApp() {
-        MediaSessionRecord newMediaButtonSession =
-                findMediaButtonSession(mMediaButtonSession.getUid());
-        if (newMediaButtonSession != mMediaButtonSession) {
-            mOnMediaButtonSessionChangedListener.onMediaButtonSessionChanged(mMediaButtonSession,
-                    newMediaButtonSession);
-            mMediaButtonSession = newMediaButtonSession;
         }
     }
 
@@ -245,14 +244,17 @@ class MediaSessionStack {
      * Get the current priority sorted list of active sessions. The most
      * important session is at index 0 and the least important at size - 1.
      *
-     * @param userId The user to check.
+     * @param userId The user to check. It can be {@link UserHandle#USER_ALL} to get all sessions
+     *    for all users in this {@link MediaSessionStack}.
      * @return All the active sessions in priority order.
      */
     public ArrayList<MediaSessionRecord> getActiveSessions(int userId) {
-        if (mCachedActiveList == null) {
-            mCachedActiveList = getPriorityList(true, userId);
+        ArrayList<MediaSessionRecord> cachedActiveList = mCachedActiveLists.get(userId);
+        if (cachedActiveList == null) {
+            cachedActiveList = getPriorityList(true, userId);
+            mCachedActiveLists.put(userId, cachedActiveList);
         }
-        return mCachedActiveList;
+        return cachedActiveList;
     }
 
     /**
@@ -382,9 +384,12 @@ class MediaSessionStack {
         return false;
     }
 
-    private void clearCache() {
+    private void clearCache(int userId) {
         mCachedDefault = null;
         mCachedVolumeDefault = null;
-        mCachedActiveList = null;
+        mCachedActiveLists.remove(userId);
+        // mCachedActiveLists may also include the list of sessions for UserHandle.USER_ALL,
+        // so they also need to be cleared.
+        mCachedActiveLists.remove(UserHandle.USER_ALL);
     }
 }

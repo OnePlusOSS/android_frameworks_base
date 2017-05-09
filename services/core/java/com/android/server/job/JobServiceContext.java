@@ -21,11 +21,11 @@ import android.app.job.JobInfo;
 import android.app.job.JobParameters;
 import android.app.job.IJobCallback;
 import android.app.job.IJobService;
+import android.app.job.JobWorkItem;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Handler;
@@ -44,8 +44,6 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IBatteryStats;
 import com.android.server.job.controllers.JobStatus;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
  * Handles client binding and lifecycle of a job. Jobs execute one at a time on an instance of this
  * class.
@@ -56,19 +54,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * job lands, and again when it is complete.
  * - Cancelling is trickier, because there are also interactions from the client. It's possible
  * the {@link com.android.server.job.JobServiceContext.JobServiceHandler} tries to process a
- * {@link #MSG_CANCEL} after the client has already finished. This is handled by having
- * {@link com.android.server.job.JobServiceContext.JobServiceHandler#handleCancelH} check whether
+ * {@link #doCancelLocked(int)} after the client has already finished. This is handled by having
+ * {@link com.android.server.job.JobServiceContext.JobServiceHandler#handleCancelLocked} check whether
  * the context is still valid.
- * To mitigate this, tearing down the context removes all messages from the handler, including any
- * tardy {@link #MSG_CANCEL}s. Additionally, we avoid sending duplicate onStopJob()
+ * To mitigate this, we avoid sending duplicate onStopJob()
  * calls to the client after they've specified jobFinished().
  */
 public class JobServiceContext extends IJobCallback.Stub implements ServiceConnection {
     private static final boolean DEBUG = JobSchedulerService.DEBUG;
     private static final String TAG = "JobServiceContext";
-    /** Define the maximum # of jobs allowed to run on a service at once. */
-    private static final int defaultMaxActiveJobsPerService =
-            ActivityManager.isLowRamDeviceStatic() ? 1 : 3;
     /** Amount of time a job is allowed to execute for before being considered timed-out. */
     private static final long EXECUTING_TIMESLICE_MILLIS = 10 * 60 * 1000;  // 10mins.
     /** Amount of time the JobScheduler waits for the initial service launch+bind. */
@@ -90,14 +84,6 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
     // Messages that result from interactions with the client service.
     /** System timed out waiting for a response. */
     private static final int MSG_TIMEOUT = 0;
-    /** Received a callback from client. */
-    private static final int MSG_CALLBACK = 1;
-    /** Run through list and start any ready jobs.*/
-    private static final int MSG_SERVICE_BOUND = 2;
-    /** Cancel a job. */
-    private static final int MSG_CANCEL = 3;
-    /** Shutdown the job. Used when the client crashes and we can't die gracefully.*/
-    private static final int MSG_SHUTDOWN_EXECUTION = 4;
 
     public static final int NO_PREFERRED_UID = -1;
 
@@ -115,7 +101,7 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
     private JobParameters mParams;
     @VisibleForTesting
     int mVerb;
-    private AtomicBoolean mCancelled = new AtomicBoolean();
+    private boolean mCancelled;
 
     /**
      * All the information maintained about the job currently being executed.
@@ -195,10 +181,11 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
             mExecutionStartTimeElapsed = SystemClock.elapsedRealtime();
 
             mVerb = VERB_BINDING;
-            scheduleOpTimeOut();
+            scheduleOpTimeOutLocked();
             final Intent intent = new Intent().setComponent(job.getServiceComponent());
             boolean binding = mContext.bindServiceAsUser(intent, this,
-                    Context.BIND_AUTO_CREATE | Context.BIND_NOT_FOREGROUND,
+                    Context.BIND_AUTO_CREATE | Context.BIND_NOT_FOREGROUND
+                            | Context.BIND_IMPORTANT_BACKGROUND,
                     new UserHandle(job.getUserId()));
             if (!binding) {
                 if (DEBUG) {
@@ -208,7 +195,7 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
                 mParams = null;
                 mExecutionStartTimeElapsed = 0L;
                 mVerb = VERB_FINISHED;
-                removeOpTimeOut();
+                removeOpTimeOutLocked();
                 return false;
             }
             try {
@@ -245,14 +232,12 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
     }
 
     /** Called externally when a job that was scheduled for execution should be cancelled. */
-    void cancelExecutingJob(int reason) {
-        mCallbackHandler.obtainMessage(MSG_CANCEL, reason, 0 /* unused */).sendToTarget();
+    void cancelExecutingJobLocked(int reason) {
+        doCancelLocked(reason);
     }
 
-    void preemptExecutingJob() {
-        Message m = mCallbackHandler.obtainMessage(MSG_CANCEL);
-        m.arg1 = JobParameters.REASON_PREEMPT;
-        m.sendToTarget();
+    void preemptExecutingJobLocked() {
+        doCancelLocked(JobParameters.REASON_PREEMPT);
     }
 
     int getPreferredUid() {
@@ -271,30 +256,71 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
         return mTimeoutElapsed;
     }
 
+    boolean timeoutIfExecutingLocked(String pkgName, int userId, boolean matchJobId, int jobId) {
+        final JobStatus executing = getRunningJob();
+        if (executing != null && (userId == UserHandle.USER_ALL || userId == executing.getUserId())
+                && (pkgName == null || pkgName.equals(executing.getSourcePackageName()))
+                && (!matchJobId || jobId == executing.getJobId())) {
+            if (mVerb == VERB_EXECUTING) {
+                mParams.setStopReason(JobParameters.REASON_TIMEOUT);
+                sendStopMessageLocked();
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public void jobFinished(int jobId, boolean reschedule) {
-        if (!verifyCallingUid()) {
-            return;
-        }
-        mCallbackHandler.obtainMessage(MSG_CALLBACK, jobId, reschedule ? 1 : 0)
-                .sendToTarget();
+        doCallback(reschedule);
     }
 
     @Override
     public void acknowledgeStopMessage(int jobId, boolean reschedule) {
-        if (!verifyCallingUid()) {
-            return;
-        }
-        mCallbackHandler.obtainMessage(MSG_CALLBACK, jobId, reschedule ? 1 : 0)
-                .sendToTarget();
+        doCallback(reschedule);
     }
 
     @Override
     public void acknowledgeStartMessage(int jobId, boolean ongoing) {
-        if (!verifyCallingUid()) {
-            return;
+        doCallback(ongoing);
+    }
+
+    @Override
+    public JobWorkItem dequeueWork(int jobId) {
+        final int callingUid = Binder.getCallingUid();
+        final long ident = Binder.clearCallingIdentity();
+        try {
+            synchronized (mLock) {
+                if (!verifyCallingUidLocked(callingUid)) {
+                    throw new SecurityException("Bad calling uid: " + callingUid);
+                }
+
+                final JobWorkItem work = mRunningJob.dequeueWorkLocked();
+                if (work == null && !mRunningJob.hasExecutingWorkLocked()) {
+                    // This will finish the job.
+                    doCallbackLocked(false);
+                }
+                return work;
+            }
+        } finally {
+            Binder.restoreCallingIdentity(ident);
         }
-        mCallbackHandler.obtainMessage(MSG_CALLBACK, jobId, ongoing ? 1 : 0).sendToTarget();
+    }
+
+    @Override
+    public boolean completeWork(int jobId, int workId) {
+        final int callingUid = Binder.getCallingUid();
+        final long ident = Binder.clearCallingIdentity();
+        try {
+            synchronized (mLock) {
+                if (!verifyCallingUidLocked(callingUid)) {
+                    throw new SecurityException("Bad calling uid: " + callingUid);
+                }
+                return mRunningJob.completeWorkLocked(ActivityManager.getService(), workId);
+            }
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
     }
 
     /**
@@ -312,20 +338,20 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
             // looper and at this point we can't get any binder callbacks from the client. Better
             // safe than sorry.
             runningJob = mRunningJob;
-        }
-        if (runningJob == null || !name.equals(runningJob.getServiceComponent())) {
-            mCallbackHandler.obtainMessage(MSG_SHUTDOWN_EXECUTION).sendToTarget();
-            return;
-        }
-        this.service = IJobService.Stub.asInterface(service);
-        final PowerManager pm =
-                (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
-        PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
-                runningJob.getTag());
-        wl.setWorkSource(new WorkSource(runningJob.getSourceUid()));
-        wl.setReferenceCounted(false);
-        wl.acquire();
-        synchronized (mLock) {
+
+            if (runningJob == null || !name.equals(runningJob.getServiceComponent())) {
+                closeAndCleanupJobLocked(true /* needsReschedule */);
+                return;
+            }
+            this.service = IJobService.Stub.asInterface(service);
+            final PowerManager pm =
+                    (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
+            PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+                    runningJob.getTag());
+            wl.setWorkSource(new WorkSource(runningJob.getSourceUid()));
+            wl.setReferenceCounted(false);
+            wl.acquire();
+
             // We use a new wakelock instance per job.  In rare cases there is a race between
             // teardown following job completion/cancellation and new job service spin-up
             // such that if we simply assign mWakeLock to be the new instance, we orphan
@@ -337,14 +363,16 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
                 mWakeLock.release();
             }
             mWakeLock = wl;
+            doServiceBoundLocked();
         }
-        mCallbackHandler.obtainMessage(MSG_SERVICE_BOUND).sendToTarget();
     }
 
     /** If the client service crashes we reschedule this job and clean up. */
     @Override
     public void onServiceDisconnected(ComponentName name) {
-        mCallbackHandler.obtainMessage(MSG_SHUTDOWN_EXECUTION).sendToTarget();
+        synchronized (mLock) {
+            closeAndCleanupJobLocked(true /* needsReschedule */);
+        }
     }
 
     /**
@@ -352,22 +380,18 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
      * whether the client exercising the callback is the client we expect.
      * @return True if the binder calling is coming from the client we expect.
      */
-    private boolean verifyCallingUid() {
-        synchronized (mLock) {
-            if (mRunningJob == null || Binder.getCallingUid() != mRunningJob.getUid()) {
-                if (DEBUG) {
-                    Slog.d(TAG, "Stale callback received, ignoring.");
-                }
-                return false;
+    private boolean verifyCallingUidLocked(final int callingUid) {
+        if (mRunningJob == null || callingUid != mRunningJob.getUid()) {
+            if (DEBUG) {
+                Slog.d(TAG, "Stale callback received, ignoring.");
             }
-            return true;
+            return false;
         }
+        return true;
     }
 
     /**
-     * Handles the lifecycle of the JobService binding/callbacks, etc. The convention within this
-     * class is to append 'H' to each function name that can only be called on this handler. This
-     * isn't strictly necessary because all of these functions are private, but helps clarity.
+     * Scheduling of async messages (basically timeouts at this point).
      */
     private class JobServiceHandler extends Handler {
         JobServiceHandler(Looper looper) {
@@ -377,272 +401,277 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
         @Override
         public void handleMessage(Message message) {
             switch (message.what) {
-                case MSG_SERVICE_BOUND:
-                    removeOpTimeOut();
-                    handleServiceBoundH();
-                    break;
-                case MSG_CALLBACK:
-                    if (DEBUG) {
-                        Slog.d(TAG, "MSG_CALLBACK of : " + mRunningJob
-                                + " v:" + VERB_STRINGS[mVerb]);
-                    }
-                    removeOpTimeOut();
-
-                    if (mVerb == VERB_STARTING) {
-                        final boolean workOngoing = message.arg2 == 1;
-                        handleStartedH(workOngoing);
-                    } else if (mVerb == VERB_EXECUTING ||
-                            mVerb == VERB_STOPPING) {
-                        final boolean reschedule = message.arg2 == 1;
-                        handleFinishedH(reschedule);
-                    } else {
-                        if (DEBUG) {
-                            Slog.d(TAG, "Unrecognised callback: " + mRunningJob);
-                        }
-                    }
-                    break;
-                case MSG_CANCEL:
-                    if (mVerb == VERB_FINISHED) {
-                        if (DEBUG) {
-                            Slog.d(TAG,
-                                   "Trying to process cancel for torn-down context, ignoring.");
-                        }
-                        return;
-                    }
-                    mParams.setStopReason(message.arg1);
-                    if (message.arg1 == JobParameters.REASON_PREEMPT) {
-                        mPreferredUid = mRunningJob != null ? mRunningJob.getUid() :
-                                NO_PREFERRED_UID;
-                    }
-                    handleCancelH();
-                    break;
                 case MSG_TIMEOUT:
-                    handleOpTimeoutH();
-                    break;
-                case MSG_SHUTDOWN_EXECUTION:
-                    closeAndCleanupJobH(true /* needsReschedule */);
+                    synchronized (mLock) {
+                        handleOpTimeoutLocked();
+                    }
                     break;
                 default:
                     Slog.e(TAG, "Unrecognised message: " + message);
             }
         }
+    }
 
-        /** Start the job on the service. */
-        private void handleServiceBoundH() {
-            if (DEBUG) {
-                Slog.d(TAG, "MSG_SERVICE_BOUND for " + mRunningJob.toShortString());
-            }
-            if (mVerb != VERB_BINDING) {
-                Slog.e(TAG, "Sending onStartJob for a job that isn't pending. "
-                        + VERB_STRINGS[mVerb]);
-                closeAndCleanupJobH(false /* reschedule */);
-                return;
-            }
-            if (mCancelled.get()) {
-                if (DEBUG) {
-                    Slog.d(TAG, "Job cancelled while waiting for bind to complete. "
-                            + mRunningJob);
-                }
-                closeAndCleanupJobH(true /* reschedule */);
-                return;
-            }
-            try {
-                mVerb = VERB_STARTING;
-                scheduleOpTimeOut();
-                service.startJob(mParams);
-            } catch (Exception e) {
-                // We catch 'Exception' because client-app malice or bugs might induce a wide
-                // range of possible exception-throw outcomes from startJob() and its handling
-                // of the client's ParcelableBundle extras.
-                Slog.e(TAG, "Error sending onStart message to '" +
-                        mRunningJob.getServiceComponent().getShortClassName() + "' ", e);
-            }
-        }
+    void doServiceBoundLocked() {
+        removeOpTimeOutLocked();
+        handleServiceBoundLocked();
+    }
 
-        /**
-         * State behaviours.
-         * VERB_STARTING   -> Successful start, change job to VERB_EXECUTING and post timeout.
-         *     _PENDING    -> Error
-         *     _EXECUTING  -> Error
-         *     _STOPPING   -> Error
-         */
-        private void handleStartedH(boolean workOngoing) {
-            switch (mVerb) {
-                case VERB_STARTING:
-                    mVerb = VERB_EXECUTING;
-                    if (!workOngoing) {
-                        // Job is finished already so fast-forward to handleFinished.
-                        handleFinishedH(false);
-                        return;
-                    }
-                    if (mCancelled.get()) {
-                        if (DEBUG) {
-                            Slog.d(TAG, "Job cancelled while waiting for onStartJob to complete.");
-                        }
-                        // Cancelled *while* waiting for acknowledgeStartMessage from client.
-                        handleCancelH();
-                        return;
-                    }
-                    scheduleOpTimeOut();
-                    break;
-                default:
-                    Slog.e(TAG, "Handling started job but job wasn't starting! Was "
-                            + VERB_STRINGS[mVerb] + ".");
-                    return;
-            }
-        }
-
-        /**
-         * VERB_EXECUTING  -> Client called jobFinished(), clean up and notify done.
-         *     _STOPPING   -> Successful finish, clean up and notify done.
-         *     _STARTING   -> Error
-         *     _PENDING    -> Error
-         */
-        private void handleFinishedH(boolean reschedule) {
-            switch (mVerb) {
-                case VERB_EXECUTING:
-                case VERB_STOPPING:
-                    closeAndCleanupJobH(reschedule);
-                    break;
-                default:
-                    Slog.e(TAG, "Got an execution complete message for a job that wasn't being" +
-                            "executed. Was " + VERB_STRINGS[mVerb] + ".");
-            }
-        }
-
-        /**
-         * A job can be in various states when a cancel request comes in:
-         * VERB_BINDING    -> Cancelled before bind completed. Mark as cancelled and wait for
-         *                    {@link #onServiceConnected(android.content.ComponentName, android.os.IBinder)}
-         *     _STARTING   -> Mark as cancelled and wait for
-         *                    {@link JobServiceContext#acknowledgeStartMessage(int, boolean)}
-         *     _EXECUTING  -> call {@link #sendStopMessageH}}, but only if there are no callbacks
-         *                      in the message queue.
-         *     _ENDING     -> No point in doing anything here, so we ignore.
-         */
-        private void handleCancelH() {
-            if (JobSchedulerService.DEBUG) {
-                Slog.d(TAG, "Handling cancel for: " + mRunningJob.getJobId() + " "
-                        + VERB_STRINGS[mVerb]);
-            }
-            switch (mVerb) {
-                case VERB_BINDING:
-                case VERB_STARTING:
-                    mCancelled.set(true);
-                    break;
-                case VERB_EXECUTING:
-                    if (hasMessages(MSG_CALLBACK)) {
-                        // If the client has called jobFinished, ignore this cancel.
-                        return;
-                    }
-                    sendStopMessageH();
-                    break;
-                case VERB_STOPPING:
-                    // Nada.
-                    break;
-                default:
-                    Slog.e(TAG, "Cancelling a job without a valid verb: " + mVerb);
-                    break;
-            }
-        }
-
-        /** Process MSG_TIMEOUT here. */
-        private void handleOpTimeoutH() {
-            switch (mVerb) {
-                case VERB_BINDING:
-                    Slog.e(TAG, "Time-out while trying to bind " + mRunningJob.toShortString() +
-                            ", dropping.");
-                    closeAndCleanupJobH(false /* needsReschedule */);
-                    break;
-                case VERB_STARTING:
-                    // Client unresponsive - wedged or failed to respond in time. We don't really
-                    // know what happened so let's log it and notify the JobScheduler
-                    // FINISHED/NO-RETRY.
-                    Slog.e(TAG, "No response from client for onStartJob '" +
-                            mRunningJob.toShortString());
-                    closeAndCleanupJobH(false /* needsReschedule */);
-                    break;
-                case VERB_STOPPING:
-                    // At least we got somewhere, so fail but ask the JobScheduler to reschedule.
-                    Slog.e(TAG, "No response from client for onStopJob, '" +
-                            mRunningJob.toShortString());
-                    closeAndCleanupJobH(true /* needsReschedule */);
-                    break;
-                case VERB_EXECUTING:
-                    // Not an error - client ran out of time.
-                    Slog.i(TAG, "Client timed out while executing (no jobFinished received)." +
-                            " sending onStop. "  + mRunningJob.toShortString());
-                    mParams.setStopReason(JobParameters.REASON_TIMEOUT);
-                    sendStopMessageH();
-                    break;
-                default:
-                    Slog.e(TAG, "Handling timeout for an invalid job state: " +
-                            mRunningJob.toShortString() + ", dropping.");
-                    closeAndCleanupJobH(false /* needsReschedule */);
-            }
-        }
-
-        /**
-         * Already running, need to stop. Will switch {@link #mVerb} from VERB_EXECUTING ->
-         * VERB_STOPPING.
-         */
-        private void sendStopMessageH() {
-            removeOpTimeOut();
-            if (mVerb != VERB_EXECUTING) {
-                Slog.e(TAG, "Sending onStopJob for a job that isn't started. " + mRunningJob);
-                closeAndCleanupJobH(false /* reschedule */);
-                return;
-            }
-            try {
-                mVerb = VERB_STOPPING;
-                scheduleOpTimeOut();
-                service.stopJob(mParams);
-            } catch (RemoteException e) {
-                Slog.e(TAG, "Error sending onStopJob to client.", e);
-                // The job's host app apparently crashed during the job, so we should reschedule.
-                closeAndCleanupJobH(true /* reschedule */);
-            }
-        }
-
-        /**
-         * The provided job has finished, either by calling
-         * {@link android.app.job.JobService#jobFinished(android.app.job.JobParameters, boolean)}
-         * or from acknowledging the stop message we sent. Either way, we're done tracking it and
-         * we want to clean up internally.
-         */
-        private void closeAndCleanupJobH(boolean reschedule) {
-            final JobStatus completedJob;
+    void doCallback(boolean reschedule) {
+        final int callingUid = Binder.getCallingUid();
+        final long ident = Binder.clearCallingIdentity();
+        try {
             synchronized (mLock) {
-                if (mVerb == VERB_FINISHED) {
+                if (!verifyCallingUidLocked(callingUid)) {
                     return;
                 }
-                completedJob = mRunningJob;
-                mJobPackageTracker.noteInactive(completedJob);
-                try {
-                    mBatteryStats.noteJobFinish(mRunningJob.getBatteryName(),
-                            mRunningJob.getSourceUid());
-                } catch (RemoteException e) {
-                    // Whatever.
-                }
-                if (mWakeLock != null) {
-                    mWakeLock.release();
-                }
-                mContext.unbindService(JobServiceContext.this);
-                mWakeLock = null;
-                mRunningJob = null;
-                mParams = null;
-                mVerb = VERB_FINISHED;
-                mCancelled.set(false);
-                service = null;
-                mAvailable = true;
+                doCallbackLocked(reschedule);
             }
-            removeOpTimeOut();
-            removeMessages(MSG_CALLBACK);
-            removeMessages(MSG_SERVICE_BOUND);
-            removeMessages(MSG_CANCEL);
-            removeMessages(MSG_SHUTDOWN_EXECUTION);
-            mCompletedListener.onJobCompleted(completedJob, reschedule);
+        } finally {
+            Binder.restoreCallingIdentity(ident);
         }
+    }
+
+    void doCallbackLocked(boolean reschedule) {
+        if (DEBUG) {
+            Slog.d(TAG, "doCallback of : " + mRunningJob
+                    + " v:" + VERB_STRINGS[mVerb]);
+        }
+        removeOpTimeOutLocked();
+
+        if (mVerb == VERB_STARTING) {
+            handleStartedLocked(reschedule);
+        } else if (mVerb == VERB_EXECUTING ||
+                mVerb == VERB_STOPPING) {
+            handleFinishedLocked(reschedule);
+        } else {
+            if (DEBUG) {
+                Slog.d(TAG, "Unrecognised callback: " + mRunningJob);
+            }
+        }
+    }
+
+    void doCancelLocked(int arg1) {
+        if (mVerb == VERB_FINISHED) {
+            if (DEBUG) {
+                Slog.d(TAG,
+                        "Trying to process cancel for torn-down context, ignoring.");
+            }
+            return;
+        }
+        mParams.setStopReason(arg1);
+        if (arg1 == JobParameters.REASON_PREEMPT) {
+            mPreferredUid = mRunningJob != null ? mRunningJob.getUid() :
+                    NO_PREFERRED_UID;
+        }
+        handleCancelLocked();
+    }
+
+    /** Start the job on the service. */
+    private void handleServiceBoundLocked() {
+        if (DEBUG) {
+            Slog.d(TAG, "handleServiceBound for " + mRunningJob.toShortString());
+        }
+        if (mVerb != VERB_BINDING) {
+            Slog.e(TAG, "Sending onStartJob for a job that isn't pending. "
+                    + VERB_STRINGS[mVerb]);
+            closeAndCleanupJobLocked(false /* reschedule */);
+            return;
+        }
+        if (mCancelled) {
+            if (DEBUG) {
+                Slog.d(TAG, "Job cancelled while waiting for bind to complete. "
+                        + mRunningJob);
+            }
+            closeAndCleanupJobLocked(true /* reschedule */);
+            return;
+        }
+        try {
+            mVerb = VERB_STARTING;
+            scheduleOpTimeOutLocked();
+            service.startJob(mParams);
+        } catch (Exception e) {
+            // We catch 'Exception' because client-app malice or bugs might induce a wide
+            // range of possible exception-throw outcomes from startJob() and its handling
+            // of the client's ParcelableBundle extras.
+            Slog.e(TAG, "Error sending onStart message to '" +
+                    mRunningJob.getServiceComponent().getShortClassName() + "' ", e);
+        }
+    }
+
+    /**
+     * State behaviours.
+     * VERB_STARTING   -> Successful start, change job to VERB_EXECUTING and post timeout.
+     *     _PENDING    -> Error
+     *     _EXECUTING  -> Error
+     *     _STOPPING   -> Error
+     */
+    private void handleStartedLocked(boolean workOngoing) {
+        switch (mVerb) {
+            case VERB_STARTING:
+                mVerb = VERB_EXECUTING;
+                if (!workOngoing) {
+                    // Job is finished already so fast-forward to handleFinished.
+                    handleFinishedLocked(false);
+                    return;
+                }
+                if (mCancelled) {
+                    if (DEBUG) {
+                        Slog.d(TAG, "Job cancelled while waiting for onStartJob to complete.");
+                    }
+                    // Cancelled *while* waiting for acknowledgeStartMessage from client.
+                    handleCancelLocked();
+                    return;
+                }
+                scheduleOpTimeOutLocked();
+                break;
+            default:
+                Slog.e(TAG, "Handling started job but job wasn't starting! Was "
+                        + VERB_STRINGS[mVerb] + ".");
+                return;
+        }
+    }
+
+    /**
+     * VERB_EXECUTING  -> Client called jobFinished(), clean up and notify done.
+     *     _STOPPING   -> Successful finish, clean up and notify done.
+     *     _STARTING   -> Error
+     *     _PENDING    -> Error
+     */
+    private void handleFinishedLocked(boolean reschedule) {
+        switch (mVerb) {
+            case VERB_EXECUTING:
+            case VERB_STOPPING:
+                closeAndCleanupJobLocked(reschedule);
+                break;
+            default:
+                Slog.e(TAG, "Got an execution complete message for a job that wasn't being" +
+                        "executed. Was " + VERB_STRINGS[mVerb] + ".");
+        }
+    }
+
+    /**
+     * A job can be in various states when a cancel request comes in:
+     * VERB_BINDING    -> Cancelled before bind completed. Mark as cancelled and wait for
+     *                    {@link #onServiceConnected(android.content.ComponentName, android.os.IBinder)}
+     *     _STARTING   -> Mark as cancelled and wait for
+     *                    {@link JobServiceContext#acknowledgeStartMessage(int, boolean)}
+     *     _EXECUTING  -> call {@link #sendStopMessageLocked}}, but only if there are no callbacks
+     *                      in the message queue.
+     *     _ENDING     -> No point in doing anything here, so we ignore.
+     */
+    private void handleCancelLocked() {
+        if (JobSchedulerService.DEBUG) {
+            Slog.d(TAG, "Handling cancel for: " + mRunningJob.getJobId() + " "
+                    + VERB_STRINGS[mVerb]);
+        }
+        switch (mVerb) {
+            case VERB_BINDING:
+            case VERB_STARTING:
+                mCancelled = true;
+                break;
+            case VERB_EXECUTING:
+                sendStopMessageLocked();
+                break;
+            case VERB_STOPPING:
+                // Nada.
+                break;
+            default:
+                Slog.e(TAG, "Cancelling a job without a valid verb: " + mVerb);
+                break;
+        }
+    }
+
+    /** Process MSG_TIMEOUT here. */
+    private void handleOpTimeoutLocked() {
+        switch (mVerb) {
+            case VERB_BINDING:
+                Slog.e(TAG, "Time-out while trying to bind " + mRunningJob.toShortString() +
+                        ", dropping.");
+                closeAndCleanupJobLocked(false /* needsReschedule */);
+                break;
+            case VERB_STARTING:
+                // Client unresponsive - wedged or failed to respond in time. We don't really
+                // know what happened so let's log it and notify the JobScheduler
+                // FINISHED/NO-RETRY.
+                Slog.e(TAG, "No response from client for onStartJob '" +
+                        mRunningJob.toShortString());
+                closeAndCleanupJobLocked(false /* needsReschedule */);
+                break;
+            case VERB_STOPPING:
+                // At least we got somewhere, so fail but ask the JobScheduler to reschedule.
+                Slog.e(TAG, "No response from client for onStopJob, '" +
+                        mRunningJob.toShortString());
+                closeAndCleanupJobLocked(true /* needsReschedule */);
+                break;
+            case VERB_EXECUTING:
+                // Not an error - client ran out of time.
+                Slog.i(TAG, "Client timed out while executing (no jobFinished received)." +
+                        " sending onStop. "  + mRunningJob.toShortString());
+                mParams.setStopReason(JobParameters.REASON_TIMEOUT);
+                sendStopMessageLocked();
+                break;
+            default:
+                Slog.e(TAG, "Handling timeout for an invalid job state: " +
+                        mRunningJob.toShortString() + ", dropping.");
+                closeAndCleanupJobLocked(false /* needsReschedule */);
+        }
+    }
+
+    /**
+     * Already running, need to stop. Will switch {@link #mVerb} from VERB_EXECUTING ->
+     * VERB_STOPPING.
+     */
+    private void sendStopMessageLocked() {
+        removeOpTimeOutLocked();
+        if (mVerb != VERB_EXECUTING) {
+            Slog.e(TAG, "Sending onStopJob for a job that isn't started. " + mRunningJob);
+            closeAndCleanupJobLocked(false /* reschedule */);
+            return;
+        }
+        try {
+            mVerb = VERB_STOPPING;
+            scheduleOpTimeOutLocked();
+            service.stopJob(mParams);
+        } catch (RemoteException e) {
+            Slog.e(TAG, "Error sending onStopJob to client.", e);
+            // The job's host app apparently crashed during the job, so we should reschedule.
+            closeAndCleanupJobLocked(true /* reschedule */);
+        }
+    }
+
+    /**
+     * The provided job has finished, either by calling
+     * {@link android.app.job.JobService#jobFinished(android.app.job.JobParameters, boolean)}
+     * or from acknowledging the stop message we sent. Either way, we're done tracking it and
+     * we want to clean up internally.
+     */
+    private void closeAndCleanupJobLocked(boolean reschedule) {
+        final JobStatus completedJob;
+        if (mVerb == VERB_FINISHED) {
+            return;
+        }
+        completedJob = mRunningJob;
+        mJobPackageTracker.noteInactive(completedJob);
+        try {
+            mBatteryStats.noteJobFinish(mRunningJob.getBatteryName(),
+                    mRunningJob.getSourceUid());
+        } catch (RemoteException e) {
+            // Whatever.
+        }
+        if (mWakeLock != null) {
+            mWakeLock.release();
+        }
+        mContext.unbindService(JobServiceContext.this);
+        mWakeLock = null;
+        mRunningJob = null;
+        mParams = null;
+        mVerb = VERB_FINISHED;
+        mCancelled = false;
+        service = null;
+        mAvailable = true;
+        removeOpTimeOutLocked();
+        mCompletedListener.onJobCompletedLocked(completedJob, reschedule);
     }
 
     /**
@@ -650,8 +679,8 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
      * we haven't received a response in a certain amount of time, we want to give up and carry
      * on with life.
      */
-    private void scheduleOpTimeOut() {
-        removeOpTimeOut();
+    private void scheduleOpTimeOutLocked() {
+        removeOpTimeOutLocked();
 
         final long timeoutMillis;
         switch (mVerb) {
@@ -678,7 +707,7 @@ public class JobServiceContext extends IJobCallback.Stub implements ServiceConne
     }
 
 
-    private void removeOpTimeOut() {
+    private void removeOpTimeOutLocked() {
         mCallbackHandler.removeMessages(MSG_TIMEOUT);
     }
 }

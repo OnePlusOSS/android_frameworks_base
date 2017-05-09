@@ -42,6 +42,7 @@ import android.widget.LinearLayout;
 
 import com.android.systemui.Dependency;
 import com.android.systemui.R;
+import com.android.systemui.statusbar.phone.SignalDrawable;
 import com.android.systemui.statusbar.phone.StatusBarIconController;
 import com.android.systemui.statusbar.policy.DarkIconDispatcher;
 import com.android.systemui.statusbar.policy.DarkIconDispatcher.DarkReceiver;
@@ -122,6 +123,7 @@ public class SignalClusterView extends LinearLayout implements NetworkController
     private boolean mActivityEnabled;
     private boolean mWifiActivityEnabled;
 
+
     public SignalClusterView(Context context) {
         this(context, null);
     }
@@ -179,22 +181,22 @@ public class SignalClusterView extends LinearLayout implements NetworkController
     protected void onFinishInflate() {
         super.onFinishInflate();
 
-        mVpn            = (ImageView) findViewById(R.id.vpn);
-        mEthernetGroup  = (ViewGroup) findViewById(R.id.ethernet_combo);
-        mEthernet       = (ImageView) findViewById(R.id.ethernet);
-        mEthernetDark   = (ImageView) findViewById(R.id.ethernet_dark);
-        mWifiGroup      = (ViewGroup) findViewById(R.id.wifi_combo);
-        mWifi           = (ImageView) findViewById(R.id.wifi_signal);
-        mWifiDark       = (ImageView) findViewById(R.id.wifi_signal_dark);
-        mWifiActivityIn = (ImageView) findViewById(R.id.wifi_in);
-        mWifiActivityOut= (ImageView) findViewById(R.id.wifi_out);
-        mAirplane       = (ImageView) findViewById(R.id.airplane);
-        mNoSims         = (ImageView) findViewById(R.id.no_sims);
-        mNoSimsDark     = (ImageView) findViewById(R.id.no_sims_dark);
+        mVpn            = findViewById(R.id.vpn);
+        mEthernetGroup  = findViewById(R.id.ethernet_combo);
+        mEthernet       = findViewById(R.id.ethernet);
+        mEthernetDark   = findViewById(R.id.ethernet_dark);
+        mWifiGroup      = findViewById(R.id.wifi_combo);
+        mWifi           = findViewById(R.id.wifi_signal);
+        mWifiDark       = findViewById(R.id.wifi_signal_dark);
+        mWifiActivityIn = findViewById(R.id.wifi_in);
+        mWifiActivityOut= findViewById(R.id.wifi_out);
+        mAirplane       = findViewById(R.id.airplane);
+        mNoSims         = findViewById(R.id.no_sims);
+        mNoSimsDark     = findViewById(R.id.no_sims_dark);
         mNoSimsCombo    =             findViewById(R.id.no_sims_combo);
         mWifiAirplaneSpacer =         findViewById(R.id.wifi_airplane_spacer);
         mWifiSignalSpacer =           findViewById(R.id.wifi_signal_spacer);
-        mMobileSignalGroup = (LinearLayout) findViewById(R.id.mobile_signal_group);
+        mMobileSignalGroup =          findViewById(R.id.mobile_signal_group);
 
         maybeScaleVpnAndNoSimsIcons();
     }
@@ -292,9 +294,8 @@ public class SignalClusterView extends LinearLayout implements NetworkController
     @Override
     public void setMobileDataIndicators(IconState statusIcon, IconState qsIcon, int statusType,
             int qsType, boolean activityIn, boolean activityOut, int dataActivityId,
-            int stackedDataId, int stackedVoiceId,
-            String typeContentDescription, String description, boolean isWide,
-            int subId, boolean roaming) {
+            int stackedDataId, int stackedVoiceId, String typeContentDescription,
+            String description, boolean isWide, int subId, boolean roaming) {
         PhoneState state = getState(subId);
         if (state == null) {
             return;
@@ -334,15 +335,6 @@ public class SignalClusterView extends LinearLayout implements NetworkController
     public void setSubs(List<SubscriptionInfo> subs) {
         if (hasCorrectSubs(subs)) {
             return;
-        }
-        // Clear out all old subIds.
-        for (PhoneState state : mPhoneStates) {
-            if (state.mMobile != null) {
-                state.maybeStopAnimatableDrawable(state.mMobile);
-            }
-            if (state.mMobileDark != null) {
-                state.maybeStopAnimatableDrawable(state.mMobileDark);
-            }
         }
         mPhoneStates.clear();
         if (mMobileSignalGroup != null) {
@@ -457,16 +449,6 @@ public class SignalClusterView extends LinearLayout implements NetworkController
         }
 
         for (PhoneState state : mPhoneStates) {
-            if (state.mMobile != null) {
-                state.maybeStopAnimatableDrawable(state.mMobile);
-                state.mMobile.setImageDrawable(null);
-                state.mLastMobileStrengthId = -1;
-            }
-            if (state.mMobileDark != null) {
-                state.maybeStopAnimatableDrawable(state.mMobileDark);
-                state.mMobileDark.setImageDrawable(null);
-                state.mLastMobileStrengthId = -1;
-            }
             if (state.mMobileType != null) {
                 state.mMobileType.setImageDrawable(null);
                 state.mLastMobileTypeId = -1;
@@ -690,7 +672,6 @@ public class SignalClusterView extends LinearLayout implements NetworkController
         private int mMobileStrengthId = 0, mMobileTypeId = 0;
         private int mLastMobileStrengthId = -1;
         private int mLastMobileTypeId = -1;
-        private int mLastMobileActivityId = -1;
         private boolean mIsMobileTypeIconWide;
         private String mMobileDescription, mMobileTypeDescription;
 
@@ -722,6 +703,11 @@ public class SignalClusterView extends LinearLayout implements NetworkController
             mMobileRoaming  = root.findViewById(R.id.mobile_roaming);
             mMobileActivityIn = root.findViewById(R.id.mobile_in);
             mMobileActivityOut = root.findViewById(R.id.mobile_out);
+            // TODO: Remove the 2 instances because now the drawable can handle darkness.
+            mMobile.setImageDrawable(new SignalDrawable(mMobile.getContext()));
+            SignalDrawable drawable = new SignalDrawable(mMobileDark.getContext());
+            drawable.setDarkIntensity(1);
+            mMobileDark.setImageDrawable(drawable);
             mDataActivity   = (ImageView) root.findViewById(R.id.data_inout);
             mStackedData    = (ImageView) root.findViewById(R.id.mobile_signal_data);
             mStackedVoice   = (ImageView) root.findViewById(R.id.mobile_signal_voice);
@@ -732,8 +718,8 @@ public class SignalClusterView extends LinearLayout implements NetworkController
         public boolean apply(boolean isSecondaryIcon) {
             if (mMobileVisible && !mIsAirplaneMode) {
                 if (mLastMobileStrengthId != mMobileStrengthId) {
-                    updateAnimatableIcon(mMobile, mMobileStrengthId);
-                    updateAnimatableIcon(mMobileDark, mMobileStrengthId);
+                    mMobile.getDrawable().setLevel(mMobileStrengthId);
+                    mMobileDark.getDrawable().setLevel(mMobileStrengthId);
                     mLastMobileStrengthId = mMobileStrengthId;
                 }
 
@@ -783,49 +769,6 @@ public class SignalClusterView extends LinearLayout implements NetworkController
             mDataActivity.setVisibility(mDataActivityId != 0 ? View.VISIBLE : View.GONE);
 
             return mMobileVisible;
-        }
-
-        private void updateAnimatableIcon(ImageView view, int resId) {
-            maybeStopAnimatableDrawable(view);
-            setIconForView(view, resId);
-            maybeStartAnimatableDrawable(view);
-        }
-
-        private void maybeStopAnimatableDrawable(ImageView view) {
-            Drawable drawable = view.getDrawable();
-
-            // Check if the icon has been scaled. If it has retrieve the actual drawable out of the
-            // wrapper.
-            if (drawable instanceof ScalingDrawableWrapper) {
-                drawable = ((ScalingDrawableWrapper) drawable).getDrawable();
-            }
-
-            if (drawable instanceof Animatable) {
-                Animatable ad = (Animatable) drawable;
-                if (ad.isRunning()) {
-                    ad.stop();
-                }
-            }
-        }
-
-        private void maybeStartAnimatableDrawable(ImageView view) {
-            Drawable drawable = view.getDrawable();
-
-            // Check if the icon has been scaled. If it has retrieve the actual drawable out of the
-            // wrapper.
-            if (drawable instanceof ScalingDrawableWrapper) {
-                drawable = ((ScalingDrawableWrapper) drawable).getDrawable();
-            }
-
-            if (drawable instanceof Animatable) {
-                Animatable ad = (Animatable) drawable;
-                if (ad instanceof AnimatedVectorDrawable) {
-                    ((AnimatedVectorDrawable) ad).forceAnimationOnUI();
-                }
-                if (!ad.isRunning()) {
-                    ad.start();
-                }
-            }
         }
 
         public void populateAccessibilityEvent(AccessibilityEvent event) {

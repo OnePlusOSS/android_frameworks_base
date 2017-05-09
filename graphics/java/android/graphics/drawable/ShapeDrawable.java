@@ -17,6 +17,8 @@
 package android.graphics.drawable;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
+import android.annotation.TestApi;
 import android.content.pm.ActivityInfo.Config;
 import android.content.res.ColorStateList;
 import android.content.res.Resources;
@@ -32,6 +34,7 @@ import android.graphics.PorterDuff.Mode;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.Shader;
+import android.graphics.Xfermode;
 import android.graphics.drawable.shapes.Shape;
 import android.util.AttributeSet;
 
@@ -306,6 +309,16 @@ public class ShapeDrawable extends Drawable {
         invalidateSelf();
     }
 
+    /**
+     * @hide
+     */
+    @Override
+    @TestApi
+    public void setXfermode(@Nullable Xfermode mode) {
+        mShapeState.mPaint.setXfermode(mode);
+        invalidateSelf();
+    }
+
     @Override
     public int getOpacity() {
         if (mShapeState.mShape == null) {
@@ -350,6 +363,12 @@ public class ShapeDrawable extends Drawable {
     public boolean isStateful() {
         final ShapeState s = mShapeState;
         return super.isStateful() || (s.mTint != null && s.mTint.isStateful());
+    }
+
+    /** @hide */
+    @Override
+    public boolean hasFocusStateSpecified() {
+        return mShapeState.mTint != null && mShapeState.mTint.hasFocusStateSpecified();
     }
 
     /**

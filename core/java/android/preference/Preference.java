@@ -17,8 +17,6 @@
 package android.preference;
 
 import android.annotation.CallSuper;
-import com.android.internal.util.CharSequences;
-
 import android.annotation.DrawableRes;
 import android.annotation.LayoutRes;
 import android.annotation.Nullable;
@@ -41,6 +39,8 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
+
+import com.android.internal.util.CharSequences;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -135,6 +135,7 @@ public class Preference implements Comparable<Preference> {
     private boolean mDependencyMet = true;
     private boolean mParentDependencyMet = true;
     private boolean mRecycleEnabled = true;
+    private boolean mHasSingleLineTitleAttr;
     private boolean mSingleLineTitle = true;
     private boolean mIconSpaceReserved;
 
@@ -303,6 +304,7 @@ public class Preference implements Comparable<Preference> {
 
                 case com.android.internal.R.styleable.Preference_singleLineTitle:
                     mSingleLineTitle = a.getBoolean(attr, mSingleLineTitle);
+                    mHasSingleLineTitleAttr = true;
                     break;
 
                 case com.android.internal.R.styleable.Preference_iconSpaceReserved:
@@ -609,7 +611,9 @@ public class Preference implements Comparable<Preference> {
             if (!TextUtils.isEmpty(title)) {
                 titleView.setText(title);
                 titleView.setVisibility(View.VISIBLE);
-                titleView.setSingleLine(mSingleLineTitle);
+                if (mHasSingleLineTitleAttr) {
+                    titleView.setSingleLine(mSingleLineTitle);
+                }
             } else {
                 titleView.setVisibility(View.GONE);
             }
@@ -646,7 +650,11 @@ public class Preference implements Comparable<Preference> {
 
         final View imageFrame = view.findViewById(com.android.internal.R.id.icon_frame);
         if (imageFrame != null) {
-            imageFrame.setVisibility(mIcon != null ? View.VISIBLE : View.GONE);
+            if (mIcon != null) {
+                imageFrame.setVisibility(View.VISIBLE);
+            } else {
+                imageFrame.setVisibility(mIconSpaceReserved ? View.INVISIBLE : View.GONE);
+            }
         }
 
         if (mShouldDisableView) {

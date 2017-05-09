@@ -29,6 +29,7 @@ import android.os.Environment;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.UserHandle;
+import android.os.storage.StorageManager;
 import android.text.TextUtils;
 import android.util.Printer;
 import android.util.SparseArray;
@@ -41,6 +42,7 @@ import java.text.Collator;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Information you can retrieve about a particular application.  This
@@ -621,12 +623,17 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      */
     public float maxAspectRatio;
 
+    /** @removed */
+    @Deprecated
+    public String volumeUuid;
+
     /**
      * UUID of the storage volume on which this application is being hosted. For
      * apps hosted on the default internal storage at
-     * {@link Environment#getDataDirectory()}, the UUID value is {@code null}.
+     * {@link Environment#getDataDirectory()}, the UUID value is
+     * {@link StorageManager#UUID_DEFAULT}.
      */
-    public String volumeUuid;
+    public UUID storageUuid;
 
     /** {@hide} */
     public String scanSourceDir;
@@ -884,7 +891,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     public @Category int category = CATEGORY_UNDEFINED;
 
     /** {@hide} */
-    @IntDef({
+    @IntDef(prefix = { "CATEGORY_" }, value = {
             CATEGORY_UNDEFINED,
             CATEGORY_GAME,
             CATEGORY_AUDIO,
@@ -1134,6 +1141,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         compatibleWidthLimitDp = orig.compatibleWidthLimitDp;
         largestWidthLimitDp = orig.largestWidthLimitDp;
         volumeUuid = orig.volumeUuid;
+        storageUuid = orig.storageUuid;
         scanSourceDir = orig.scanSourceDir;
         scanPublicSourceDir = orig.scanPublicSourceDir;
         sourceDir = orig.sourceDir;
@@ -1195,7 +1203,13 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeInt(requiresSmallestWidthDp);
         dest.writeInt(compatibleWidthLimitDp);
         dest.writeInt(largestWidthLimitDp);
-        dest.writeString(volumeUuid);
+        if (storageUuid != null) {
+            dest.writeInt(1);
+            dest.writeLong(storageUuid.getMostSignificantBits());
+            dest.writeLong(storageUuid.getLeastSignificantBits());
+        } else {
+            dest.writeInt(0);
+        }
         dest.writeString(scanSourceDir);
         dest.writeString(scanPublicSourceDir);
         dest.writeString(sourceDir);
@@ -1257,7 +1271,10 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         requiresSmallestWidthDp = source.readInt();
         compatibleWidthLimitDp = source.readInt();
         largestWidthLimitDp = source.readInt();
-        volumeUuid = source.readString();
+        if (source.readInt() != 0) {
+            storageUuid = new UUID(source.readLong(), source.readLong());
+            volumeUuid = StorageManager.convert(storageUuid);
+        }
         scanSourceDir = source.readString();
         scanPublicSourceDir = source.readString();
         sourceDir = source.readString();

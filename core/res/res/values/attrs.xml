@@ -60,6 +60,15 @@
              mode. -->
         <attr name="colorMultiSelectHighlight" format="color" />
 
+        <!-- Drawable to be drawn over the view to mark it as autofilled-->
+        <attr name="autofilledHighlight" format="reference" />
+
+        <!-- Max width of the autofill data set picker as a fraction of the screen width -->
+        <attr name="autofillDatasetPickerMaxWidth" format="reference" />
+
+        <!-- Max height of the autofill data set picker as a fraction of the screen height -->
+        <attr name="autofillDatasetPickerMaxHeight" format="reference" />
+
         <!-- Default disabled alpha for widgets that set enabled/disabled alpha programmatically. -->
         <attr name="disabledAlpha" format="float" />
         <!-- The alpha applied to the foreground color to create the primary text color. -->
@@ -430,10 +439,9 @@
             <flag name="adjustNothing" value="0x30" />
         </attr>
 
-        <!-- Flag allowing you to disable the preview animation for a window.
-             The default value is false; if set to true, the system can never
-             use the window's theme to show a preview of it before your
-             actual instance is shown to the user. -->
+        <!-- Flag allowing you to disable the splash screen for a window. The default value is
+             false; if set to true, the system can never use the window's theme to show a splash
+             screen before your actual instance is shown to the user. -->
         <attr name="windowDisablePreview" format="boolean" />
 
         <!-- Flag indicating that this window should not be displayed at all.
@@ -1372,6 +1380,22 @@
              Corresponds to
              {@link android.view.inputmethod.EditorInfo#IME_ACTION_PREVIOUS}. -->
         <flag name="actionPrevious" value="0x00000007" />
+        <!-- Used to request that the IME should not update any personalized data such as typing
+             history and personalized language model based on what the user typed on this text
+             editing object. Typical use cases are:
+             <ul>
+                 <li>When the application is in a special mode, where user's activities are expected
+                 to be not recorded in the application's history. Some web browsers and chat
+                 applications may have this kind of modes.</li>
+                 <li>When storing typing history does not make much sense.  Specifying this flag in
+                 typing games may help to avoid typing history from being filled up with words that
+                 the user is less likely to type in their daily life.  Another example is that when
+                 the application already knows that the expected input is not a valid word (e.g. a
+                 promotion code that is not a valid word in any natural language).</li>
+             </ul>
+             <p>Applications need to be aware that the flag is not a guarantee, and some IMEs may
+             not respect it.</p> -->
+        <flag name="flagNoPersonalizedLearning" value="0x1000000" />
         <!-- Used to request that the IME never go
              into fullscreen mode.  Applications need to be aware that the flag is not
              a guarantee, and not all IMEs will respect it.
@@ -2049,6 +2073,17 @@
              Corresponds to setting {@link android.view.View#SYSTEM_UI_FLAG_LIGHT_STATUS_BAR} on
              the decor view. -->
         <attr name="windowLightStatusBar" format="boolean" />
+
+        <!-- Reference to a drawable to be used as the splash screen content of the window. This
+             drawable will be placed on top of the {@link android.R.attr#windowBackground} with its
+             bounds inset by the system bars. If the drawable should not be inset by the system
+             bars, use a fullscreen theme.
+             <p>
+             Note that even if no splashscreen content is set on the theme, the system may still
+             show a splash screen using the other attributes on the theme, like the
+             {@link android.R.attr#windowBackground}.
+             -->
+        <attr name="windowSplashscreenContent" format="reference" />
     </declare-styleable>
 
     <!-- The set of attributes that describe a AlertDialog's theme. -->
@@ -2294,18 +2329,7 @@
             <enum name="auto" value="0x00000010" />
         </attr>
 
-        <!-- Controls the autofill behavior for this view. -->
-        <attr name="autofillMode">
-            <!-- Inherit the behavior from the parent. If there is no parent it is auto. This is the
-                 default value for this attribute.-->
-            <enum name="inherit" value="0" />
-            <!-- Allows this view to automatically trigger an autofill request when it get focus.
-                 -->
-            <enum name="auto" value="1" />
-            <!-- Do not trigger an autofill request when this view is focused. The user can still
-                 manually force an autofill request for this view. -->
-            <enum name="manual" value="2" />
-        </attr>
+        <attr name="__removed3" />
 
         <!-- Describes the content of a view so that a autofill service can fill in the appropriate
              data. Multiple hints can be combined in a comma separated list or an array of strings
@@ -2317,10 +2341,18 @@
         <attr name="importantForAutofill">
             <!-- Let the Android System use its heuristics to determine if the view is important for autofill. -->
             <flag name="auto" value="0" />
-            <!-- Hint the Android System that this view is important for autofill. -->
+            <!-- Hint the Android System that this view is important for autofill,
+                  and its children (if any) will be traversed.. -->
             <flag name="yes" value="0x1" />
-            <!-- Hint the Android System that this view is *not* important for autofill. -->
+            <!-- Hint the Android System that this view is *not* important for autofill,
+                  but its children (if any) will be traversed.. -->
             <flag name="no" value="0x2" />
+            <!-- Hint the Android System that this view is important for autofill,
+                 but its children (if any) will not be traversed. -->
+            <flag name="yesExcludeDescendants" value="0x4" />
+            <!-- Hint the Android System that this view is *not* important for autofill,
+                 and its children (if any) will not be traversed. -->
+            <flag name="noExcludeDescendants" value="0x8" />
         </attr>
 
         <!-- Boolean that controls whether a view can take focus while in touch mode.
@@ -2953,6 +2985,9 @@
              See {@link android.view.View#setFocusedByDefault(boolean)}. -->
         <attr name="focusedByDefault" format="boolean" />
 
+        <!-- Whether this View should use a default focus highlight when it gets focused but
+             doesn't have {@link android.R.attr#state_focused} defined in its background. -->
+        <attr name="defaultFocusHighlightEnabled" format="boolean" />
     </declare-styleable>
 
     <!-- Attributes that can be assigned to a tag for a particular View. -->
@@ -3214,18 +3249,7 @@
              and subtype in order to provide the consistent user experience in switching
              between IMEs and subtypes. -->
         <attr name="supportsSwitchingToNextInputMethod" format="boolean" />
-        <!-- Set to true if this input method supports ways to dismiss the windows assigned to
-             the input method (for example, a dismiss button rendered by the input method itself).  The
-             System UI may optimize the UI by not showing system-level dismiss button if this
-             value is true.
-             <p> Must be a boolean value, either "true" or "false". The default value is "false".
-             <p> This may also be a reference to a resource (in the form "@[package:]type:name")
-             or theme attribute (in the form "?[package:]type:name") containing a value of this
-             type.
-             <p> A UI element that dismisses the input method window should report
-             {@link android.view.accessibility.AccessibilityNodeInfo#ACTION_DISMISS} action, so
-             that accessibility services can handle it accordingly. -->
-        <attr name="supportsDismissingWindow" format="boolean" />
+        <attr name="__removed2" format="boolean" />
     </declare-styleable>
 
     <!-- This is the subtype of InputMethod. Subtype can describe locales (for example, en_US and
@@ -3419,7 +3443,9 @@
             <flag name="flagIncludeNotImportantViews" value="0x00000002" />
             <!-- Has flag {@link android.accessibilityservice.AccessibilityServiceInfo#FLAG_REQUEST_TOUCH_EXPLORATION_MODE}. -->
             <flag name="flagRequestTouchExplorationMode" value="0x00000004" />
-            <!-- Has flag {@link android.accessibilityservice.AccessibilityServiceInfo#FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY}. -->
+            <!-- Has flag {@link android.accessibilityservice.AccessibilityServiceInfo#FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY}.
+                 Not used by the framework.
+            -->
             <flag name="flagRequestEnhancedWebAccessibility" value="0x00000008" />
             <!-- Has flag {@link android.accessibilityservice.AccessibilityServiceInfo#FLAG_REPORT_VIEW_IDS}. -->
             <flag name="flagReportViewIds" value="0x00000010" />
@@ -3431,8 +3457,8 @@
             <flag name="flagEnableAccessibilityVolume" value="0x00000080" />
             <!-- Has flag {@link android.accessibilityservice.AccessibilityServiceInfo#FLAG_REQUEST_ACCESSIBILITY_BUTTON}. -->
             <flag name="flagRequestAccessibilityButton" value="0x00000100" />
-            <!-- Has flag {@link android.accessibilityservice.AccessibilityServiceInfo#FLAG_CAPTURE_FINGERPRINT_GESTURES}. -->
-            <flag name="flagCaptureFingerprintGestures" value="0x00000200" />
+            <!-- Has flag {@link android.accessibilityservice.AccessibilityServiceInfo#FLAG_REQUEST_FINGERPRINT_GESTURES}. -->
+            <flag name="flagRequestFingerprintGestures" value="0x00000200" />
         </attr>
         <!-- Component name of an activity that allows the user to modify
              the settings for this service. This setting cannot be changed at runtime. -->
@@ -3450,12 +3476,8 @@
          -->
         <attr name="canRequestTouchExplorationMode" format="boolean" />
         <!-- Attribute whether the accessibility service wants to be able to request enhanced
-             web accessibility enhancements. For example, installing scripts to make app
-             content more accessible.
-             <p>
-             Required to allow setting the {@link android.accessibilityservice
-             #AccessibilityServiceInfo#FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY} flag.
-             </p>
+             web accessibility enhancements.
+             {@deprecated Not used by the framework}
          -->
         <attr name="canRequestEnhancedWebAccessibility" format="boolean" />
         <!-- Attribute whether the accessibility service wants to be able to request to
@@ -3476,10 +3498,10 @@
              the fingerprint sensor.
              <p>
              Required to allow setting the {@link android.accessibilityservice
-             #AccessibilityServiceInfo#FLAG_CAN_CAPTURE_FINGERPRINT_GESTURES} flag.
+             #AccessibilityServiceInfo#FLAG_REQUEST_FINGERPRINT_GESTURES} flag to have any effect.
              </p>
          -->
-        <attr name="canCaptureFingerprintGestures" format="boolean" />
+        <attr name="canRequestFingerprintGestures" format="boolean" />
         <!-- Short description of the accessibility service purpose or behavior.-->
         <attr name="description" />
         <!-- Brief summary of the accessibility service purpose or behavior. -->
@@ -4769,6 +4791,13 @@
         <attr name="autoSizeMinTextSize" format="dimension" />
         <!-- The maximum text size constraint to be used when auto-sizing text. -->
         <attr name="autoSizeMaxTextSize" format="dimension" />
+        <!-- Mode for justification. -->
+        <attr name="justificationMode">
+            <!-- No justification. -->
+            <enum name="none" value="0" />
+            <!-- Justification by stretching word spacing. -->
+            <enum name="inter_word" value = "1" />
+        </attr>
     </declare-styleable>
     <declare-styleable name="TextViewAppearance">
         <!-- Base text color, typeface, size, and style. -->
@@ -5760,11 +5789,11 @@
     <declare-styleable name="InsetDrawable">
         <attr name="visible" />
         <attr name="drawable" />
-        <attr name="inset"  format="dimension"/>
-        <attr name="insetLeft" format="dimension" />
-        <attr name="insetRight" format="dimension" />
-        <attr name="insetTop" format="dimension" />
-        <attr name="insetBottom" format="dimension" />
+        <attr name="inset"  format="fraction|dimension"/>
+        <attr name="insetLeft" format="fraction|dimension" />
+        <attr name="insetRight" format="fraction|dimension" />
+        <attr name="insetTop" format="fraction|dimension" />
+        <attr name="insetBottom" format="fraction|dimension" />
     </declare-styleable>
 
     <!-- Drawable used to draw bitmaps. -->

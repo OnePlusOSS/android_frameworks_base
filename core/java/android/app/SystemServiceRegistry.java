@@ -120,6 +120,8 @@ import android.print.IPrintManager;
 import android.print.PrintManager;
 import android.view.autofill.AutofillManager;
 import android.view.autofill.IAutoFillManager;
+import android.service.oemlock.IOemLockService;
+import android.service.oemlock.OemLockManager;
 import android.service.persistentdata.IPersistentDataBlockService;
 import android.service.persistentdata.PersistentDataBlockManager;
 import android.service.vr.IVrManager;
@@ -641,7 +643,8 @@ final class SystemServiceRegistry {
                 new CachedServiceFetcher<PrintManager>() {
             @Override
             public PrintManager createService(ContextImpl ctx) throws ServiceNotFoundException {
-                IBinder iBinder = ServiceManager.getServiceOrThrow(Context.PRINT_SERVICE);
+                // Get the services without throwing as this is an optional feature
+                IBinder iBinder = ServiceManager.getService(Context.PRINT_SERVICE);
                 IPrintManager service = IPrintManager.Stub.asInterface(iBinder);
                 return new PrintManager(ctx.getOuterContext(), service, UserHandle.myUserId(),
                         UserHandle.getAppId(Process.myUid()));
@@ -652,8 +655,9 @@ final class SystemServiceRegistry {
                     @Override
                     public CompanionDeviceManager createService(ContextImpl ctx)
                             throws ServiceNotFoundException {
+                        // Get the services without throwing as this is an optional feature
                         IBinder iBinder =
-                                ServiceManager.getServiceOrThrow(Context.COMPANION_DEVICE_SERVICE);
+                                ServiceManager.getService(Context.COMPANION_DEVICE_SERVICE);
                         ICompanionDeviceManager service =
                                 ICompanionDeviceManager.Stub.asInterface(iBinder);
                         return new CompanionDeviceManager(service, ctx);
@@ -750,6 +754,20 @@ final class SystemServiceRegistry {
                 }
             }});
 
+        registerService(Context.OEM_LOCK_SERVICE, OemLockManager.class,
+                new StaticServiceFetcher<OemLockManager>() {
+            @Override
+            public OemLockManager createService() throws ServiceNotFoundException {
+                IBinder b = ServiceManager.getServiceOrThrow(Context.OEM_LOCK_SERVICE);
+                IOemLockService oemLockService = IOemLockService.Stub.asInterface(b);
+                if (oemLockService != null) {
+                    return new OemLockManager(oemLockService);
+                } else {
+                    // not supported
+                    return null;
+                }
+            }});
+
         registerService(Context.MEDIA_PROJECTION_SERVICE, MediaProjectionManager.class,
                 new CachedServiceFetcher<MediaProjectionManager>() {
             @Override
@@ -833,7 +851,8 @@ final class SystemServiceRegistry {
                 new CachedServiceFetcher<AutofillManager>() {
             @Override
             public AutofillManager createService(ContextImpl ctx) throws ServiceNotFoundException {
-                IBinder b = ServiceManager.getServiceOrThrow(Context.AUTOFILL_MANAGER_SERVICE);
+                // Get the services without throwing as this is an optional feature
+                IBinder b = ServiceManager.getService(Context.AUTOFILL_MANAGER_SERVICE);
                 IAutoFillManager service = IAutoFillManager.Stub.asInterface(b);
                 return new AutofillManager(ctx.getOuterContext(), service);
             }});

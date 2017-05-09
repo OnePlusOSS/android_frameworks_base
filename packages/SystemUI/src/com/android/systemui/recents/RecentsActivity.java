@@ -192,8 +192,9 @@ public class RecentsActivity extends Activity implements ViewTreeObserver.OnPreD
                         // and the old last stack active time, they were not visible and in the
                         // TaskStack so we don't need to remove any associated TaskViews but we do
                         // need to load the task id's from the system
-                        RecentsTaskLoadPlan loadPlan = Recents.getTaskLoader().createLoadPlan(ctx);
-                        loadPlan.preloadRawTasks(false /* includeFrontMostExcludedTask */);
+                        RecentsTaskLoader loader = Recents.getTaskLoader();
+                        RecentsTaskLoadPlan loadPlan = loader.createLoadPlan(ctx);
+                        loader.preloadRawTasks(loadPlan, false /* includeFrontMostExcludedTask */);
                         List<ActivityManager.RecentTaskInfo> tasks = loadPlan.getRawTasks();
                         for (int i = tasks.size() - 1; i >= 0; i--) {
                             ActivityManager.RecentTaskInfo task = tasks.get(i);
@@ -325,7 +326,7 @@ public class RecentsActivity extends Activity implements ViewTreeObserver.OnPreD
         // Set the Recents layout
         setContentView(R.layout.recents);
         takeKeyEvents(true);
-        mRecentsView = (RecentsView) findViewById(R.id.recents_view);
+        mRecentsView = findViewById(R.id.recents_view);
         mRecentsView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
                 View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
                 View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);

@@ -15,7 +15,7 @@
  */
 package com.android.server.autofill.ui;
 
-import static com.android.server.autofill.ui.Helper.DEBUG;
+import static com.android.server.autofill.Helper.sDebug;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -28,7 +28,6 @@ import android.service.autofill.Dataset;
 import android.service.autofill.FillResponse;
 import android.service.autofill.SaveInfo;
 import android.text.TextUtils;
-import android.text.format.DateUtils;
 import android.util.Slog;
 import android.view.autofill.AutofillId;
 import android.view.autofill.IAutofillWindowPresenter;
@@ -48,9 +47,7 @@ import java.io.PrintWriter;
  * managing saving of user edits.
  */
 public final class AutoFillUI {
-    private static final String TAG = "AutoFillUI";
-
-    private static final int MAX_SAVE_TIMEOUT_MS = (int) (30 * DateUtils.SECOND_IN_MILLIS);
+    private static final String TAG = "AutofillUI";
 
     private final Handler mHandler = UiThread.getHandler();
     private final @NonNull Context mContext;
@@ -60,17 +57,17 @@ public final class AutoFillUI {
 
     private @Nullable AutoFillUiCallback mCallback;
 
-    private int mSaveTimeoutMs = (int) (5 * DateUtils.SECOND_IN_MILLIS);
     private final MetricsLogger mMetricsLogger = new MetricsLogger();
 
     public interface AutoFillUiCallback {
-        void authenticate(@NonNull IntentSender intent, @Nullable Bundle extras);
-        void fill(@NonNull Dataset dataset);
+        void authenticate(int requestId, @NonNull IntentSender intent, @Nullable Bundle extras);
+        void fill(int requestId, @NonNull Dataset dataset);
         void save();
         void cancelSave();
         void requestShowFillUi(AutofillId id, int width, int height,
                 IAutofillWindowPresenter presenter);
         void requestHideFillUi(AutofillId id);
+        void startIntentSender(IntentSender intentSender);
     }
 
     public AutoFillUI(@NonNull Context context) {
@@ -142,7 +139,7 @@ public final class AutoFillUI {
      */
     public void showFillUi(@NonNull AutofillId focusedId, @NonNull FillResponse response,
             @Nullable String filterText, @NonNull String packageName) {
-        if (DEBUG) {
+        if (sDebug) {
             Slog.d(TAG, "showFillUi(): id=" + focusedId + ", filter=" + filterText);
         }
         final LogMaker log = (new LogMaker(MetricsProto.MetricsEvent.AUTOFILL_FILL_UI))
@@ -164,7 +161,8 @@ public final class AutoFillUI {
                     log.setType(MetricsProto.MetricsEvent.TYPE_DETAIL);
                     hideFillUiUiThread();
                     if (mCallback != null) {
-                        mCallback.authenticate(response.getAuthentication(), response.getExtras());
+                        mCallback.authenticate(response.getRequestId(),
+                                response.getAuthentication(), response.getClientState());
                     }
                 }
 
@@ -173,7 +171,7 @@ public final class AutoFillUI {
                     log.setType(MetricsProto.MetricsEvent.TYPE_ACTION);
                     hideFillUiUiThread();
                     if (mCallback != null) {
-                        mCallback.fill(dataset);
+                        mCallback.fill(response.getRequestId(), dataset);
                     }
                 }
 
@@ -203,6 +201,13 @@ public final class AutoFillUI {
                 public void requestHideFillUi() {
                     if (mCallback != null) {
                         mCallback.requestHideFillUi(focusedId);
+                    }
+                }
+
+                @Override
+                public void startIntentSender(IntentSender intentSender) {
+                    if (mCallback != null) {
+                        mCallback.startIntentSender(intentSender);
                     }
                 }
             });
@@ -273,22 +278,11 @@ public final class AutoFillUI {
         mHandler.post(this::hideAllUiThread);
     }
 
-    public void setSaveTimeout(int timeout) {
-        if (timeout > MAX_SAVE_TIMEOUT_MS) {
-            throw new IllegalArgumentException("Maximum value is " + MAX_SAVE_TIMEOUT_MS + "ms");
-        }
-        if (timeout <= 0) {
-            throw new IllegalArgumentException("Must be a positive value");
-        }
-        mSaveTimeoutMs = timeout;
-    }
-
     public void dump(PrintWriter pw) {
         pw.println("Autofill UI");
         final String prefix = "  ";
         final String prefix2 = "    ";
         pw.print(prefix); pw.print("showsSaveUi: "); pw.println(mSaveUi != null);
-        pw.print(prefix); pw.print("save timeout: "); pw.println(mSaveTimeoutMs);
         if (mFillUi != null) {
             pw.print(prefix); pw.println("showsFillUi: true");
             mFillUi.dump(pw, prefix2);

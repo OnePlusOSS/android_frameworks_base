@@ -42,13 +42,16 @@ struct ANDROID_API Typeface {
 
     static Typeface* createFromTypeface(Typeface* src, SkTypeface::Style style);
 
+    static Typeface* createFromTypefaceWithStyle(Typeface* base, int weight, bool italic);
+
     static Typeface* createFromTypefaceWithVariation(Typeface* src,
             const std::vector<minikin::FontVariation>& variations);
 
     static Typeface* createWeightAlias(Typeface* src, int baseweight);
 
     static Typeface* createFromFamilies(
-            std::vector<std::shared_ptr<minikin::FontFamily>>&& families);
+            std::vector<std::shared_ptr<minikin::FontFamily>>&& families,
+            int weight, int italic);
 
     static void setDefault(Typeface* face);
 

@@ -28,12 +28,14 @@ import android.content.Intent;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.TransactionTooLargeException;
 import android.os.UserHandle;
 import android.util.Slog;
 import android.util.TimeUtils;
 
+import com.android.internal.os.IResultReceiver;
 import com.android.server.am.ActivityStackSupervisor.ActivityContainer;
 
 import java.io.PrintWriter;
@@ -50,6 +52,7 @@ final class PendingIntentRecord extends IIntentSender.Stub {
     boolean sent = false;
     boolean canceled = false;
     private long whitelistDuration = 0;
+    private RemoteCallbackList<IResultReceiver> mCancelCallbacks;
 
     String stringName;
     String lastTagPrefix;
@@ -191,9 +194,29 @@ final class PendingIntentRecord extends IIntentSender.Stub {
         ref = new WeakReference<PendingIntentRecord>(this);
     }
 
-    void setWhitelistDuration(long duration) {
+    void setWhitelistDurationLocked(long duration) {
         this.whitelistDuration = duration;
         this.stringName = null;
+    }
+
+    public void registerCancelListenerLocked(IResultReceiver receiver) {
+        if (mCancelCallbacks == null) {
+            mCancelCallbacks = new RemoteCallbackList<>();
+        }
+        mCancelCallbacks.register(receiver);
+    }
+
+    public void unregisterCancelListenerLocked(IResultReceiver receiver) {
+        mCancelCallbacks.unregister(receiver);
+        if (mCancelCallbacks.getRegisteredCallbackCount() <= 0) {
+            mCancelCallbacks = null;
+        }
+    }
+
+    public RemoteCallbackList<IResultReceiver> detachCancelListenersLocked() {
+        RemoteCallbackList<IResultReceiver> listeners = mCancelCallbacks;
+        mCancelCallbacks = null;
+        return listeners;
     }
 
     public void send(int code, Intent intent, String resolvedType, IIntentReceiver finishedReceiver,
@@ -214,14 +237,6 @@ final class PendingIntentRecord extends IIntentSender.Stub {
         if (intent != null) intent.setDefusable(true);
         if (options != null) options.setDefusable(true);
 
-        if (whitelistDuration > 0 && !canceled) {
-            // Must call before acquiring the lock. It's possible the method return before sending
-            // the intent due to some validations inside the lock, in which case the UID shouldn't
-            // be whitelisted, but since the whitelist is temporary, that would be ok.
-            owner.tempWhitelistAppForPowerSave(Binder.getCallingPid(), Binder.getCallingUid(), uid,
-                    whitelistDuration);
-        }
-
         synchronized (owner) {
             final ActivityContainer activityContainer = (ActivityContainer)container;
             if (activityContainer != null && activityContainer.mParentActivity != null &&
@@ -234,7 +249,6 @@ final class PendingIntentRecord extends IIntentSender.Stub {
                 sent = true;
                 if ((key.flags&PendingIntent.FLAG_ONE_SHOT) != 0) {
                     owner.cancelIntentSenderLocked(this, true);
-                    canceled = true;
                 }
 
                 Intent finalIntent = key.requestIntent != null
@@ -255,6 +269,22 @@ final class PendingIntentRecord extends IIntentSender.Stub {
                     finalIntent.setFlags((finalIntent.getFlags() & ~flagsMask) | flagsValues);
                 } else {
                     resolvedType = key.requestResolvedType;
+                }
+
+                if (whitelistDuration > 0) {
+                    StringBuilder tag = new StringBuilder(64);
+                    tag.append("pendingintent:");
+                    UserHandle.formatUid(tag, Binder.getCallingUid());
+                    tag.append(":");
+                    if (finalIntent.getAction() != null) {
+                        tag.append(finalIntent.getAction());
+                    } else if (finalIntent.getComponent() != null) {
+                        finalIntent.getComponent().appendShortString(tag);
+                    } else if (finalIntent.getData() != null) {
+                        tag.append(finalIntent.getData());
+                    }
+                    owner.tempWhitelistForPendingIntentLocked(Binder.getCallingPid(),
+                            Binder.getCallingUid(), uid, whitelistDuration, tag.toString());
                 }
 
                 final long origId = Binder.clearCallingIdentity();
@@ -397,6 +427,13 @@ final class PendingIntentRecord extends IIntentSender.Stub {
             pw.print("whitelistDuration=");
             TimeUtils.formatDuration(whitelistDuration, pw);
             pw.println();
+        }
+        if (mCancelCallbacks != null) {
+            pw.print(prefix); pw.println("mCancelCallbacks:");
+            for (int i = 0; i < mCancelCallbacks.getRegisteredCallbackCount(); i++) {
+                pw.print(prefix); pw.print("  #"); pw.print(i); pw.print(": ");
+                pw.println(mCancelCallbacks.getRegisteredCallbackItem(i));
+            }
         }
     }
 

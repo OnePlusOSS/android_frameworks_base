@@ -18,17 +18,22 @@ package android.app.job;
 
 import static android.util.TimeUtils.formatDuration;
 
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.content.ClipData;
 import android.content.ComponentName;
 import android.net.Uri;
+import android.os.BaseBundle;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.PersistableBundle;
 import android.util.Log;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Objects;
 
@@ -42,6 +47,18 @@ import java.util.Objects;
  */
 public class JobInfo implements Parcelable {
     private static String TAG = "JobInfo";
+
+    /** @hide */
+    @IntDef(prefix = { "NETWORK_TYPE_" }, value = {
+            NETWORK_TYPE_NONE,
+            NETWORK_TYPE_ANY,
+            NETWORK_TYPE_UNMETERED,
+            NETWORK_TYPE_NOT_ROAMING,
+            NETWORK_TYPE_METERED,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface NetworkType {}
+
     /** Default. */
     public static final int NETWORK_TYPE_NONE = 0;
     /** This job requires network connectivity. */
@@ -50,6 +67,8 @@ public class JobInfo implements Parcelable {
     public static final int NETWORK_TYPE_UNMETERED = 2;
     /** This job requires network connectivity that is not roaming. */
     public static final int NETWORK_TYPE_NOT_ROAMING = 3;
+    /** This job requires metered connectivity such as most cellular data networks. */
+    public static final int NETWORK_TYPE_METERED = 4;
 
     /**
      * Amount of backoff a job has initially by default, in milliseconds.
@@ -60,6 +79,14 @@ public class JobInfo implements Parcelable {
      * Maximum backoff we allow for a job, in milliseconds.
      */
     public static final long MAX_BACKOFF_DELAY_MILLIS = 5 * 60 * 60 * 1000;  // 5 hours.
+
+    /** @hide */
+    @IntDef(prefix = { "BACKOFF_POLICY_" }, value = {
+            BACKOFF_POLICY_LINEAR,
+            BACKOFF_POLICY_EXPONENTIAL,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface BackoffPolicy {}
 
     /**
      * Linearly back-off a failed job. See
@@ -241,7 +268,7 @@ public class JobInfo implements Parcelable {
     /**
      * Bundle of extras which are returned to your application at execution time.
      */
-    public PersistableBundle getExtras() {
+    public @NonNull PersistableBundle getExtras() {
         return extras;
     }
 
@@ -249,7 +276,7 @@ public class JobInfo implements Parcelable {
      * Bundle of transient extras which are returned to your application at execution time,
      * but not persisted by the system.
      */
-    public Bundle getTransientExtras() {
+    public @NonNull Bundle getTransientExtras() {
         return transientExtras;
     }
 
@@ -257,7 +284,7 @@ public class JobInfo implements Parcelable {
      * ClipData of information that is returned to your application at execution time,
      * but not persisted by the system.
      */
-    public ClipData getClipData() {
+    public @Nullable ClipData getClipData() {
         return clipData;
     }
 
@@ -271,7 +298,7 @@ public class JobInfo implements Parcelable {
     /**
      * Name of the service endpoint that will be called back into by the JobScheduler.
      */
-    public ComponentName getService() {
+    public @NonNull ComponentName getService() {
         return service;
     }
 
@@ -324,8 +351,7 @@ public class JobInfo implements Parcelable {
      * Which content: URIs must change for the job to be scheduled.  Returns null
      * if there are none required.
      */
-    @Nullable
-    public TriggerContentUri[] getTriggerContentUris() {
+    public @Nullable TriggerContentUri[] getTriggerContentUris() {
         return triggerContentUris;
     }
 
@@ -346,12 +372,9 @@ public class JobInfo implements Parcelable {
     }
 
     /**
-     * One of {@link android.app.job.JobInfo#NETWORK_TYPE_ANY},
-     * {@link android.app.job.JobInfo#NETWORK_TYPE_NONE},
-     * {@link android.app.job.JobInfo#NETWORK_TYPE_UNMETERED}, or
-     * {@link android.app.job.JobInfo#NETWORK_TYPE_NOT_ROAMING}.
+     * The kind of connectivity requirements that the job has.
      */
-    public int getNetworkType() {
+    public @NetworkType int getNetworkType() {
         return networkType;
     }
 
@@ -416,11 +439,9 @@ public class JobInfo implements Parcelable {
     }
 
     /**
-     * One of either {@link android.app.job.JobInfo#BACKOFF_POLICY_EXPONENTIAL}, or
-     * {@link android.app.job.JobInfo#BACKOFF_POLICY_LINEAR}, depending on which criteria you set
-     * when creating this job.
+     * Return the backoff policy of this job.
      */
-    public int getBackoffPolicy() {
+    public @BackoffPolicy int getBackoffPolicy() {
         return backoffPolicy;
     }
 
@@ -440,6 +461,130 @@ public class JobInfo implements Parcelable {
      */
     public boolean hasLateConstraint() {
         return hasLateConstraint;
+    }
+
+    private static boolean kindofEqualsBundle(BaseBundle a, BaseBundle b) {
+        return (a == b) || (a != null && a.kindofEquals(b));
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof JobInfo)) {
+            return false;
+        }
+        JobInfo j = (JobInfo) o;
+        if (jobId != j.jobId) {
+            return false;
+        }
+        // XXX won't be correct if one is parcelled and the other not.
+        if (!kindofEqualsBundle(extras, j.extras)) {
+            return false;
+        }
+        // XXX won't be correct if one is parcelled and the other not.
+        if (!kindofEqualsBundle(transientExtras, j.transientExtras)) {
+            return false;
+        }
+        // XXX for now we consider two different clip data objects to be different,
+        // regardless of whether their contents are the same.
+        if (clipData != j.clipData) {
+            return false;
+        }
+        if (clipGrantFlags != j.clipGrantFlags) {
+            return false;
+        }
+        if (!Objects.equals(service, j.service)) {
+            return false;
+        }
+        if (constraintFlags != j.constraintFlags) {
+            return false;
+        }
+        if (!Objects.deepEquals(triggerContentUris, j.triggerContentUris)) {
+            return false;
+        }
+        if (triggerContentUpdateDelay != j.triggerContentUpdateDelay) {
+            return false;
+        }
+        if (triggerContentMaxDelay != j.triggerContentMaxDelay) {
+            return false;
+        }
+        if (hasEarlyConstraint != j.hasEarlyConstraint) {
+            return false;
+        }
+        if (hasLateConstraint != j.hasLateConstraint) {
+            return false;
+        }
+        if (networkType != j.networkType) {
+            return false;
+        }
+        if (minLatencyMillis != j.minLatencyMillis) {
+            return false;
+        }
+        if (maxExecutionDelayMillis != j.maxExecutionDelayMillis) {
+            return false;
+        }
+        if (isPeriodic != j.isPeriodic) {
+            return false;
+        }
+        if (isPersisted != j.isPersisted) {
+            return false;
+        }
+        if (intervalMillis != j.intervalMillis) {
+            return false;
+        }
+        if (flexMillis != j.flexMillis) {
+            return false;
+        }
+        if (initialBackoffMillis != j.initialBackoffMillis) {
+            return false;
+        }
+        if (backoffPolicy != j.backoffPolicy) {
+            return false;
+        }
+        if (priority != j.priority) {
+            return false;
+        }
+        if (flags != j.flags) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hashCode = jobId;
+        if (extras != null) {
+            hashCode = 31*hashCode + extras.hashCode();
+        }
+        if (transientExtras != null) {
+            hashCode = 31*hashCode + transientExtras.hashCode();
+        }
+        if (clipData != null) {
+            hashCode = 31*hashCode + clipData.hashCode();
+        }
+        hashCode = 31*hashCode + clipGrantFlags;
+        if (service != null) {
+            hashCode = 31*hashCode + service.hashCode();
+        }
+        hashCode = 31*hashCode + constraintFlags;
+        if (triggerContentUris != null) {
+            hashCode = 31*hashCode + triggerContentUris.hashCode();
+        }
+        hashCode = 31*hashCode + Long.hashCode(triggerContentUpdateDelay);
+        hashCode = 31*hashCode + Long.hashCode(triggerContentMaxDelay);
+        hashCode = 31*hashCode + Boolean.hashCode(hasEarlyConstraint);
+        hashCode = 31*hashCode + Boolean.hashCode(hasLateConstraint);
+        hashCode = 31*hashCode + networkType;
+        hashCode = 31*hashCode + Long.hashCode(minLatencyMillis);
+        hashCode = 31*hashCode + Long.hashCode(maxExecutionDelayMillis);
+        hashCode = 31*hashCode + Boolean.hashCode(isPeriodic);
+        hashCode = 31*hashCode + Boolean.hashCode(isPersisted);
+        hashCode = 31*hashCode + Long.hashCode(intervalMillis);
+        hashCode = 31*hashCode + Long.hashCode(flexMillis);
+        hashCode = 31*hashCode + Long.hashCode(initialBackoffMillis);
+        hashCode = 31*hashCode + backoffPolicy;
+        hashCode = 31*hashCode + priority;
+        hashCode = 31*hashCode + flags;
+        return hashCode;
     }
 
     private JobInfo(Parcel in) {
@@ -563,6 +708,13 @@ public class JobInfo implements Parcelable {
         private final Uri mUri;
         private final int mFlags;
 
+        /** @hide */
+        @Retention(RetentionPolicy.SOURCE)
+        @IntDef(flag = true, prefix = { "FLAG_" }, value = {
+                FLAG_NOTIFY_FOR_DESCENDANTS,
+        })
+        public @interface Flags { }
+
         /**
          * Flag for trigger: also trigger if any descendants of the given URI change.
          * Corresponds to the <var>notifyForDescendants</var> of
@@ -573,10 +725,9 @@ public class JobInfo implements Parcelable {
         /**
          * Create a new trigger description.
          * @param uri The URI to observe.  Must be non-null.
-         * @param flags Optional flags for the observer, either 0 or
-         * {@link #FLAG_NOTIFY_FOR_DESCENDANTS}.
+         * @param flags Flags for the observer.
          */
-        public TriggerContentUri(@NonNull Uri uri, int flags) {
+        public TriggerContentUri(@NonNull Uri uri, @Flags int flags) {
             mUri = uri;
             mFlags = flags;
         }
@@ -591,7 +742,7 @@ public class JobInfo implements Parcelable {
         /**
          * Return the flags supplied for the trigger.
          */
-        public int getFlags() {
+        public @Flags int getFlags() {
             return mFlags;
         }
 
@@ -681,7 +832,7 @@ public class JobInfo implements Parcelable {
          * @param jobService The endpoint that you implement that will receive the callback from the
          * JobScheduler.
          */
-        public Builder(int jobId, ComponentName jobService) {
+        public Builder(int jobId, @NonNull ComponentName jobService) {
             mJobService = jobService;
             mJobId = jobId;
         }
@@ -702,17 +853,21 @@ public class JobInfo implements Parcelable {
          * Set optional extras. This is persisted, so we only allow primitive types.
          * @param extras Bundle containing extras you want the scheduler to hold on to for you.
          */
-        public Builder setExtras(PersistableBundle extras) {
+        public Builder setExtras(@NonNull PersistableBundle extras) {
             mExtras = extras;
             return this;
         }
 
         /**
-         * Set optional transient extras. This is incompatible with jobs that are also
-         * persisted with {@link #setPersisted(boolean)}; mixing the two is not allowed.
+         * Set optional transient extras.
+         *
+         * <p>Because setting this property is not compatible with persisted
+         * jobs, doing so will throw an {@link java.lang.IllegalArgumentException} when
+         * {@link android.app.job.JobInfo.Builder#build()} is called.</p>
+         *
          * @param extras Bundle containing extras you want the scheduler to hold on to for you.
          */
-        public Builder setTransientExtras(Bundle extras) {
+        public Builder setTransientExtras(@NonNull Bundle extras) {
             mTransientExtras = extras;
             return this;
         }
@@ -739,7 +894,7 @@ public class JobInfo implements Parcelable {
          * {@link android.content.Intent#FLAG_GRANT_WRITE_URI_PERMISSION}, and
          * {@link android.content.Intent#FLAG_GRANT_PREFIX_URI_PERMISSION}.
          */
-        public Builder setClipData(ClipData clip, int grantFlags) {
+        public Builder setClipData(@Nullable ClipData clip, int grantFlags) {
             mClipData = clip;
             mClipGrantFlags = grantFlags;
             return this;
@@ -753,7 +908,7 @@ public class JobInfo implements Parcelable {
          * job. If the network requested is not available your job will never run. See
          * {@link #setOverrideDeadline(long)} to change this behaviour.
          */
-        public Builder setRequiredNetworkType(int networkType) {
+        public Builder setRequiredNetworkType(@NetworkType int networkType) {
             mNetworkType = networkType;
             return this;
         }
@@ -934,10 +1089,9 @@ public class JobInfo implements Parcelable {
          * mode.
          * @param initialBackoffMillis Millisecond time interval to wait initially when job has
          *                             failed.
-         * @param backoffPolicy is one of {@link #BACKOFF_POLICY_LINEAR} or
-         * {@link #BACKOFF_POLICY_EXPONENTIAL}
          */
-        public Builder setBackoffCriteria(long initialBackoffMillis, int backoffPolicy) {
+        public Builder setBackoffCriteria(long initialBackoffMillis,
+                @BackoffPolicy int backoffPolicy) {
             mBackoffPolicySet = true;
             mInitialBackoffMillis = initialBackoffMillis;
             mBackoffPolicy = backoffPolicy;
@@ -945,13 +1099,12 @@ public class JobInfo implements Parcelable {
         }
 
         /**
-         * Set whether or not to persist this job across device reboots. This will only have an
-         * effect if your application holds the permission
-         * {@link android.Manifest.permission#RECEIVE_BOOT_COMPLETED}. Otherwise an exception will
-         * be thrown.
-         * @param isPersisted True to indicate that the job will be written to disk and loaded at
-         *                    boot.
+         * Set whether or not to persist this job across device reboots.
+         *
+         * @param isPersisted True to indicate that the job will be written to
+         *            disk and loaded at boot.
          */
+        @RequiresPermission(android.Manifest.permission.RECEIVE_BOOT_COMPLETED)
         public Builder setPersisted(boolean isPersisted) {
             mIsPersisted = isPersisted;
             return this;

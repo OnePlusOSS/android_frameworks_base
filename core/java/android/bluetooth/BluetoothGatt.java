@@ -17,6 +17,7 @@
 package android.bluetooth;
 
 import android.content.Context;
+import android.os.Handler;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.util.Log;
@@ -43,6 +44,7 @@ public final class BluetoothGatt implements BluetoothProfile {
 
     private IBluetoothGatt mService;
     private BluetoothGattCallback mCallback;
+    private Handler mHandler;
     private int mClientIf;
     private BluetoothDevice mDevice;
     private boolean mAutoConnect;
@@ -154,8 +156,16 @@ public final class BluetoothGatt implements BluetoothProfile {
                 }
                 mClientIf = clientIf;
                 if (status != GATT_SUCCESS) {
-                    mCallback.onConnectionStateChange(BluetoothGatt.this, GATT_FAILURE,
-                                                      BluetoothProfile.STATE_DISCONNECTED);
+                    mHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (mCallback != null) {
+                                mCallback.onConnectionStateChange(BluetoothGatt.this, GATT_FAILURE,
+                                                  BluetoothProfile.STATE_DISCONNECTED);
+                            }
+                        }
+                    });
+
                     synchronized(mStateLock) {
                         mConnState = CONN_STATE_IDLE;
                     }
@@ -181,11 +191,14 @@ public final class BluetoothGatt implements BluetoothProfile {
                     return;
                 }
 
-                try {
-                    mCallback.onPhyUpdate(BluetoothGatt.this, txPhy, rxPhy, status);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onPhyUpdate(BluetoothGatt.this, txPhy, rxPhy, status);
+                        }
+                    }
+                });
             }
 
             /**
@@ -200,11 +213,14 @@ public final class BluetoothGatt implements BluetoothProfile {
                     return;
                 }
 
-                try {
-                    mCallback.onPhyRead(BluetoothGatt.this, txPhy, rxPhy, status);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onPhyRead(BluetoothGatt.this, txPhy, rxPhy, status);
+                        }
+                    }
+                });
             }
 
             /**
@@ -221,11 +237,16 @@ public final class BluetoothGatt implements BluetoothProfile {
                 }
                 int profileState = connected ? BluetoothProfile.STATE_CONNECTED :
                                                BluetoothProfile.STATE_DISCONNECTED;
-                try {
-                    mCallback.onConnectionStateChange(BluetoothGatt.this, status, profileState);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onConnectionStateChange(BluetoothGatt.this, status,
+                                                              profileState);
+                        }
+                    }
+                });
 
                 synchronized(mStateLock) {
                     if (connected) {
@@ -279,11 +300,14 @@ public final class BluetoothGatt implements BluetoothProfile {
                     }
                 }
 
-                try {
-                    mCallback.onServicesDiscovered(BluetoothGatt.this, status);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onServicesDiscovered(BluetoothGatt.this, status);
+                        }
+                    }
+                });
             }
 
             /**
@@ -328,11 +352,15 @@ public final class BluetoothGatt implements BluetoothProfile {
 
                 if (status == 0) characteristic.setValue(value);
 
-                try {
-                    mCallback.onCharacteristicRead(BluetoothGatt.this, characteristic, status);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onCharacteristicRead(BluetoothGatt.this, characteristic,
+                                                           status);
+                        }
+                    }
+                });
             }
 
             /**
@@ -373,11 +401,15 @@ public final class BluetoothGatt implements BluetoothProfile {
 
                 mAuthRetryState = AUTH_RETRY_STATE_IDLE;
 
-                try {
-                    mCallback.onCharacteristicWrite(BluetoothGatt.this, characteristic, status);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onCharacteristicWrite(BluetoothGatt.this, characteristic,
+                                                            status);
+                        }
+                    }
+                });
             }
 
             /**
@@ -398,11 +430,14 @@ public final class BluetoothGatt implements BluetoothProfile {
 
                 characteristic.setValue(value);
 
-                try {
-                    mCallback.onCharacteristicChanged(BluetoothGatt.this, characteristic);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onCharacteristicChanged(BluetoothGatt.this, characteristic);
+                        }
+                    }
+                });
             }
 
             /**
@@ -442,11 +477,14 @@ public final class BluetoothGatt implements BluetoothProfile {
 
                 mAuthRetryState = AUTH_RETRY_STATE_IDLE;
 
-                try {
-                    mCallback.onDescriptorRead(BluetoothGatt.this, descriptor, status);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onDescriptorRead(BluetoothGatt.this, descriptor, status);
+                        }
+                    }
+                });
             }
 
             /**
@@ -485,11 +523,14 @@ public final class BluetoothGatt implements BluetoothProfile {
 
                 mAuthRetryState = AUTH_RETRY_STATE_IDLE;
 
-                try {
-                    mCallback.onDescriptorWrite(BluetoothGatt.this, descriptor, status);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onDescriptorWrite(BluetoothGatt.this, descriptor, status);
+                        }
+                    }
+                });
             }
 
             /**
@@ -508,11 +549,14 @@ public final class BluetoothGatt implements BluetoothProfile {
                     mDeviceBusy = false;
                 }
 
-                try {
-                    mCallback.onReliableWriteCompleted(BluetoothGatt.this, status);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                           mCallback.onReliableWriteCompleted(BluetoothGatt.this, status);
+                        }
+                    }
+                });
             }
 
             /**
@@ -526,11 +570,14 @@ public final class BluetoothGatt implements BluetoothProfile {
                 if (!address.equals(mDevice.getAddress())) {
                     return;
                 }
-                try {
-                    mCallback.onReadRemoteRssi(BluetoothGatt.this, rssi, status);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onReadRemoteRssi(BluetoothGatt.this, rssi, status);
+                        }
+                    }
+                });
             }
 
             /**
@@ -544,11 +591,15 @@ public final class BluetoothGatt implements BluetoothProfile {
                 if (!address.equals(mDevice.getAddress())) {
                     return;
                 }
-                try {
-                    mCallback.onMtuChanged(BluetoothGatt.this, mtu, status);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onMtuChanged(BluetoothGatt.this, mtu, status);
+                        }
+                    }
+                });
             }
 
             /**
@@ -564,12 +615,16 @@ public final class BluetoothGatt implements BluetoothProfile {
                 if (!address.equals(mDevice.getAddress())) {
                     return;
                 }
-                try {
-                    mCallback.onConnectionUpdated(BluetoothGatt.this, interval, latency,
-                                                  timeout, status);
-                } catch (Exception ex) {
-                    Log.w(TAG, "Unhandled exception in callback", ex);
-                }
+
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (mCallback != null) {
+                            mCallback.onConnectionUpdated(BluetoothGatt.this, interval, latency,
+                                                          timeout, status);
+                        }
+                    }
+                });
             }
         };
 
@@ -659,11 +714,12 @@ public final class BluetoothGatt implements BluetoothProfile {
      * @return If true, the callback will be called to notify success or failure,
      *         false on immediate error
      */
-    private boolean registerApp(BluetoothGattCallback callback) {
+    private boolean registerApp(BluetoothGattCallback callback, Handler handler) {
         if (DBG) Log.d(TAG, "registerApp()");
         if (mService == null) return false;
 
         mCallback = callback;
+        mHandler = handler;
         UUID uuid = UUID.randomUUID();
         if (DBG) Log.d(TAG, "registerApp() - UUID=" + uuid);
 
@@ -716,7 +772,8 @@ public final class BluetoothGatt implements BluetoothProfile {
      *                    device becomes available (true).
      * @return true, if the connection attempt was initiated successfully
      */
-    /*package*/ boolean connect(Boolean autoConnect, BluetoothGattCallback callback) {
+    /*package*/ boolean connect(Boolean autoConnect, BluetoothGattCallback callback,
+                                Handler handler) {
         if (DBG) Log.d(TAG, "connect() - device: " + mDevice.getAddress() + ", auto: " + autoConnect);
         synchronized(mStateLock) {
             if (mConnState != CONN_STATE_IDLE) {
@@ -727,7 +784,7 @@ public final class BluetoothGatt implements BluetoothProfile {
 
         mAutoConnect = autoConnect;
 
-        if (!registerApp(callback)) {
+        if (!registerApp(callback, handler)) {
             synchronized(mStateLock) {
                 mConnState = CONN_STATE_IDLE;
             }
@@ -785,11 +842,11 @@ public final class BluetoothGatt implements BluetoothProfile {
      * if no PHY change happens. It is also triggered when remote device updates the PHY.
      *
      * @param txPhy preferred transmitter PHY. Bitwise OR of any of
-     *             {@link BluetoothDevice#PHY_LE_1M}, {@link BluetoothDevice#PHY_LE_2M}, and
-     *             {@link BluetoothDevice#PHY_LE_CODED}.
+     *             {@link BluetoothDevice#PHY_LE_1M_MASK}, {@link BluetoothDevice#PHY_LE_2M_MASK},
+     *             and {@link BluetoothDevice#PHY_LE_CODED_MASK}.
      * @param rxPhy preferred receiver PHY. Bitwise OR of any of
-     *             {@link BluetoothDevice#PHY_LE_1M}, {@link BluetoothDevice#PHY_LE_2M}, and
-     *             {@link BluetoothDevice#PHY_LE_CODED}.
+     *             {@link BluetoothDevice#PHY_LE_1M_MASK}, {@link BluetoothDevice#PHY_LE_2M_MASK},
+     *             and {@link BluetoothDevice#PHY_LE_CODED_MASK}.
      * @param phyOptions preferred coding to use when transmitting on the LE Coded PHY. Can be one
      *             of {@link BluetoothDevice#PHY_OPTION_NO_PREFERRED},
      *             {@link BluetoothDevice#PHY_OPTION_S2} or {@link BluetoothDevice#PHY_OPTION_S8}
@@ -945,6 +1002,41 @@ public final class BluetoothGatt implements BluetoothProfile {
 
         return true;
     }
+
+    /**
+     * Reads the characteristic using its UUID from the associated remote device.
+     *
+     * <p>This is an asynchronous operation. The result of the read operation
+     * is reported by the {@link BluetoothGattCallback#onCharacteristicRead}
+     * callback.
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} permission.
+     *
+     * @param uuid UUID of characteristic to read from the remote device
+     * @return true, if the read operation was initiated successfully
+     * @hide
+     */
+    public boolean readUsingCharacteristicUuid(UUID uuid, int startHandle, int endHandle) {
+        if (VDBG) Log.d(TAG, "readUsingCharacteristicUuid() - uuid: " + uuid);
+        if (mService == null || mClientIf == 0) return false;
+
+        synchronized(mDeviceBusy) {
+            if (mDeviceBusy) return false;
+            mDeviceBusy = true;
+        }
+
+        try {
+            mService.readUsingCharacteristicUuid(mClientIf, mDevice.getAddress(),
+                new ParcelUuid(uuid), startHandle, endHandle, AUTHENTICATION_NONE);
+        } catch (RemoteException e) {
+            Log.e(TAG,"",e);
+            mDeviceBusy = false;
+            return false;
+        }
+
+        return true;
+    }
+
 
     /**
      * Writes a given characteristic and its values to the associated remote device.

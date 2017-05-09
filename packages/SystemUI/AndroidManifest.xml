@@ -22,9 +22,6 @@
         android:sharedUserId="android.uid.systemui"
         coreApp="true">
 
-    <protected-broadcast android:name="com.android.systemui.action.PLUGIN_CHANGED" />
-
-
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -538,6 +535,17 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.android.intent.action.SHOW_BRIGHTNESS_DIALOG" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".ForegroundServicesDialog"
+            android:process=":fgservices"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:theme="@*android:style/Theme.DeviceDefault.Settings.Dialog">
+            <intent-filter android:priority="1">
+                <action android:name="android.settings.FOREGROUND_SERVICES_SETTINGS" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>

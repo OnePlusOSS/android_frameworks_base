@@ -112,6 +112,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -575,6 +576,22 @@ public class AccountManagerService
         long identityToken = clearCallingIdentity();
         try {
             UserAccounts accounts = getUserAccounts(userId);
+            if (AccountManager.PACKAGE_NAME_KEY_LEGACY_VISIBLE.equals(packageName)) {
+                int visibility = getAccountVisibilityFromCache(account, packageName, accounts);
+                if (AccountManager.VISIBILITY_UNDEFINED != visibility) {
+                    return visibility;
+                } else {
+                   return AccountManager.VISIBILITY_USER_MANAGED_VISIBLE;
+                }
+            }
+            if (AccountManager.PACKAGE_NAME_KEY_LEGACY_NOT_VISIBLE.equals(packageName)) {
+                int visibility = getAccountVisibilityFromCache(account, packageName, accounts);
+                if (AccountManager.VISIBILITY_UNDEFINED != visibility) {
+                    return visibility;
+                } else {
+                   return AccountManager.VISIBILITY_USER_MANAGED_NOT_VISIBLE;
+                }
+            }
             return resolveAccountVisibility(account, packageName, accounts);
         } finally {
             restoreCallingIdentity(identityToken);
@@ -638,11 +655,6 @@ public class AccountManagerService
         // Authenticator can not restrict visibility to itself.
         if (signatureCheckResult == SIGNATURE_CHECK_UID_MATCH) {
             return AccountManager.VISIBILITY_VISIBLE; // Authenticator can always see the account
-        }
-
-        if (isSpecialPackageKey(packageName)) {
-            Log.d(TAG, "Package name is forbidden: " + packageName);
-            return AccountManager.VISIBILITY_NOT_VISIBLE;
         }
 
         // Return stored value if it was set.
@@ -752,10 +764,12 @@ public class AccountManagerService
         synchronized (accounts.dbLock) {
             synchronized (accounts.cacheLock) {
                 Map<String, Integer> packagesToVisibility;
+                List<String> accountRemovedReceivers;
                 if (notify) {
                     if (isSpecialPackageKey(packageName)) {
                         packagesToVisibility =
                                 getRequestingPackages(account, accounts);
+                        accountRemovedReceivers = getAccountRemovedReceivers(account, accounts);
                     } else {
                         if (!packageExistsForUser(packageName, accounts.userId)) {
                             return false; // package is not installed.
@@ -763,15 +777,20 @@ public class AccountManagerService
                         packagesToVisibility = new HashMap<>();
                         packagesToVisibility.put(packageName,
                                 resolveAccountVisibility(account, packageName, accounts));
+                        accountRemovedReceivers = new ArrayList<>();
+                        if (shouldNotifyPackageOnAccountRemoval(account, packageName, accounts)) {
+                            accountRemovedReceivers.add(packageName);
+                        }
                     }
                 } else {
-                    // Notifications will not be send.
+                    // Notifications will not be send - only used during add account.
                     if (!isSpecialPackageKey(packageName) &&
                             !packageExistsForUser(packageName, accounts.userId)) {
                         // package is not installed and not meta value.
                         return false;
                     }
-                    packagesToVisibility = new HashMap<>();
+                    packagesToVisibility = Collections.emptyMap();
+                    accountRemovedReceivers = Collections.emptyList();
                 }
 
                 if (!updateAccountVisibilityLocked(account, packageName, newVisibility, accounts)) {
@@ -781,10 +800,13 @@ public class AccountManagerService
                 if (notify) {
                     for (Entry<String, Integer> packageToVisibility : packagesToVisibility
                             .entrySet()) {
-                        if (packageToVisibility.getValue()
-                                != AccountManager.VISIBILITY_NOT_VISIBLE) {
+                        if (shouldNotifyOnVisibilityChange(packageToVisibility.getValue(),
+                                resolveAccountVisibility(account, packageName, accounts))) {
                             notifyPackage(packageToVisibility.getKey(), accounts);
                         }
+                    }
+                    for (String packageNameToNotify : accountRemovedReceivers) {
+                        sendAccountRemovedBroadcast(account, packageNameToNotify, accounts.userId);
                     }
                     sendAccountsChangedBroadcast(accounts.userId);
                 }
@@ -889,10 +911,11 @@ public class AccountManagerService
     // Send notification to all packages which can potentially see the account
     private void sendNotificationAccountUpdated(Account account, UserAccounts accounts) {
         Map<String, Integer> packagesToVisibility = getRequestingPackages(account, accounts);
-        // packages with VISIBILITY_USER_MANAGED_NOT_VISIBL still get notification.
-        // Should we notify VISIBILITY_NOT_VISIBLE packages when account is added?
+
         for (Entry<String, Integer> packageToVisibility : packagesToVisibility.entrySet()) {
-            if (packageToVisibility.getValue() != AccountManager.VISIBILITY_NOT_VISIBLE) {
+            if ((packageToVisibility.getValue() != AccountManager.VISIBILITY_NOT_VISIBLE)
+                    && (packageToVisibility.getValue()
+                        != AccountManager.VISIBILITY_USER_MANAGED_NOT_VISIBLE)) {
                 notifyPackage(packageToVisibility.getKey(), accounts);
             }
         }
@@ -931,6 +954,44 @@ public class AccountManagerService
         return result;
     }
 
+    // Returns a list of packages listening to ACTION_ACCOUNT_REMOVED able to see the account.
+    private List<String> getAccountRemovedReceivers(Account account, UserAccounts accounts) {
+        Intent intent = new Intent(AccountManager.ACTION_ACCOUNT_REMOVED);
+        intent.setFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
+        List<ResolveInfo> receivers =
+            mPackageManager.queryBroadcastReceiversAsUser(intent, 0, accounts.userId);
+        List<String> result = new ArrayList<>();
+        if (receivers == null) {
+            return result;
+        }
+        for (ResolveInfo resolveInfo: receivers) {
+            String packageName = resolveInfo.activityInfo.applicationInfo.packageName;
+            int visibility = resolveAccountVisibility(account, packageName, accounts);
+            if (visibility == AccountManager.VISIBILITY_VISIBLE
+                || visibility == AccountManager.VISIBILITY_USER_MANAGED_VISIBLE) {
+                result.add(packageName);
+            }
+        }
+        return result;
+    }
+
+    // Returns true if given package is listening to ACTION_ACCOUNT_REMOVED and can see the account.
+    private boolean shouldNotifyPackageOnAccountRemoval(Account account,
+            String packageName, UserAccounts accounts) {
+        int visibility = resolveAccountVisibility(account, packageName, accounts);
+        if (visibility != AccountManager.VISIBILITY_VISIBLE
+            && visibility != AccountManager.VISIBILITY_USER_MANAGED_VISIBLE) {
+            return false;
+        }
+
+        Intent intent = new Intent(AccountManager.ACTION_ACCOUNT_REMOVED);
+        intent.setFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
+        intent.setPackage(packageName);
+        List<ResolveInfo> receivers =
+            mPackageManager.queryBroadcastReceiversAsUser(intent, 0, accounts.userId);
+        return (receivers != null && receivers.size() > 0);
+    }
+
     private boolean packageExistsForUser(String packageName, int userId) {
         try {
             long identityToken = clearCallingIdentity();
@@ -957,6 +1018,15 @@ public class AccountManagerService
         Log.i(TAG, "the accounts changed, sending broadcast of "
                 + ACCOUNTS_CHANGED_INTENT.getAction());
         mContext.sendBroadcastAsUser(ACCOUNTS_CHANGED_INTENT, new UserHandle(userId));
+    }
+
+    private void sendAccountRemovedBroadcast(Account account, String packageName, int userId) {
+        Intent intent = new Intent(AccountManager.ACTION_ACCOUNT_REMOVED);
+        intent.setFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND);
+        intent.setPackage(packageName);
+        intent.putExtra(AccountManager.KEY_ACCOUNT_NAME, account.name);
+        intent.putExtra(AccountManager.KEY_ACCOUNT_TYPE, account.type);
+        mContext.sendBroadcastAsUser(intent, new UserHandle(userId));
     }
 
     @Override
@@ -1081,6 +1151,8 @@ public class AccountManagerService
                                     + "'s registered authenticator no longer exist.");
                             Map<String, Integer> packagesToVisibility =
                                     getRequestingPackages(account, accounts);
+                            List<String> accountRemovedReceivers =
+                                getAccountRemovedReceivers(account, accounts);
                             accountsDb.beginTransaction();
                             try {
                                 accountsDb.deleteDeAccount(accountId);
@@ -1106,10 +1178,13 @@ public class AccountManagerService
 
                             for (Entry<String, Integer> packageToVisibility :
                                     packagesToVisibility.entrySet()) {
-                                if (packageToVisibility.getValue()
-                                        != AccountManager.VISIBILITY_NOT_VISIBLE) {
+                                if (shouldNotifyOnVisibilityChange(packageToVisibility.getValue(),
+                                        AccountManager.VISIBILITY_NOT_VISIBLE)) {
                                     notifyPackage(packageToVisibility.getKey(), accounts);
                                 }
+                            }
+                            for (String packageName : accountRemovedReceivers) {
+                                sendAccountRemovedBroadcast(account, packageName, accounts.userId);
                             }
                         } else {
                             ArrayList<String> accountNames = accountNamesByType.get(account.type);
@@ -1138,6 +1213,14 @@ public class AccountManagerService
                 }
             }
         }
+    }
+
+    private boolean shouldNotifyOnVisibilityChange(int oldVisibility, int newVisibility) {
+        boolean oldVisible = (oldVisibility == AccountManager.VISIBILITY_VISIBLE) ||
+            (oldVisibility == AccountManager.VISIBILITY_USER_MANAGED_VISIBLE);
+        boolean newVisible = (newVisibility == AccountManager.VISIBILITY_VISIBLE) ||
+            (newVisibility == AccountManager.VISIBILITY_USER_MANAGED_VISIBLE);
+        return oldVisible == newVisible;
     }
 
     private SparseBooleanArray getUidsOfInstalledOrUpdatedPackagesAsUser(int userId) {
@@ -1336,6 +1419,7 @@ public class AccountManagerService
 
     @Override
     public String getPassword(Account account) {
+        android.util.SeempLog.record(14);
         int callingUid = Binder.getCallingUid();
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "getPassword: " + account
@@ -1416,6 +1500,7 @@ public class AccountManagerService
 
     @Override
     public String getUserData(Account account, String key) {
+        android.util.SeempLog.record(15);
         final int callingUid = Binder.getCallingUid();
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             String msg = String.format("getUserData( account: %s, key: %s, callerUid: %s, pid: %s",
@@ -1904,6 +1989,8 @@ public class AccountManagerService
         }
         synchronized (accounts.dbLock) {
             synchronized (accounts.cacheLock) {
+                List<String> accountRemovedReceivers =
+                    getAccountRemovedReceivers(accountToRename, accounts);
                 accounts.accountsDb.beginTransaction();
                 Account renamedAccount = new Account(newName, accountToRename.type);
                 if ((accounts.accountsDb.findCeAccountId(renamedAccount) >= 0)) {
@@ -1971,6 +2058,9 @@ public class AccountManagerService
 
                 sendNotificationAccountUpdated(resultAccount, accounts);
                 sendAccountsChangedBroadcast(accounts.userId);
+                for (String packageName : accountRemovedReceivers) {
+                    sendAccountRemovedBroadcast(accountToRename, packageName, accounts.userId);
+                }
             }
         }
         return resultAccount;
@@ -1984,6 +2074,7 @@ public class AccountManagerService
     @Override
     public void removeAccount(IAccountManagerResponse response, Account account,
             boolean expectActivityLaunch) {
+        android.util.SeempLog.record(17);
         removeAccountAsUser(
                 response,
                 account,
@@ -2173,6 +2264,8 @@ public class AccountManagerService
             synchronized (accounts.cacheLock) {
                 Map<String, Integer> packagesToVisibility = getRequestingPackages(account,
                         accounts);
+                List<String> accountRemovedReceivers =
+                    getAccountRemovedReceivers(account, accounts);
                 accounts.accountsDb.beginTransaction();
                 // Set to a dummy value, this will only be used if the database
                 // transaction succeeds.
@@ -2198,14 +2291,18 @@ public class AccountManagerService
                     removeAccountFromCacheLocked(accounts, account);
                     for (Entry<String, Integer> packageToVisibility : packagesToVisibility
                             .entrySet()) {
-                        if (packageToVisibility.getValue()
-                                != AccountManager.VISIBILITY_NOT_VISIBLE) {
+                        if ((packageToVisibility.getValue() == AccountManager.VISIBILITY_VISIBLE)
+                                || (packageToVisibility.getValue()
+                                    == AccountManager.VISIBILITY_USER_MANAGED_VISIBLE)) {
                             notifyPackage(packageToVisibility.getKey(), accounts);
                         }
                     }
 
                     // Only broadcast LOGIN_ACCOUNTS_CHANGED if a change occurred.
                     sendAccountsChangedBroadcast(accounts.userId);
+                    for (String packageName : accountRemovedReceivers) {
+                        sendAccountRemovedBroadcast(account, packageName, accounts.userId);
+                    }
                     String action = userUnlocked ? AccountsDb.DEBUG_ACTION_ACCOUNT_REMOVE
                             : AccountsDb.DEBUG_ACTION_ACCOUNT_REMOVE_DE;
                     logRecord(action, AccountsDb.TABLE_ACCOUNTS, accountId, accounts);
@@ -2419,6 +2516,7 @@ public class AccountManagerService
 
     @Override
     public void setPassword(Account account, String password) {
+        android.util.SeempLog.record(18);
         final int callingUid = Binder.getCallingUid();
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "setAuthToken: " + account
@@ -2485,6 +2583,7 @@ public class AccountManagerService
 
     @Override
     public void clearPassword(Account account) {
+        android.util.SeempLog.record(19);
         final int callingUid = Binder.getCallingUid();
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "clearPassword: " + account
@@ -2511,6 +2610,7 @@ public class AccountManagerService
 
     @Override
     public void setUserData(Account account, String key, String value) {
+        android.util.SeempLog.record(20);
         final int callingUid = Binder.getCallingUid();
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "setUserData: " + account
@@ -2990,6 +3090,7 @@ public class AccountManagerService
     public void addAccount(final IAccountManagerResponse response, final String accountType,
             final String authTokenType, final String[] requiredFeatures,
             final boolean expectActivityLaunch, final Bundle optionsIn) {
+        android.util.SeempLog.record(16);
         Bundle.setDefusable(optionsIn, true);
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "addAccount: accountType " + accountType
@@ -3739,6 +3840,7 @@ public class AccountManagerService
     @Override
     public void editProperties(IAccountManagerResponse response, final String accountType,
             final boolean expectActivityLaunch) {
+        android.util.SeempLog.record(21);
         final int callingUid = Binder.getCallingUid();
         if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "editProperties: accountType " + accountType
@@ -4997,7 +5099,7 @@ public class AccountManagerService
             INotificationManager notificationManager = mInjector.getNotificationManager();
             try {
                 notificationManager.enqueueNotificationWithTag(packageName, packageName,
-                        id.mTag, id.mId, notification, new int[1], userId);
+                        id.mTag, id.mId, notification, userId);
             } catch (RemoteException e) {
                 /* ignore - local call */
             }

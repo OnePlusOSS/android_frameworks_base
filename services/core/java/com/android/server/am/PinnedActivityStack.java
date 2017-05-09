@@ -21,7 +21,7 @@ import android.graphics.Rect;
 
 import com.android.server.am.ActivityStackSupervisor.ActivityContainer;
 import com.android.server.wm.PinnedStackWindowController;
-import com.android.server.wm.StackWindowController;
+import com.android.server.wm.PinnedStackWindowListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +29,8 @@ import java.util.List;
 /**
  * State and management of the pinned stack of activities.
  */
-class PinnedActivityStack extends ActivityStack<PinnedStackWindowController> {
+class PinnedActivityStack extends ActivityStack<PinnedStackWindowController>
+        implements PinnedStackWindowListener {
 
     PinnedActivityStack(ActivityContainer activityContainer,
             RecentTasks recentTasks, boolean onTop) {
@@ -42,9 +43,15 @@ class PinnedActivityStack extends ActivityStack<PinnedStackWindowController> {
         return new PinnedStackWindowController(mStackId, this, displayId, onTop, outBounds);
     }
 
-    void animateResizePinnedStack(Rect sourceBounds, Rect destBounds, int animationDuration) {
-        getWindowContainerController().animateResizePinnedStack(sourceBounds, destBounds,
-                animationDuration);
+    Rect getPictureInPictureBounds(float aspectRatio, boolean useExistingStackBounds) {
+        return getWindowContainerController().getPictureInPictureBounds(aspectRatio,
+                useExistingStackBounds);
+    }
+
+    void animateResizePinnedStack(Rect sourceHintBounds, Rect toBounds, int animationDuration,
+            boolean schedulePipModeChangedOnAnimationEnd) {
+        getWindowContainerController().animateResizePinnedStack(toBounds, sourceHintBounds,
+                animationDuration, schedulePipModeChangedOnAnimationEnd);
     }
 
     void setPictureInPictureAspectRatio(float aspectRatio) {
@@ -55,11 +62,22 @@ class PinnedActivityStack extends ActivityStack<PinnedStackWindowController> {
         getWindowContainerController().setPictureInPictureActions(actions);
     }
 
-    boolean isBoundsAnimatingToFullscreen() {
-        return getWindowContainerController().isBoundsAnimatingToFullscreen();
+    boolean isAnimatingBoundsToFullscreen() {
+        return getWindowContainerController().isAnimatingBoundsToFullscreen();
     }
 
-    @Override
+    /**
+     * Returns whether to defer the scheduling of the multi-window mode.
+     */
+    boolean deferScheduleMultiWindowModeChanged() {
+        // For the pinned stack, the deferring of the multi-window mode changed is tied to the
+        // transition animation into picture-in-picture, and is called once the animation completes,
+        // or is interrupted in a way that would leave the stack in a non-fullscreen state.
+        // @see BoundsAnimationController
+        // @see BoundsAnimationControllerTests
+        return mWindowContainerController.deferScheduleMultiWindowModeChanged();
+    }
+
     public void updatePictureInPictureModeForPinnedStackAnimation(Rect targetStackBounds) {
         // It is guaranteed that the activities requiring the update will be in the pinned stack at
         // this point (either reparented before the animation into PiP, or before reparenting after

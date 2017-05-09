@@ -15,8 +15,6 @@
  */
 package android.view.autofill;
 
-import static android.view.autofill.Helper.DEBUG;
-
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.view.View;
@@ -30,7 +28,6 @@ public final class AutofillId implements Parcelable {
     private final boolean mVirtual;
     private final int mVirtualId;
 
-    // TODO(b/33197203): use factory and cache values, since they're immutable
     /** @hide */
     public AutofillId(int id) {
         mVirtual = false;
@@ -93,11 +90,9 @@ public final class AutofillId implements Parcelable {
 
     @Override
     public String toString() {
-        if (!DEBUG) return super.toString();
-
         final StringBuilder builder = new StringBuilder().append(mViewId);
         if (mVirtual) {
-            builder.append(":").append(mVirtualId);
+            builder.append(':').append(mVirtualId);
         }
         return builder.toString();
     }

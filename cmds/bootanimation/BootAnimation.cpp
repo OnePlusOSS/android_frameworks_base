@@ -62,6 +62,9 @@
 #include <EGL/eglext.h>
 
 #include "BootAnimation.h"
+
+#include <private/regionalization/Environment.h>
+
 #include "audioplay.h"
 
 namespace android {
@@ -266,6 +269,36 @@ status_t BootAnimation::initTexture(FileMap* map, int* width, int* height)
     return NO_ERROR;
 }
 
+
+/** Get bootup Animation File
+ * Parameter:
+ * 1.defaultfile: system default media file
+ * 2.isShutdown : is shutdown or boot status
+ * Return Value : Animation File path
+ **/
+const char *BootAnimation::getAnimationFileName(const char * defaultfile,bool isShutdown)
+{
+    // Load animations of Carrier through regionalization environment
+    if (Environment::isSupported()) {
+        Environment* environment = new Environment();
+        int isShutdownState = Environment::BOOT_STATUS;
+        if (isShutdown) {
+           isShutdownState = Environment::SHUTDOWN_STATUS;
+        }
+        const char* animFile = environment->getMediaFile(
+                Environment::ANIMATION_TYPE, isShutdownState);
+        ALOGE("Get Carrier Animation type: %d,status:%d", Environment::ANIMATION_TYPE,isShutdown);
+        if (animFile != NULL && strcmp(animFile, "") != 0) {
+           return animFile;
+        }else{
+           ALOGD("Get Carrier Animation file: %s failed", animFile);
+        }
+        delete environment;
+    }
+
+    return defaultfile;
+}
+
 status_t BootAnimation::readyToRun() {
     mAssets.addDefaultAssets();
 
@@ -329,8 +362,8 @@ status_t BootAnimation::readyToRun() {
         !strcmp("trigger_restart_min_framework", decrypt);
 
     if (!mShuttingDown && encryptedAnimation &&
-        (access(SYSTEM_ENCRYPTED_BOOTANIMATION_FILE, R_OK) == 0)) {
-        mZipFileName = SYSTEM_ENCRYPTED_BOOTANIMATION_FILE;
+        (access(getAnimationFileName(SYSTEM_ENCRYPTED_BOOTANIMATION_FILE,mShuttingDown),R_OK) == 0)) {
+        mZipFileName = getAnimationFileName(SYSTEM_ENCRYPTED_BOOTANIMATION_FILE,mShuttingDown);
         return NO_ERROR;
     }
     static const char* bootFiles[] = {OEM_BOOTANIMATION_FILE, SYSTEM_BOOTANIMATION_FILE};
@@ -338,8 +371,8 @@ status_t BootAnimation::readyToRun() {
         {OEM_SHUTDOWNANIMATION_FILE, SYSTEM_SHUTDOWNANIMATION_FILE};
 
     for (const char* f : (!mShuttingDown ? bootFiles : shutdownFiles)) {
-        if (access(f, R_OK) == 0) {
-            mZipFileName = f;
+        if (access(getAnimationFileName(f,mShuttingDown), R_OK) == 0) {
+            mZipFileName = getAnimationFileName(f,mShuttingDown);
             return NO_ERROR;
         }
     }

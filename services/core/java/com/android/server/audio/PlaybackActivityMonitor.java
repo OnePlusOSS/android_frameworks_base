@@ -46,31 +46,27 @@ import java.util.Set;
 public final class PlaybackActivityMonitor
         implements AudioPlaybackConfiguration.PlayerDeathMonitor, PlayerFocusEnforcer {
 
-    public final static String TAG = "AudioService.PlaybackActivityMonitor";
+    public static final String TAG = "AudioService.PlaybackActivityMonitor";
 
-    private final static boolean DEBUG = false;
-    private final static int VOLUME_SHAPER_SYSTEM_DUCK_ID = 1;
+    private static final boolean DEBUG = false;
+    private static final int VOLUME_SHAPER_SYSTEM_DUCK_ID = 1;
 
-    private final VolumeShaper.Configuration DUCK_VSHAPE =
+    private static final VolumeShaper.Configuration DUCK_VSHAPE =
             new VolumeShaper.Configuration.Builder()
                 .setId(VOLUME_SHAPER_SYSTEM_DUCK_ID)
                 .setCurve(new float[] { 0.f, 1.f } /* times */,
                     new float[] { 1.f, 0.2f } /* volumes */)
                 .setOptionFlags(VolumeShaper.Configuration.OPTION_FLAG_CLOCK_TIME)
-                .setDurationMs(MediaFocusControl.getFocusRampTimeMs(
+                .setDuration(MediaFocusControl.getFocusRampTimeMs(
                     AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
                     new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION)
                             .build()))
                 .build();
-    private final VolumeShaper.Configuration DUCK_ID =
+    private static final VolumeShaper.Configuration DUCK_ID =
             new VolumeShaper.Configuration(VOLUME_SHAPER_SYSTEM_DUCK_ID);
-    private final VolumeShaper.Operation PLAY_CREATE_IF_NEEDED =
+    private static final VolumeShaper.Operation PLAY_CREATE_IF_NEEDED =
             new VolumeShaper.Operation.Builder(VolumeShaper.Operation.PLAY)
                     .createIfNeeded()
-                    .build();
-    private final VolumeShaper.Operation TERMINATE =
-            new VolumeShaper.Operation.Builder()
-                    .terminate()
                     .build();
 
     private final ArrayList<PlayMonitorClient> mClients = new ArrayList<PlayMonitorClient>();
@@ -166,14 +162,7 @@ public final class PlaybackActivityMonitor
         synchronized(mPlayerLock) {
             final AudioPlaybackConfiguration apc = mPlayers.get(new Integer(piid));
             if (checkConfigurationCaller(piid, apc, binderUid)) {
-                try {
-                    apc.getPlayerProxy().applyVolumeShaper(
-                            DUCK_ID,
-                            TERMINATE);
-                } catch (Exception e) { /* silent failure, happens with binder failure */ }
                 mPlayers.remove(new Integer(piid));
-            } else {
-                Log.e(TAG, "Error releasing player " + piid);
             }
         }
     }
@@ -206,16 +195,16 @@ public final class PlaybackActivityMonitor
     }
 
     /**
-     * Check that piid and uid are valid for the given configuration.
+     * Check that piid and uid are valid for the given valid configuration.
      * @param piid the piid of the player.
      * @param apc the configuration found for this piid.
      * @param binderUid actual uid of client trying to signal a player state/event/attributes.
-     * @return true if the call is valid and the change should proceed, false otherwise.
+     * @return true if the call is valid and the change should proceed, false otherwise. Always
+     *      returns false when apc is null.
      */
     private static boolean checkConfigurationCaller(int piid,
             final AudioPlaybackConfiguration apc, int binderUid) {
         if (apc == null) {
-            Log.e(TAG, "Invalid operation: unknown player " + piid);
             return false;
         } else if ((binderUid != 0) && (apc.getClientUid() != binderUid)) {
             Log.e(TAG, "Forbidden operation from uid " + binderUid + " for player " + piid);
@@ -319,10 +308,17 @@ public final class PlaybackActivityMonitor
                 {
                     if (mDuckedPlayers.contains(new Integer(piid))) {
                         if (DEBUG) { Log.v(TAG, "player " + piid + " already ducked"); }
+                    } else if (MediaFocusControl.ENFORCE_DUCKING
+                            && MediaFocusControl.ENFORCE_DUCKING_FOR_NEW
+                            && loser.getSdkTarget() <= MediaFocusControl.DUCKING_IN_APP_SDK_LEVEL) {
+                        // legacy behavior, apps used to be notified when they should be ducking
+                        if (DEBUG) { Log.v(TAG, "not ducking player " + piid + ": old SDK"); }
+                        return false;
                     } else if (apc.getAudioAttributes().getContentType() ==
                             AudioAttributes.CONTENT_TYPE_SPEECH) {
                         // the player is speaking, ducking will make the speech unintelligible
                         // so let the app handle it instead
+                        if (DEBUG) { Log.v(TAG, "not ducking player " + piid + ": SPEECH"); }
                         return false;
                     } else if (apc.getPlayerType()
                             == AudioPlaybackConfiguration.PLAYER_TYPE_JAM_SOUNDPOOL) {
@@ -509,7 +505,7 @@ public final class PlaybackActivityMonitor
     /**
      * Inner class to track clients that want to be notified of playback updates
      */
-    private final static class PlayMonitorClient implements IBinder.DeathRecipient {
+    private static final class PlayMonitorClient implements IBinder.DeathRecipient {
 
         // can afford to be static because only one PlaybackActivityMonitor ever instantiated
         static PlaybackActivityMonitor sListenerDeathMonitor;

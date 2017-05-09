@@ -23,6 +23,7 @@
 #include "hwui/MinikinUtils.h"
 #include "pipeline/skia/AnimatedDrawables.h"
 
+#include <SkCanvasStateUtils.h>
 #include <SkColorSpaceXformCanvas.h>
 #include <SkDrawable.h>
 #include <SkDeque.h>
@@ -59,7 +60,8 @@ SkiaCanvas::SkiaCanvas(SkCanvas* canvas, XformToSRGB xformToSRGB)
 
 SkiaCanvas::SkiaCanvas(const SkBitmap& bitmap) {
     sk_sp<SkColorSpace> cs = bitmap.refColorSpace();
-    mCanvasOwned = std::unique_ptr<SkCanvas>(new SkCanvas(bitmap));
+    mCanvasOwned =
+            std::unique_ptr<SkCanvas>(new SkCanvas(bitmap, SkCanvas::ColorBehavior::kLegacy));
     mCanvasWrapper = SkCreateColorSpaceXformCanvas(mCanvasOwned.get(),
             cs == nullptr ? SkColorSpace::MakeSRGB() : std::move(cs));
     mCanvas = mCanvasWrapper.get();
@@ -80,37 +82,12 @@ void SkiaCanvas::reset(SkCanvas* skiaCanvas) {
 // Canvas state operations: Replace Bitmap
 // ----------------------------------------------------------------------------
 
-class ClipCopier : public SkCanvas::ClipVisitor {
-public:
-    explicit ClipCopier(SkCanvas* dstCanvas) : m_dstCanvas(dstCanvas) {}
-
-    virtual void clipRect(const SkRect& rect, SkClipOp op, bool antialias) {
-        m_dstCanvas->clipRect(rect, op, antialias);
-    }
-    virtual void clipRRect(const SkRRect& rrect, SkClipOp op, bool antialias) {
-        m_dstCanvas->clipRRect(rrect, op, antialias);
-    }
-    virtual void clipPath(const SkPath& path, SkClipOp op, bool antialias) {
-        m_dstCanvas->clipPath(path, op, antialias);
-    }
-
-private:
-    SkCanvas* m_dstCanvas;
-};
-
 void SkiaCanvas::setBitmap(const SkBitmap& bitmap) {
     sk_sp<SkColorSpace> cs = bitmap.refColorSpace();
-    std::unique_ptr<SkCanvas> newCanvas = std::unique_ptr<SkCanvas>(new SkCanvas(bitmap));
+    std::unique_ptr<SkCanvas> newCanvas =
+            std::unique_ptr<SkCanvas>(new SkCanvas(bitmap, SkCanvas::ColorBehavior::kLegacy));
     std::unique_ptr<SkCanvas> newCanvasWrapper = SkCreateColorSpaceXformCanvas(newCanvas.get(),
             cs == nullptr ? SkColorSpace::MakeSRGB() : std::move(cs));
-
-    if (!bitmap.isNull()) {
-        // Copy the canvas matrix & clip state.
-        newCanvasWrapper->setMatrix(mCanvas->getTotalMatrix());
-
-        ClipCopier copier(newCanvasWrapper.get());
-        mCanvas->replayClips(&copier);
-    }
 
     // deletes the previously owned canvas (if any)
     mCanvasOwned = std::move(newCanvas);
@@ -413,14 +390,8 @@ bool SkiaCanvas::clipRect(float left, float top, float right, float bottom, SkCl
 }
 
 bool SkiaCanvas::clipPath(const SkPath* path, SkClipOp op) {
-    SkRRect roundRect;
-    if (path->isRRect(&roundRect)) {
-        this->recordClip(roundRect, op);
-        mCanvas->clipRRect(roundRect, op);
-    } else {
-        this->recordClip(*path, op);
-        mCanvas->clipPath(*path, op);
-    }
+    this->recordClip(*path, op);
+    mCanvas->clipPath(*path, op);
     return !mCanvas->isClipEmpty();
 }
 
@@ -434,6 +405,30 @@ SkDrawFilter* SkiaCanvas::getDrawFilter() {
 
 void SkiaCanvas::setDrawFilter(SkDrawFilter* drawFilter) {
     mCanvas->setDrawFilter(drawFilter);
+}
+
+// ----------------------------------------------------------------------------
+// Canvas state operations: Capture
+// ----------------------------------------------------------------------------
+
+SkCanvasState* SkiaCanvas::captureCanvasState() const {
+    SkCanvas* canvas = mCanvas;
+    if (mCanvasOwned) {
+        // Important to use the underlying SkCanvas, not the wrapper.
+        canvas = mCanvasOwned.get();
+    }
+
+    // Workarounds for http://crbug.com/271096: SW draw only supports
+    // translate & scale transforms, and a simple rectangular clip.
+    // (This also avoids significant wasted time in calling
+    // SkCanvasStateUtils::CaptureCanvasState when the clip is complex).
+    if (!canvas->isClipRect() ||
+        (canvas->getTotalMatrix().getType() &
+                  ~(SkMatrix::kTranslate_Mask | SkMatrix::kScale_Mask))) {
+      return nullptr;
+    }
+
+    return SkCanvasStateUtils::CaptureCanvasState(canvas);
 }
 
 // ----------------------------------------------------------------------------

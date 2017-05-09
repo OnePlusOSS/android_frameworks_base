@@ -16,6 +16,8 @@
 
 package com.android.server.am;
 
+import android.content.pm.IPackageManager;
+import android.content.pm.PermissionInfo;
 import android.os.Trace;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -153,8 +155,6 @@ public final class BroadcastQueue {
 
     static final int BROADCAST_INTENT_MSG = ActivityManagerService.FIRST_BROADCAST_QUEUE_MSG;
     static final int BROADCAST_TIMEOUT_MSG = ActivityManagerService.FIRST_BROADCAST_QUEUE_MSG + 1;
-    static final int SCHEDULE_TEMP_WHITELIST_MSG
-            = ActivityManagerService.FIRST_BROADCAST_QUEUE_MSG + 2;
 
     final BroadcastHandler mHandler;
 
@@ -174,13 +174,6 @@ public final class BroadcastQueue {
                 case BROADCAST_TIMEOUT_MSG: {
                     synchronized (mService) {
                         broadcastTimeoutLocked(true);
-                    }
-                } break;
-                case SCHEDULE_TEMP_WHITELIST_MSG: {
-                    DeviceIdleController.LocalService dic = mService.mLocalDeviceIdleController;
-                    if (dic != null) {
-                        dic.addPowerSaveTempWhitelistAppDirect(UserHandle.getAppId(msg.arg1),
-                                msg.arg2, true, (String)msg.obj);
                     }
                 } break;
             }
@@ -787,12 +780,36 @@ public final class BroadcastQueue {
         if (r.intent.getAction() != null) {
             b.append(r.intent.getAction());
         } else if (r.intent.getComponent() != null) {
-            b.append(r.intent.getComponent().flattenToShortString());
+            r.intent.getComponent().appendShortString(b);
         } else if (r.intent.getData() != null) {
             b.append(r.intent.getData());
         }
-        mHandler.obtainMessage(SCHEDULE_TEMP_WHITELIST_MSG, uid, (int)duration, b.toString())
-                .sendToTarget();
+        mService.tempWhitelistUidLocked(uid, duration, b.toString());
+    }
+
+    /**
+     * Return true if all given permissions are signature-only perms.
+     */
+    final boolean isSignaturePerm(String[] perms) {
+        if (perms == null) {
+            return false;
+        }
+        IPackageManager pm = AppGlobals.getPackageManager();
+        for (int i = perms.length-1; i >= 0; i--) {
+            try {
+                PermissionInfo pi = pm.getPermissionInfo(perms[i], 0);
+                if ((pi.protectionLevel & (PermissionInfo.PROTECTION_MASK_BASE
+                        | PermissionInfo.PROTECTION_FLAG_PRIVILEGED))
+                        != PermissionInfo.PROTECTION_SIGNATURE) {
+                    // If this a signature permission and NOT allowed for privileged apps, it
+                    // is okay...  otherwise, nope!
+                    return false;
+                }
+            } catch (RemoteException e) {
+                return false;
+            }
+        }
+        return true;
     }
 
     final void processNextBroadcast(boolean fromMsg) {
@@ -1163,7 +1180,7 @@ public final class BroadcastQueue {
                 skip = true;
             }
             if (!skip && r.callerInstantApp
-                    && (info.activityInfo.flags & ActivityInfo.FLAG_VISIBLE_TO_EPHEMERAL) == 0
+                    && (info.activityInfo.flags & ActivityInfo.FLAG_VISIBLE_TO_INSTANT_APP) == 0
                     && r.callingUid != info.activityInfo.applicationInfo.uid) {
                 Slog.w(TAG, "Instant App Denial: receiving "
                         + r.intent
@@ -1246,7 +1263,8 @@ public final class BroadcastQueue {
                             || (r.intent.getComponent() == null
                                 && r.intent.getPackage() == null
                                 && ((r.intent.getFlags()
-                                        & Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND) == 0))) {
+                                        & Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND) == 0)
+                                && !isSignaturePerm(r.requiredPermissions))) {
                         mService.addBackgroundCheckViolationLocked(r.intent.getAction(),
                                 component.getPackageName());
                         Slog.w(TAG, "Background execution not allowed: receiving "

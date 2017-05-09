@@ -961,8 +961,7 @@ public class LockSettingsService extends ILockSettings.Stub {
                     if (pi.isManagedProfile()
                             && !mLockPatternUtils.isSeparateProfileChallengeEnabled(pi.id)
                             && mStorage.hasChildProfileLock(pi.id)
-                            && mUserManager.isUserRunning(pi.id)
-                            && !mUserManager.isUserUnlocked(pi.id)) {
+                            && mUserManager.isUserRunning(pi.id)) {
                         unlockChildProfile(pi.id);
                     }
                 }
@@ -1562,8 +1561,9 @@ public class LockSettingsService extends ILockSettings.Stub {
                 // migration to synthetic password.
                 synchronized (mSpManager) {
                     if (shouldMigrateToSyntheticPasswordLocked(userId)) {
-                        initializeSyntheticPasswordLocked(storedHash.hash, credential,
-                                storedHash.type, userId);
+                        AuthenticationToken auth = initializeSyntheticPasswordLocked(
+                                storedHash.hash, credential, storedHash.type, userId);
+                        activateEscrowTokens(auth, userId);
                     }
                 }
             }
@@ -2071,9 +2071,11 @@ public class LockSettingsService extends ILockSettings.Stub {
                             pwdHandle, null, userId).authToken;
                 }
             }
-            disableEscrowTokenOnNonManagedDevicesIfNeeded(userId);
-            if (!mSpManager.hasEscrowData(userId)) {
-                throw new SecurityException("Escrow token is disabled on the current user");
+            if (isSyntheticPasswordBasedCredentialLocked(userId)) {
+                disableEscrowTokenOnNonManagedDevicesIfNeeded(userId);
+                if (!mSpManager.hasEscrowData(userId)) {
+                    throw new SecurityException("Escrow token is disabled on the current user");
+                }
             }
             long handle = mSpManager.createTokenBasedSyntheticPassword(token, userId);
             if (auth != null) {
@@ -2085,6 +2087,7 @@ public class LockSettingsService extends ILockSettings.Stub {
 
     private void activateEscrowTokens(AuthenticationToken auth, int userId) throws RemoteException {
         if (DEBUG) Slog.d(TAG, "activateEscrowTokens: user=" + userId);
+        disableEscrowTokenOnNonManagedDevicesIfNeeded(userId);
         synchronized (mSpManager) {
             for (long handle : mSpManager.getPendingTokensForUser(userId)) {
                 Slog.i(TAG, String.format("activateEscrowTokens: %x %d ", handle, userId));

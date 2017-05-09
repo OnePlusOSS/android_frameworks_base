@@ -336,8 +336,12 @@ public class AccessPoint implements Comparable<AccessPoint> {
             builder.append(',').append(securityToString(security, pskType));
         }
         builder.append(",level=").append(getLevel());
-        builder.append(",rankingScore=").append(mRankingScore);
-        builder.append(",badge=").append(mBadge);
+        if (mRankingScore != Integer.MIN_VALUE) {
+            builder.append(",rankingScore=").append(mRankingScore);
+        }
+        if (mBadge != NetworkBadging.BADGING_NONE) {
+            builder.append(",badge=").append(mBadge);
+        }
         builder.append(",metered=").append(isMetered());
 
         return builder.append(')').toString();
@@ -985,25 +989,32 @@ public class AccessPoint implements Comparable<AccessPoint> {
         return false;
     }
 
+    /** Attempt to update the AccessPoint and return true if an update occurred. */
     public boolean update(WifiConfiguration config, WifiInfo info, NetworkInfo networkInfo) {
-        boolean reorder = false;
+        boolean updated = false;
+        final int oldLevel = getLevel();
         if (info != null && isInfoForThisAccessPoint(config, info)) {
-            reorder = (mInfo == null);
-            mRssi = info.getRssi();
-            mInfo = info;
-            mNetworkInfo = networkInfo;
-            if (mAccessPointListener != null) {
-                mAccessPointListener.onAccessPointChanged(this);
+            updated = (mInfo == null);
+            if (mRssi != info.getRssi()) {
+                mRssi = info.getRssi();
+                updated = true;
             }
+            mInfo = info;
+            // TODO(b/37289220): compare NetworkInfo states and set updated = true if necessary
+            mNetworkInfo = networkInfo;
         } else if (mInfo != null) {
-            reorder = true;
+            updated = true;
             mInfo = null;
             mNetworkInfo = null;
-            if (mAccessPointListener != null) {
-                mAccessPointListener.onAccessPointChanged(this);
+        }
+        if (updated && mAccessPointListener != null) {
+            mAccessPointListener.onAccessPointChanged(this);
+
+            if (oldLevel != getLevel() /* current level */) {
+                mAccessPointListener.onLevelChanged(this);
             }
         }
-        return reorder;
+        return updated;
     }
 
     void update(WifiConfiguration config) {

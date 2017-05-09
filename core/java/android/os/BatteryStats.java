@@ -182,7 +182,7 @@ public abstract class BatteryStats implements Parcelable {
      * New in version 19:
      *   - Wakelock data (wl) gets current and max times.
      * New in version 20:
-     *   - Background timers and counters for: Sensor, BluetoothScan, WifiScan, Jobs.
+     *   - Background timers and counters for: Sensor, BluetoothScan, WifiScan, Jobs, Syncs.
      */
     static final String CHECKIN_VERSION = "20";
 
@@ -592,11 +592,6 @@ public abstract class BatteryStats implements Parcelable {
          * Get the total cpu time (in microseconds) this UID had processes executing kernel syscalls.
          */
         public abstract long getSystemCpuTimeUs(int which);
-
-        /**
-         * Get the total cpu power consumed (in milli-ampere-microseconds).
-         */
-        public abstract long getCpuPowerMaUs(int which);
 
         /**
          * Returns the approximate cpu time (in milliseconds) spent at a certain CPU speed for a
@@ -1370,8 +1365,6 @@ public abstract class BatteryStats implements Parcelable {
         public static final int EVENT_WAKEUP_AP = 0x0013;
         // Event for reporting that a specific partial wake lock has been held for a long duration.
         public static final int EVENT_LONG_WAKE_LOCK = 0x0014;
-        // Event reporting the new estimated (learned) capacity of the battery in mAh.
-        public static final int EVENT_ESTIMATED_BATTERY_CAP = 0x0015;
 
         // Number of event types.
         public static final int EVENT_COUNT = 0x0016;
@@ -2506,6 +2499,16 @@ public abstract class BatteryStats implements Parcelable {
     public abstract int getEstimatedBatteryCapacity();
 
     /**
+     * @return The minimum learned battery capacity in uAh.
+     */
+    public abstract int getMinLearnedBatteryCapacity();
+
+    /**
+     * @return The maximum learned battery capacity in uAh.
+     */
+    public abstract int getMaxLearnedBatteryCapacity() ;
+
+    /**
      * Return the array of discharge step durations.
      */
     public abstract LevelStepTracker getDischargeLevelStepTracker();
@@ -2995,13 +2998,14 @@ public abstract class BatteryStats implements Parcelable {
         final String category = STAT_NAMES[which];
 
         // Dump "battery" stat
-        dumpLine(pw, 0 /* uid */, category, BATTERY_DATA, 
+        dumpLine(pw, 0 /* uid */, category, BATTERY_DATA,
                 which == STATS_SINCE_CHARGED ? getStartCount() : "N/A",
                 whichBatteryRealtime / 1000, whichBatteryUptime / 1000,
                 totalRealtime / 1000, totalUptime / 1000,
                 getStartClockTime(),
                 whichBatteryScreenOffRealtime / 1000, whichBatteryScreenOffUptime / 1000,
-                getEstimatedBatteryCapacity());
+                getEstimatedBatteryCapacity(),
+                getMinLearnedBatteryCapacity(), getMaxLearnedBatteryCapacity());
 
         
         // Calculate wakelock times across all uids.
@@ -3392,9 +3396,13 @@ public abstract class BatteryStats implements Parcelable {
                 // Convert from microseconds to milliseconds with rounding
                 final long totalTime = (timer.getTotalTimeLocked(rawRealtime, which) + 500) / 1000;
                 final int count = timer.getCountLocked(which);
+                final Timer bgTimer = timer.getSubTimer();
+                final long bgTime = bgTimer != null ?
+                        (bgTimer.getTotalTimeLocked(rawRealtime, which) + 500) / 1000 : -1;
+                final int bgCount = bgTimer != null ? bgTimer.getCountLocked(which) : -1;
                 if (totalTime != 0) {
                     dumpLine(pw, uid, category, SYNC_DATA, "\"" + syncs.keyAt(isy) + "\"",
-                            totalTime, count);
+                            totalTime, count, bgTime, bgCount);
                 }
             }
 
@@ -3467,10 +3475,9 @@ public abstract class BatteryStats implements Parcelable {
 
             final long userCpuTimeUs = u.getUserCpuTimeUs(which);
             final long systemCpuTimeUs = u.getSystemCpuTimeUs(which);
-            final long powerCpuMaUs = u.getCpuPowerMaUs(which);
-            if (userCpuTimeUs > 0 || systemCpuTimeUs > 0 || powerCpuMaUs > 0) {
+            if (userCpuTimeUs > 0 || systemCpuTimeUs > 0) {
                 dumpLine(pw, uid, category, CPU_DATA, userCpuTimeUs / 1000, systemCpuTimeUs / 1000,
-                        powerCpuMaUs / 1000);
+                        0 /* old cpu power, keep for compatibility */);
             }
 
             final ArrayMap<String, ? extends BatteryStats.Uid.Proc> processStats
@@ -3581,6 +3588,25 @@ public abstract class BatteryStats implements Parcelable {
             sb.append(prefix);
                 sb.append("  Estimated battery capacity: ");
                 sb.append(BatteryStatsHelper.makemAh(estimatedBatteryCapacity));
+                sb.append(" mAh");
+            pw.println(sb.toString());
+        }
+
+        final int minLearnedBatteryCapacity = getMinLearnedBatteryCapacity();
+        if (minLearnedBatteryCapacity > 0) {
+            sb.setLength(0);
+            sb.append(prefix);
+                sb.append("  Min learned battery capacity: ");
+                sb.append(BatteryStatsHelper.makemAh(minLearnedBatteryCapacity / 1000));
+                sb.append(" mAh");
+            pw.println(sb.toString());
+        }
+        final int maxLearnedBatteryCapacity = getMaxLearnedBatteryCapacity();
+        if (maxLearnedBatteryCapacity > 0) {
+            sb.setLength(0);
+            sb.append(prefix);
+                sb.append("  Max learned battery capacity: ");
+                sb.append(BatteryStatsHelper.makemAh(maxLearnedBatteryCapacity / 1000));
                 sb.append(" mAh");
             pw.println(sb.toString());
         }
@@ -4608,6 +4634,10 @@ public abstract class BatteryStats implements Parcelable {
                 // Convert from microseconds to milliseconds with rounding
                 final long totalTime = (timer.getTotalTimeLocked(rawRealtime, which) + 500) / 1000;
                 final int count = timer.getCountLocked(which);
+                final Timer bgTimer = timer.getSubTimer();
+                final long bgTime = bgTimer != null ?
+                        (bgTimer.getTotalTimeLocked(rawRealtime, which) + 500) / 1000 : -1;
+                final int bgCount = bgTimer != null ? bgTimer.getCountLocked(which) : -1;
                 sb.setLength(0);
                 sb.append(prefix);
                 sb.append("    Sync ");
@@ -4618,6 +4648,13 @@ public abstract class BatteryStats implements Parcelable {
                     sb.append("realtime (");
                     sb.append(count);
                     sb.append(" times)");
+                    if (bgTime > 0) {
+                        sb.append(", ");
+                        formatTimeMs(sb, bgTime);
+                        sb.append("background (");
+                        sb.append(bgCount);
+                        sb.append(" times)");
+                    }
                 } else {
                     sb.append("(not used)");
                 }
@@ -4758,17 +4795,13 @@ public abstract class BatteryStats implements Parcelable {
 
             final long userCpuTimeUs = u.getUserCpuTimeUs(which);
             final long systemCpuTimeUs = u.getSystemCpuTimeUs(which);
-            final long powerCpuMaUs = u.getCpuPowerMaUs(which);
-            if (userCpuTimeUs > 0 || systemCpuTimeUs > 0 || powerCpuMaUs > 0) {
+            if (userCpuTimeUs > 0 || systemCpuTimeUs > 0) {
                 sb.setLength(0);
                 sb.append(prefix);
                 sb.append("    Total cpu time: u=");
                 formatTimeMs(sb, userCpuTimeUs / 1000);
                 sb.append("s=");
                 formatTimeMs(sb, systemCpuTimeUs / 1000);
-                sb.append("p=");
-                printmAh(sb, powerCpuMaUs / (1000.0 * 1000.0 * 60.0 * 60.0));
-                sb.append("mAh");
                 pw.println(sb.toString());
             }
 

@@ -65,16 +65,7 @@ using android::base::StringPrintf;
 
 namespace aapt {
 
-// The type of package to build.
-enum class PackageType {
-  kApp,
-  kSharedLib,
-  kStaticLib,
-};
-
 struct LinkOptions {
-  PackageType package_type = PackageType::kApp;
-
   std::string output_path;
   std::string manifest_path;
   std::vector<std::string> include_paths;
@@ -87,6 +78,7 @@ struct LinkOptions {
   Maybe<std::string> generate_java_class_path;
   Maybe<std::string> custom_java_package;
   std::set<std::string> extra_java_packages;
+  Maybe<std::string> generate_text_symbols_path;
   Maybe<std::string> generate_proguard_rules_path;
   Maybe<std::string> generate_main_dex_proguard_rules_path;
   bool generate_non_final_ids = false;
@@ -126,11 +118,20 @@ struct LinkOptions {
 
 class LinkContext : public IAaptContext {
  public:
-  LinkContext() : name_mangler_({}), symbols_(&name_mangler_) {
+  LinkContext(IDiagnostics* diagnostics)
+      : diagnostics_(diagnostics), name_mangler_({}), symbols_(&name_mangler_) {
+  }
+
+  PackageType GetPackageType() override {
+    return package_type_;
+  }
+
+  void SetPackageType(PackageType type) {
+    package_type_ = type;
   }
 
   IDiagnostics* GetDiagnostics() override {
-    return &diagnostics_;
+    return diagnostics_;
   }
 
   NameMangler* GetNameMangler() override {
@@ -180,13 +181,70 @@ class LinkContext : public IAaptContext {
  private:
   DISALLOW_COPY_AND_ASSIGN(LinkContext);
 
-  StdErrDiagnostics diagnostics_;
+  PackageType package_type_ = PackageType::kApp;
+  IDiagnostics* diagnostics_;
   NameMangler name_mangler_;
   std::string compilation_package_;
   uint8_t package_id_ = 0x0;
   SymbolTable symbols_;
   bool verbose_ = false;
   int min_sdk_version_ = 0;
+};
+
+// A custom delegate that generates compatible pre-O IDs for use with feature splits.
+// Feature splits use package IDs > 7f, which in Java (since Java doesn't have unsigned ints)
+// is interpreted as a negative number. Some verification was wrongly assuming negative values
+// were invalid.
+//
+// This delegate will attempt to masquerade any '@id/' references with ID 0xPPTTEEEE,
+// where PP > 7f, as 0x7fPPEEEE. Any potential overlapping is verified and an error occurs if such
+// an overlap exists.
+class FeatureSplitSymbolTableDelegate : public DefaultSymbolTableDelegate {
+ public:
+  FeatureSplitSymbolTableDelegate(IAaptContext* context) : context_(context) {
+  }
+
+  virtual ~FeatureSplitSymbolTableDelegate() = default;
+
+  virtual std::unique_ptr<SymbolTable::Symbol> FindByName(
+      const ResourceName& name,
+      const std::vector<std::unique_ptr<ISymbolSource>>& sources) override {
+    std::unique_ptr<SymbolTable::Symbol> symbol =
+        DefaultSymbolTableDelegate::FindByName(name, sources);
+    if (symbol == nullptr) {
+      return {};
+    }
+
+    // Check to see if this is an 'id' with the target package.
+    if (name.type == ResourceType::kId && symbol->id) {
+      ResourceId* id = &symbol->id.value();
+      if (id->package_id() > kAppPackageId) {
+        // Rewrite the resource ID to be compatible pre-O.
+        ResourceId rewritten_id(kAppPackageId, id->package_id(), id->entry_id());
+
+        // Check that this doesn't overlap another resource.
+        if (DefaultSymbolTableDelegate::FindById(rewritten_id, sources) != nullptr) {
+          // The ID overlaps, so log a message (since this is a weird failure) and fail.
+          context_->GetDiagnostics()->Error(DiagMessage() << "Failed to rewrite " << name
+                                                          << " for pre-O feature split support");
+          return {};
+        }
+
+        if (context_->IsVerbose()) {
+          context_->GetDiagnostics()->Note(DiagMessage() << "rewriting " << name << " (" << *id
+                                                         << ") -> (" << rewritten_id << ")");
+        }
+
+        *id = rewritten_id;
+      }
+    }
+    return symbol;
+  }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(FeatureSplitSymbolTableDelegate);
+
+  IAaptContext* context_;
 };
 
 static bool FlattenXml(xml::XmlResource* xml_res, const StringPiece& path,
@@ -376,8 +434,8 @@ bool ResourceFileFlattener::LinkAndVersionXmlFile(ResourceTable* table, FileOper
         versioned_file_desc.config.sdkVersion = (uint16_t)sdk_level;
 
         FileOperation new_file_op;
-        new_file_op.xml_to_flatten =
-            util::make_unique<xml::XmlResource>(versioned_file_desc, doc->root->Clone());
+        new_file_op.xml_to_flatten = util::make_unique<xml::XmlResource>(
+            versioned_file_desc, StringPool{}, doc->root->Clone());
         new_file_op.config = versioned_file_desc.config;
         new_file_op.entry = file_op->entry;
         new_file_op.dst_path =
@@ -626,7 +684,7 @@ class LinkCommand {
       std::string error_str;
       std::unique_ptr<ResourceTable> include_static = LoadStaticLibrary(path, &error_str);
       if (include_static) {
-        if (options_.package_type != PackageType::kStaticLib) {
+        if (context_->GetPackageType() != PackageType::kStaticLib) {
           // Can't include static libraries when not building a static library (they have no IDs
           // assigned).
           context_->GetDiagnostics()->Error(
@@ -837,8 +895,8 @@ class LinkCommand {
   }
 
   bool WriteJavaFile(ResourceTable* table, const StringPiece& package_name_to_generate,
-                     const StringPiece& out_package,
-                     const JavaClassGeneratorOptions& java_options) {
+                     const StringPiece& out_package, const JavaClassGeneratorOptions& java_options,
+                     const Maybe<std::string> out_text_symbols_path = {}) {
     if (!options_.generate_java_class_path) {
       return true;
     }
@@ -861,8 +919,20 @@ class LinkCommand {
       return false;
     }
 
+    std::unique_ptr<std::ofstream> fout_text;
+    if (out_text_symbols_path) {
+      fout_text =
+          util::make_unique<std::ofstream>(out_text_symbols_path.value(), std::ofstream::binary);
+      if (!*fout_text) {
+        context_->GetDiagnostics()->Error(
+            DiagMessage() << "failed writing to '" << out_text_symbols_path.value()
+                          << "': " << android::base::SystemErrorCodeToString(errno));
+        return false;
+      }
+    }
+
     JavaClassGenerator generator(context_, table, java_options);
-    if (!generator.Generate(package_name_to_generate, out_package, &fout)) {
+    if (!generator.Generate(package_name_to_generate, out_package, &fout, fout_text.get())) {
       context_->GetDiagnostics()->Error(DiagMessage(out_path) << generator.getError());
       return false;
     }
@@ -1287,7 +1357,7 @@ class LinkCommand {
    */
   bool WriteApk(IArchiveWriter* writer, proguard::KeepSet* keep_set, xml::XmlResource* manifest,
                 ResourceTable* table) {
-    const bool keep_raw_values = options_.package_type == PackageType::kStaticLib;
+    const bool keep_raw_values = context_->GetPackageType() == PackageType::kStaticLib;
     bool result =
         FlattenXml(manifest, "AndroidManifest.xml", {}, keep_raw_values, writer, context_);
     if (!result) {
@@ -1312,7 +1382,7 @@ class LinkCommand {
       return false;
     }
 
-    if (options_.package_type == PackageType::kStaticLib) {
+    if (context_->GetPackageType() == PackageType::kStaticLib) {
       if (!FlattenTableToPb(table, writer)) {
         return false;
       }
@@ -1361,7 +1431,7 @@ class LinkCommand {
       context_->SetPackageId(0x01);
 
       // Verify we're building a regular app.
-      if (options_.package_type != PackageType::kApp) {
+      if (context_->GetPackageType() != PackageType::kApp) {
         context_->GetDiagnostics()->Error(
             DiagMessage() << "package 'android' can only be built as a regular app");
         return 1;
@@ -1401,7 +1471,7 @@ class LinkCommand {
       return 1;
     }
 
-    if (options_.package_type != PackageType::kStaticLib) {
+    if (context_->GetPackageType() != PackageType::kStaticLib) {
       PrivateAttributeMover mover;
       if (!mover.Consume(context_, &final_table_)) {
         context_->GetDiagnostics()->Error(DiagMessage() << "failed moving private attributes");
@@ -1450,13 +1520,26 @@ class LinkCommand {
     context_->GetExternalSymbols()->PrependSource(
         util::make_unique<ResourceTableSymbolSource>(&final_table_));
 
+    // Workaround for pre-O runtime that would treat negative resource IDs
+    // (any ID with a package ID > 7f) as invalid. Intercept any ID (PPTTEEEE) with PP > 0x7f
+    // and type == 'id', and return the ID 0x7fPPEEEE. IDs don't need to be real resources, they
+    // are just identifiers.
+    if (context_->GetMinSdkVersion() < SDK_O && context_->GetPackageType() == PackageType::kApp) {
+      if (context_->IsVerbose()) {
+        context_->GetDiagnostics()->Note(DiagMessage()
+                                         << "enabling pre-O feature split ID rewriting");
+      }
+      context_->GetExternalSymbols()->SetDelegate(
+          util::make_unique<FeatureSplitSymbolTableDelegate>(context_));
+    }
+
     ReferenceLinker linker;
     if (!linker.Consume(context_, &final_table_)) {
       context_->GetDiagnostics()->Error(DiagMessage() << "failed linking references");
       return 1;
     }
 
-    if (options_.package_type == PackageType::kStaticLib) {
+    if (context_->GetPackageType() == PackageType::kStaticLib) {
       if (!options_.products.empty()) {
         context_->GetDiagnostics()->Warn(DiagMessage()
                                          << "can't select products when building static library");
@@ -1477,7 +1560,7 @@ class LinkCommand {
       }
     }
 
-    if (options_.package_type != PackageType::kStaticLib && context_->GetMinSdkVersion() > 0) {
+    if (context_->GetPackageType() != PackageType::kStaticLib && context_->GetMinSdkVersion() > 0) {
       if (context_->IsVerbose()) {
         context_->GetDiagnostics()->Note(DiagMessage()
                                          << "collapsing resource versions for minimum SDK "
@@ -1501,7 +1584,7 @@ class LinkCommand {
     proguard::KeepSet proguard_keep_set;
     proguard::KeepSet proguard_main_dex_keep_set;
 
-    if (options_.package_type == PackageType::kStaticLib) {
+    if (context_->GetPackageType() == PackageType::kStaticLib) {
       if (options_.table_splitter_options.config_filter != nullptr ||
           !options_.table_splitter_options.preferred_densities.empty()) {
         context_->GetDiagnostics()->Warn(DiagMessage()
@@ -1628,11 +1711,12 @@ class LinkCommand {
       template_options.types = JavaClassGeneratorOptions::SymbolTypes::kAll;
       template_options.javadoc_annotations = options_.javadoc_annotations;
 
-      if (options_.package_type == PackageType::kStaticLib || options_.generate_non_final_ids) {
+      if (context_->GetPackageType() == PackageType::kStaticLib ||
+          options_.generate_non_final_ids) {
         template_options.use_final = false;
       }
 
-      if (options_.package_type == PackageType::kSharedLib) {
+      if (context_->GetPackageType() == PackageType::kSharedLib) {
         template_options.use_final = false;
         template_options.rewrite_callback_options = OnResourcesLoadedCallbackOptions{};
       }
@@ -1683,7 +1767,8 @@ class LinkCommand {
             std::move(packages_to_callback);
       }
 
-      if (!WriteJavaFile(&final_table_, actual_package, output_package, options)) {
+      if (!WriteJavaFile(&final_table_, actual_package, output_package, options,
+                         options_.generate_text_symbols_path)) {
         return 1;
       }
     }
@@ -1721,8 +1806,8 @@ class LinkCommand {
   std::map<size_t, std::string> shared_libs_;
 };
 
-int Link(const std::vector<StringPiece>& args) {
-  LinkContext context;
+int Link(const std::vector<StringPiece>& args, IDiagnostics* diagnostics) {
+  LinkContext context(diagnostics);
   LinkOptions options;
   std::vector<std::string> overlay_arg_list;
   std::vector<std::string> extra_java_packages;
@@ -1785,9 +1870,9 @@ int Link(const std::vector<StringPiece>& args) {
           .OptionalSwitch("-z", "Require localization of strings marked 'suggested'.",
                           &require_localization)
           .OptionalFlagList("-c",
-                        "Comma separated list of configurations to include. The default\n"
-                        "is all configurations.",
-                        &configs)
+                            "Comma separated list of configurations to include. The default\n"
+                            "is all configurations.",
+                            &configs)
           .OptionalFlag("--preferred-density",
                         "Selects the closest matching density and strips out all others.",
                         &preferred_density)
@@ -1841,6 +1926,10 @@ int Link(const std::vector<StringPiece>& args) {
           .OptionalFlagList("--add-javadoc-annotation",
                             "Adds a JavaDoc annotation to all generated Java classes.",
                             &options.javadoc_annotations)
+          .OptionalFlag("--output-text-symbols",
+                        "Generates a text file containing the resource symbols of the R class in\n"
+                        "the specified folder.",
+                        &options.generate_text_symbols_path)
           .OptionalSwitch("--auto-add-overlay",
                           "Allows the addition of new resources in overlays without\n"
                           "<add-resource> tags.",
@@ -1855,7 +1944,8 @@ int Link(const std::vector<StringPiece>& args) {
                             &options.extensions_to_not_compress)
           .OptionalFlagList("--split",
                             "Split resources matching a set of configs out to a Split APK.\n"
-                            "Syntax: path/to/output.apk:<config>[,<config>[...]].",
+                            "Syntax: path/to/output.apk:<config>[,<config>[...]].\n"
+                            "On Windows, use a semicolon ';' separator instead.",
                             &split_args)
           .OptionalSwitch("-v", "Enables verbose logging.", &verbose);
 
@@ -1903,18 +1993,18 @@ int Link(const std::vector<StringPiece>& args) {
   }
 
   if (shared_lib) {
-    options.package_type = PackageType::kSharedLib;
+    context.SetPackageType(PackageType::kSharedLib);
     context.SetPackageId(0x00);
   } else if (static_lib) {
-    options.package_type = PackageType::kStaticLib;
+    context.SetPackageType(PackageType::kStaticLib);
     context.SetPackageId(kAppPackageId);
   } else {
-    options.package_type = PackageType::kApp;
+    context.SetPackageType(PackageType::kApp);
     context.SetPackageId(kAppPackageId);
   }
 
   if (package_id) {
-    if (options.package_type != PackageType::kApp) {
+    if (context.GetPackageType() != PackageType::kApp) {
       context.GetDiagnostics()->Error(
           DiagMessage() << "can't specify --package-id when not building a regular app");
       return 1;
@@ -1981,7 +2071,7 @@ int Link(const std::vector<StringPiece>& args) {
     }
   }
 
-  if (options.package_type != PackageType::kStaticLib && stable_id_file_path) {
+  if (context.GetPackageType() != PackageType::kStaticLib && stable_id_file_path) {
     if (!LoadStableIdMap(context.GetDiagnostics(), stable_id_file_path.value(),
                          &options.stable_id_map)) {
       return 1;
@@ -1996,7 +2086,7 @@ int Link(const std::vector<StringPiece>& args) {
        ".3gpp2", ".amr",  ".awb",  ".wma", ".wmv",  ".webm", ".mkv"});
 
   // Turn off auto versioning for static-libs.
-  if (options.package_type == PackageType::kStaticLib) {
+  if (context.GetPackageType() == PackageType::kStaticLib) {
     options.no_auto_version = true;
     options.no_version_vectors = true;
     options.no_version_transitions = true;

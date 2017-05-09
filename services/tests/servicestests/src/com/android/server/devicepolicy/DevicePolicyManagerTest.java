@@ -1217,7 +1217,8 @@ public class DevicePolicyManagerTest extends DpmTestBase {
     }
 
     /**
-     * Setup a package in the package manager mock. Useful for faking installed applications.
+     * Setup a package in the package manager mock for {@link DpmMockContext#CALLER_USER_HANDLE}.
+     * Useful for faking installed applications.
      *
      * @param packageName the name of the package to be setup
      * @param appId the application ID to be given to the package
@@ -1225,19 +1226,41 @@ public class DevicePolicyManagerTest extends DpmTestBase {
      */
     private int setupPackageInPackageManager(final String packageName, final int appId)
             throws Exception {
+        return setupPackageInPackageManager(
+                packageName, DpmMockContext.CALLER_USER_HANDLE, appId,
+                ApplicationInfo.FLAG_HAS_CODE);
+    }
+
+    /**
+     * Setup a package in the package manager mock. Useful for faking installed applications.
+     *
+     * @param packageName the name of the package to be setup
+     * @param userId the user id where the package will be "installed"
+     * @param appId the application ID to be given to the package
+     * @param flags flags to set in the ApplicationInfo for this package
+     * @return the UID of the package as known by the mock package manager
+     */
+    private int setupPackageInPackageManager(
+            final String packageName, int userId, final int appId, int flags)
+            throws Exception {
         // Make the PackageManager return the package instead of throwing a NameNotFoundException
         final PackageInfo pi = new PackageInfo();
         pi.applicationInfo = new ApplicationInfo();
-        pi.applicationInfo.flags = ApplicationInfo.FLAG_HAS_CODE;
+        pi.applicationInfo.flags = flags;
         doReturn(pi).when(mContext.ipackageManager).getPackageInfo(
                 eq(packageName),
                 anyInt(),
-                eq(DpmMockContext.CALLER_USER_HANDLE));
+                eq(userId));
+        doReturn(pi.applicationInfo).when(mContext.ipackageManager).getApplicationInfo(
+                eq(packageName),
+                anyInt(),
+                eq(userId));
+
         // Setup application UID with the PackageManager
-        final int uid = UserHandle.getUid(DpmMockContext.CALLER_USER_HANDLE, appId);
+        final int uid = UserHandle.getUid(userId, appId);
         doReturn(uid).when(mContext.packageManager).getPackageUidAsUser(
                 eq(packageName),
-                eq(DpmMockContext.CALLER_USER_HANDLE));
+                eq(userId));
         // Associate packageName to uid
         doReturn(packageName).when(mContext.ipackageManager).getNameForUid(eq(uid));
         doReturn(new String[]{packageName})
@@ -2154,7 +2177,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
 
         // Have the profile owner specify a set of affiliation ids. Check that the test user remains
         // unaffiliated.
-        final List<String> userAffiliationIds = new ArrayList<>();
+        final Set<String> userAffiliationIds = new ArraySet<>();
         userAffiliationIds.add("red");
         userAffiliationIds.add("green");
         userAffiliationIds.add("blue");
@@ -2164,7 +2187,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
 
         // Have the device owner specify a set of affiliation ids that do not intersect with those
         // specified by the profile owner. Check that the test user remains unaffiliated.
-        final List<String> deviceAffiliationIds = new ArrayList<>();
+        final Set<String> deviceAffiliationIds = new ArraySet<>();
         deviceAffiliationIds.add("cyan");
         deviceAffiliationIds.add("yellow");
         deviceAffiliationIds.add("magenta");
@@ -2184,7 +2207,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         assertTrue(dpm.isAffiliatedUser());
 
         // Clear affiliation ids for the profile owner. The user becomes unaffiliated.
-        dpm.setAffiliationIds(admin2, Collections.emptyList());
+        dpm.setAffiliationIds(admin2, Collections.emptySet());
         assertTrue(dpm.getAffiliationIds(admin2).isEmpty());
         assertFalse(dpm.isAffiliatedUser());
 
@@ -3377,7 +3400,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         MoreAsserts.assertEmpty(targetUsers);
 
         // Setting affiliation ids
-        final List<String> userAffiliationIds = Arrays.asList("some.affiliation-id");
+        final Set<String> userAffiliationIds = Collections.singleton("some.affiliation-id");
         mContext.binder.callingUid = DpmMockContext.CALLER_SYSTEM_USER_UID;
         dpm.setAffiliationIds(admin1, userAffiliationIds);
 
@@ -3397,7 +3420,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         MoreAsserts.assertContentsInAnyOrder(targetUsers, UserHandle.SYSTEM);
 
         // Changing affiliation ids in one
-        dpm.setAffiliationIds(admin1, Arrays.asList("some-different-affiliation-id"));
+        dpm.setAffiliationIds(admin1, Collections.singleton("some-different-affiliation-id"));
 
         // Since the managed profile is not affiliated any more, they should not be allowed to talk
         // to each other.
@@ -3422,7 +3445,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         addManagedProfile(adminDifferentPackage, MANAGED_PROFILE_ADMIN_UID, admin2);
 
         // Setting affiliation ids
-        final List<String> userAffiliationIds = Arrays.asList("some-affiliation-id");
+        final Set<String> userAffiliationIds = Collections.singleton("some-affiliation-id");
         dpm.setAffiliationIds(admin1, userAffiliationIds);
 
         mContext.binder.callingUid = MANAGED_PROFILE_ADMIN_UID;
@@ -3484,7 +3507,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         assertFalse(dpm.isLockTaskPermitted("doPackage1"));
 
         // Setting same affiliation ids
-        final List<String> userAffiliationIds = Arrays.asList("some-affiliation-id");
+        final Set<String> userAffiliationIds = Collections.singleton("some-affiliation-id");
         mContext.binder.callingUid = DpmMockContext.CALLER_SYSTEM_USER_UID;
         dpm.setAffiliationIds(admin1, userAffiliationIds);
 
@@ -3500,7 +3523,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
                 .updateLockTaskPackages(eq(MANAGED_PROFILE_USER_ID), eq(poPackages));
 
         // Unaffiliate the profile, lock task mode no longer available on the profile.
-        dpm.setAffiliationIds(adminDifferentPackage, Collections.<String>emptyList());
+        dpm.setAffiliationIds(adminDifferentPackage, Collections.emptySet());
         assertFalse(dpm.isLockTaskPermitted("poPackage1"));
         // Lock task packages cleared when loading user data and when the user becomes unaffiliated.
         verify(mContext.iactivityManager, times(2))
@@ -3969,6 +3992,210 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         assertFalse(dpm.isCurrentInputMethodSetByOwner());
         mContext.binder.callingUid = secondUserSystemUid;
         assertFalse(dpm.isCurrentInputMethodSetByOwner());
+    }
+
+    public void testSetPermittedCrossProfileNotificationListeners_unavailableForDo()
+            throws Exception {
+        // Set up a device owner.
+        mContext.binder.callingUid = DpmMockContext.CALLER_SYSTEM_USER_UID;
+        setupDeviceOwner();
+        assertSetPermittedCrossProfileNotificationListenersUnavailable(mContext.binder.callingUid);
+    }
+
+    public void testSetPermittedCrossProfileNotificationListeners_unavailableForPoOnUser()
+            throws Exception {
+        // Set up a profile owner.
+        mContext.binder.callingUid = DpmMockContext.CALLER_UID;
+        setupProfileOwner();
+        assertSetPermittedCrossProfileNotificationListenersUnavailable(mContext.binder.callingUid);
+    }
+
+    private void assertSetPermittedCrossProfileNotificationListenersUnavailable(
+            int adminUid) throws Exception {
+        mContext.binder.callingUid = adminUid;
+        final int userId = UserHandle.getUserId(adminUid);
+
+        final String packageName = "some.package";
+        assertFalse(dpms.setPermittedCrossProfileNotificationListeners(
+                admin1, Collections.singletonList(packageName)));
+        assertNull(dpms.getPermittedCrossProfileNotificationListeners(admin1));
+
+        mContext.binder.callingUid = DpmMockContext.SYSTEM_UID;
+        assertTrue(dpms.isNotificationListenerServicePermitted(packageName, userId));
+
+        // Attempt to set to empty list (which means no listener is whitelisted)
+        mContext.binder.callingUid = adminUid;
+        assertFalse(dpms.setPermittedCrossProfileNotificationListeners(
+                admin1, Collections.<String>emptyList()));
+        assertNull(dpms.getPermittedCrossProfileNotificationListeners(admin1));
+
+        mContext.binder.callingUid = DpmMockContext.SYSTEM_UID;
+        assertTrue(dpms.isNotificationListenerServicePermitted(packageName, userId));
+    }
+
+    public void testIsNotificationListenerServicePermitted_onlySystemCanCall() throws Exception {
+        // Set up a managed profile
+        final int MANAGED_PROFILE_USER_ID = 15;
+        final int MANAGED_PROFILE_ADMIN_UID = UserHandle.getUid(MANAGED_PROFILE_USER_ID, 19436);
+        addManagedProfile(admin1, MANAGED_PROFILE_ADMIN_UID, admin1);
+        mContext.binder.callingUid = MANAGED_PROFILE_ADMIN_UID;
+
+        final String permittedListener = "some.package";
+        setupPackageInPackageManager(
+                permittedListener,
+                UserHandle.USER_SYSTEM, // We check the packageInfo from the primary user.
+                /*appId=*/ 12345, /*flags=*/ 0);
+
+        assertTrue(dpms.setPermittedCrossProfileNotificationListeners(
+                admin1, Collections.singletonList(permittedListener)));
+
+        try {
+            dpms.isNotificationListenerServicePermitted(
+                permittedListener, MANAGED_PROFILE_USER_ID);
+            fail("isNotificationListenerServicePermitted should throw if not called from System");
+        } catch (SecurityException expected) {
+        }
+
+        mContext.binder.callingUid = DpmMockContext.SYSTEM_UID;
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                permittedListener, MANAGED_PROFILE_USER_ID));
+    }
+
+    public void testSetPermittedCrossProfileNotificationListeners_managedProfile()
+            throws Exception {
+        // Set up a managed profile
+        final int MANAGED_PROFILE_USER_ID = 15;
+        final int MANAGED_PROFILE_ADMIN_UID = UserHandle.getUid(MANAGED_PROFILE_USER_ID, 19436);
+        addManagedProfile(admin1, MANAGED_PROFILE_ADMIN_UID, admin1);
+        mContext.binder.callingUid = MANAGED_PROFILE_ADMIN_UID;
+
+        final String permittedListener = "permitted.package";
+        int appId = 12345;
+        setupPackageInPackageManager(
+                permittedListener,
+                UserHandle.USER_SYSTEM,  // We check the packageInfo from the primary user.
+                appId, /*flags=*/ 0);
+
+        final String notPermittedListener = "not.permitted.package";
+        setupPackageInPackageManager(
+                notPermittedListener,
+                UserHandle.USER_SYSTEM,  // We check the packageInfo from the primary user.
+                ++appId, /*flags=*/ 0);
+
+        final String systemListener = "system.package";
+        setupPackageInPackageManager(
+                systemListener,
+                UserHandle.USER_SYSTEM,  // We check the packageInfo from the primary user.
+                ++appId, ApplicationInfo.FLAG_SYSTEM);
+
+        // By default all packages are allowed
+        assertNull(dpms.getPermittedCrossProfileNotificationListeners(admin1));
+
+        mContext.binder.callingUid = DpmMockContext.SYSTEM_UID;
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                permittedListener, MANAGED_PROFILE_USER_ID));
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                notPermittedListener, MANAGED_PROFILE_USER_ID));
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                systemListener, MANAGED_PROFILE_USER_ID));
+
+        // Setting only one package in the whitelist
+        mContext.binder.callingUid = MANAGED_PROFILE_ADMIN_UID;
+        assertTrue(dpms.setPermittedCrossProfileNotificationListeners(
+                admin1, Collections.singletonList(permittedListener)));
+        List<String> permittedListeners =
+                dpms.getPermittedCrossProfileNotificationListeners(admin1);
+        assertEquals(1, permittedListeners.size());
+        assertEquals(permittedListener, permittedListeners.get(0));
+
+        mContext.binder.callingUid = DpmMockContext.SYSTEM_UID;
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                permittedListener, MANAGED_PROFILE_USER_ID));
+        assertFalse(dpms.isNotificationListenerServicePermitted(
+                notPermittedListener, MANAGED_PROFILE_USER_ID));
+        // System packages are always allowed (even if not in the whitelist)
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                systemListener, MANAGED_PROFILE_USER_ID));
+
+        // Setting an empty whitelist - only system listeners allowed
+        mContext.binder.callingUid = MANAGED_PROFILE_ADMIN_UID;
+        assertTrue(dpms.setPermittedCrossProfileNotificationListeners(
+                admin1, Collections.<String>emptyList()));
+        assertEquals(0, dpms.getPermittedCrossProfileNotificationListeners(admin1).size());
+
+        mContext.binder.callingUid = DpmMockContext.SYSTEM_UID;
+        assertFalse(dpms.isNotificationListenerServicePermitted(
+                permittedListener, MANAGED_PROFILE_USER_ID));
+        assertFalse(dpms.isNotificationListenerServicePermitted(
+                notPermittedListener, MANAGED_PROFILE_USER_ID));
+        // System packages are always allowed (even if not in the whitelist)
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                systemListener, MANAGED_PROFILE_USER_ID));
+
+        // Setting a null whitelist - all listeners allowed
+        mContext.binder.callingUid = MANAGED_PROFILE_ADMIN_UID;
+        assertTrue(dpms.setPermittedCrossProfileNotificationListeners(admin1, null));
+        assertNull(dpms.getPermittedCrossProfileNotificationListeners(admin1));
+
+        mContext.binder.callingUid = DpmMockContext.SYSTEM_UID;
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                permittedListener, MANAGED_PROFILE_USER_ID));
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                notPermittedListener, MANAGED_PROFILE_USER_ID));
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                systemListener, MANAGED_PROFILE_USER_ID));
+    }
+
+    public void testSetPermittedCrossProfileNotificationListeners_doesNotAffectPrimaryProfile()
+            throws Exception {
+        // Set up a managed profile
+        final int MANAGED_PROFILE_USER_ID = 15;
+        final int MANAGED_PROFILE_ADMIN_UID = UserHandle.getUid(MANAGED_PROFILE_USER_ID, 19436);
+        addManagedProfile(admin1, MANAGED_PROFILE_ADMIN_UID, admin1);
+        mContext.binder.callingUid = MANAGED_PROFILE_ADMIN_UID;
+
+        final String nonSystemPackage = "non.system.package";
+        int appId = 12345;
+        setupPackageInPackageManager(
+                nonSystemPackage,
+                UserHandle.USER_SYSTEM,  // We check the packageInfo from the primary user.
+                appId, /*flags=*/ 0);
+
+        final String systemListener = "system.package";
+        setupPackageInPackageManager(
+                systemListener,
+                UserHandle.USER_SYSTEM,  // We check the packageInfo from the primary user.
+                ++appId, ApplicationInfo.FLAG_SYSTEM);
+
+        // By default all packages are allowed (for all profiles)
+        assertNull(dpms.getPermittedCrossProfileNotificationListeners(admin1));
+
+        mContext.binder.callingUid = DpmMockContext.SYSTEM_UID;
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                nonSystemPackage, MANAGED_PROFILE_USER_ID));
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                systemListener, MANAGED_PROFILE_USER_ID));
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                nonSystemPackage, UserHandle.USER_SYSTEM));
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                systemListener, UserHandle.USER_SYSTEM));
+
+        // Setting an empty whitelist - only system listeners allowed in managed profile, but
+        // all allowed in primary profile
+        mContext.binder.callingUid = MANAGED_PROFILE_ADMIN_UID;
+        assertTrue(dpms.setPermittedCrossProfileNotificationListeners(
+                admin1, Collections.<String>emptyList()));
+        assertEquals(0, dpms.getPermittedCrossProfileNotificationListeners(admin1).size());
+
+        mContext.binder.callingUid = DpmMockContext.SYSTEM_UID;
+        assertFalse(dpms.isNotificationListenerServicePermitted(
+                nonSystemPackage, MANAGED_PROFILE_USER_ID));
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                systemListener, MANAGED_PROFILE_USER_ID));
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                nonSystemPackage, UserHandle.USER_SYSTEM));
+        assertTrue(dpms.isNotificationListenerServicePermitted(
+                systemListener, UserHandle.USER_SYSTEM));
     }
 
     public void testGetOwnerInstalledCaCertsForDeviceOwner() throws Exception {

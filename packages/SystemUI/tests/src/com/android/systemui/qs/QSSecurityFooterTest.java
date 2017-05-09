@@ -40,6 +40,15 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+/*
+ * Compile and run the whole SystemUI test suite:
+   runtest --path frameworks/base/packages/SystemUI/tests
+ *
+ * Compile and run just this class:
+   runtest --path \
+   frameworks/base/packages/SystemUI/tests/src/com/android/systemui/qs/QSSecurityFooterTest.java
+*/
+
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 public class QSSecurityFooterTest extends SysuiTestCase {
@@ -47,11 +56,11 @@ public class QSSecurityFooterTest extends SysuiTestCase {
     private final String MANAGING_ORGANIZATION = "organization";
     private final String DEVICE_OWNER_PACKAGE = "TestDPC";
     private final String VPN_PACKAGE = "TestVPN";
+    private final String VPN_PACKAGE_2 = "TestVPN 2";
 
     private ViewGroup mRootView;
     private TextView mFooterText;
     private TestableImageView mFooterIcon;
-    private TestableImageView mFooterIcon2;
     private QSSecurityFooter mFooter;
     private SecurityController mSecurityController = mock(SecurityController.class);
 
@@ -69,15 +78,12 @@ public class QSSecurityFooterTest extends SysuiTestCase {
         mRootView = (ViewGroup) mFooter.getView();
         mFooterText = (TextView) mRootView.findViewById(R.id.footer_text);
         mFooterIcon = (TestableImageView) mRootView.findViewById(R.id.footer_icon);
-        mFooterIcon2 = (TestableImageView) mRootView.findViewById(R.id.footer_icon2);
         mFooter.setHostEnvironment(null);
     }
 
     @Test
     public void testUnmanaged() {
         when(mSecurityController.isDeviceManaged()).thenReturn(false);
-        when(mSecurityController.isVpnEnabled()).thenReturn(false);
-        when(mSecurityController.isVpnBranded()).thenReturn(false);
         mFooter.refreshState();
 
         waitForIdleSync(mFooter.mHandler);
@@ -91,8 +97,12 @@ public class QSSecurityFooterTest extends SysuiTestCase {
         mFooter.refreshState();
 
         waitForIdleSync(mFooter.mHandler);
-        assertEquals(mContext.getString(R.string.do_disclosure_generic), mFooterText.getText());
+        assertEquals(mContext.getString(R.string.quick_settings_disclosure_management),
+                     mFooterText.getText());
         assertEquals(View.VISIBLE, mRootView.getVisibility());
+        assertEquals(View.VISIBLE, mFooterIcon.getVisibility());
+        // -1 == never set.
+        assertEquals(-1, mFooterIcon.getLastImageResource());
     }
 
     @Test
@@ -103,37 +113,100 @@ public class QSSecurityFooterTest extends SysuiTestCase {
         mFooter.refreshState();
 
         waitForIdleSync(mFooter.mHandler);
-        assertEquals(mContext.getString(R.string.do_disclosure_with_name, MANAGING_ORGANIZATION),
+        assertEquals(mContext.getString(R.string.quick_settings_disclosure_named_management,
+                                        MANAGING_ORGANIZATION),
                 mFooterText.getText());
         assertEquals(View.VISIBLE, mRootView.getVisibility());
+        assertEquals(View.VISIBLE, mFooterIcon.getVisibility());
+        // -1 == never set.
+        assertEquals(-1, mFooterIcon.getLastImageResource());
     }
 
     @Test
     public void testNetworkLoggingEnabled() {
         when(mSecurityController.isDeviceManaged()).thenReturn(true);
         when(mSecurityController.isNetworkLoggingEnabled()).thenReturn(true);
-        when(mSecurityController.isVpnEnabled()).thenReturn(false);
         mFooter.refreshState();
 
         waitForIdleSync(mFooter.mHandler);
-        assertEquals(View.VISIBLE, mFooterIcon.getVisibility());
-        assertEquals(R.drawable.ic_qs_network_logging, mFooterIcon.getLastImageResource());
-        assertEquals(View.INVISIBLE, mFooterIcon2.getVisibility());
-    }
-
-    @Test
-    public void testVpnEnabled() {
-        when(mSecurityController.isDeviceManaged()).thenReturn(true);
-        when(mSecurityController.isNetworkLoggingEnabled()).thenReturn(false);
-        when(mSecurityController.isVpnEnabled()).thenReturn(true);
-        when(mSecurityController.isVpnBranded()).thenReturn(false);
-        mFooter.refreshState();
-
-        waitForIdleSync(mFooter.mHandler);
+        assertEquals(mContext.getString(R.string.quick_settings_disclosure_management_monitoring),
+                mFooterText.getText());
         assertEquals(View.VISIBLE, mFooterIcon.getVisibility());
         // -1 == never set.
         assertEquals(-1, mFooterIcon.getLastImageResource());
-        assertEquals(View.INVISIBLE, mFooterIcon2.getVisibility());
+
+        // Same situation, but with organization name set
+        when(mSecurityController.getDeviceOwnerOrganizationName())
+                .thenReturn(MANAGING_ORGANIZATION);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        assertEquals(mContext.getString(
+                             R.string.quick_settings_disclosure_named_management_monitoring,
+                             MANAGING_ORGANIZATION),
+                     mFooterText.getText());
+    }
+
+    @Test
+    public void testManagedCACertsInstalled() {
+        when(mSecurityController.isDeviceManaged()).thenReturn(true);
+        when(mSecurityController.hasCACertInCurrentUser()).thenReturn(true);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        assertEquals(mContext.getString(R.string.quick_settings_disclosure_management_monitoring),
+                mFooterText.getText());
+    }
+
+    @Test
+    public void testManagedOneVpnEnabled() {
+        when(mSecurityController.isDeviceManaged()).thenReturn(true);
+        when(mSecurityController.isVpnEnabled()).thenReturn(true);
+        when(mSecurityController.getPrimaryVpnName()).thenReturn(VPN_PACKAGE);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        assertEquals(mContext.getString(R.string.quick_settings_disclosure_management_named_vpn,
+                                        VPN_PACKAGE),
+                     mFooterText.getText());
+        assertEquals(View.VISIBLE, mFooterIcon.getVisibility());
+        assertEquals(R.drawable.ic_qs_vpn, mFooterIcon.getLastImageResource());
+
+        // Same situation, but with organization name set
+        when(mSecurityController.getDeviceOwnerOrganizationName())
+                .thenReturn(MANAGING_ORGANIZATION);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        assertEquals(mContext.getString(
+                              R.string.quick_settings_disclosure_named_management_named_vpn,
+                              MANAGING_ORGANIZATION, VPN_PACKAGE),
+                     mFooterText.getText());
+    }
+
+    @Test
+    public void testManagedTwoVpnsEnabled() {
+        when(mSecurityController.isDeviceManaged()).thenReturn(true);
+        when(mSecurityController.isVpnEnabled()).thenReturn(true);
+        when(mSecurityController.getPrimaryVpnName()).thenReturn(VPN_PACKAGE);
+        when(mSecurityController.getWorkProfileVpnName()).thenReturn(VPN_PACKAGE_2);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        assertEquals(mContext.getString(R.string.quick_settings_disclosure_management_vpns),
+                     mFooterText.getText());
+        assertEquals(View.VISIBLE, mFooterIcon.getVisibility());
+        assertEquals(R.drawable.ic_qs_vpn, mFooterIcon.getLastImageResource());
+
+        // Same situation, but with organization name set
+        when(mSecurityController.getDeviceOwnerOrganizationName())
+                .thenReturn(MANAGING_ORGANIZATION);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        assertEquals(mContext.getString(R.string.quick_settings_disclosure_named_management_vpns,
+                                        MANAGING_ORGANIZATION),
+                     mFooterText.getText());
     }
 
     @Test
@@ -141,78 +214,170 @@ public class QSSecurityFooterTest extends SysuiTestCase {
         when(mSecurityController.isDeviceManaged()).thenReturn(true);
         when(mSecurityController.isNetworkLoggingEnabled()).thenReturn(true);
         when(mSecurityController.isVpnEnabled()).thenReturn(true);
-        when(mSecurityController.isVpnBranded()).thenReturn(false);
+        when(mSecurityController.getPrimaryVpnName()).thenReturn("VPN Test App");
         mFooter.refreshState();
 
         waitForIdleSync(mFooter.mHandler);
         assertEquals(View.VISIBLE, mFooterIcon.getVisibility());
-        assertEquals(View.VISIBLE, mFooterIcon2.getVisibility());
+        assertEquals(R.drawable.ic_qs_vpn, mFooterIcon.getLastImageResource());
+        assertEquals(mContext.getString(R.string.quick_settings_disclosure_management_monitoring),
+                mFooterText.getText());
+    }
+
+    @Test
+    public void testWorkProfileCACertsInstalled() {
+        when(mSecurityController.isDeviceManaged()).thenReturn(false);
+        when(mSecurityController.hasCACertInWorkProfile()).thenReturn(true);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
         // -1 == never set.
         assertEquals(-1, mFooterIcon.getLastImageResource());
-        assertEquals(-1, mFooterIcon2.getLastImageResource());
+        assertEquals(mContext.getString(
+                             R.string.quick_settings_disclosure_managed_profile_monitoring),
+                     mFooterText.getText());
+
+        // Same situation, but with organization name set
+        when(mSecurityController.getWorkProfileOrganizationName())
+                .thenReturn(MANAGING_ORGANIZATION);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        assertEquals(mContext.getString(
+                             R.string.quick_settings_disclosure_named_managed_profile_monitoring,
+                             MANAGING_ORGANIZATION),
+                     mFooterText.getText());
     }
 
     @Test
-    public void testGetMessageWithNoOrganizationAndNoVPN() {
-        assertEquals(getExpectedMessage(false /* hasDeviceOwnerOrganization */, false /* hasVPN */),
-                mFooter.getMessage(DEVICE_OWNER_PACKAGE,
-                        null /* profileOwnerPackage */,
-                        null /* primaryVpn */,
-                        null /* profileVpn */,
-                        null /* deviceOwnerOrganization */,
-                        false /* hasProfileOwner */,
-                        false /* isBranded */));
+    public void testCACertsInstalled() {
+        when(mSecurityController.isDeviceManaged()).thenReturn(false);
+        when(mSecurityController.hasCACertInCurrentUser()).thenReturn(true);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        // -1 == never set.
+        assertEquals(-1, mFooterIcon.getLastImageResource());
+        assertEquals(mContext.getString(R.string.quick_settings_disclosure_monitoring),
+                     mFooterText.getText());
     }
 
     @Test
-    public void testGetMessageWithNoOrganizationAndVPN() {
-        assertEquals(getExpectedMessage(false /* hasDeviceOwnerOrganization */, true /* hasVPN */),
-                mFooter.getMessage(DEVICE_OWNER_PACKAGE,
-                        null /* profileOwnerPackage */,
-                        VPN_PACKAGE,
-                        null /* profileVpn */,
-                        null /* deviceOwnerOrganization */,
-                        false /* hasProfileOwner */,
-                        false /* isBranded */));
+    public void testTwoVpnsEnabled() {
+        when(mSecurityController.isVpnEnabled()).thenReturn(true);
+        when(mSecurityController.getPrimaryVpnName()).thenReturn(VPN_PACKAGE);
+        when(mSecurityController.getWorkProfileVpnName()).thenReturn(VPN_PACKAGE_2);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        assertEquals(R.drawable.ic_qs_vpn, mFooterIcon.getLastImageResource());
+        assertEquals(mContext.getString(R.string.quick_settings_disclosure_vpns),
+                     mFooterText.getText());
     }
 
     @Test
-    public void testGetMessageWithOrganizationAndNoVPN() {
-        assertEquals(getExpectedMessage(true /* hasDeviceOwnerOrganization */, false /* hasVPN */),
-                mFooter.getMessage(DEVICE_OWNER_PACKAGE,
-                        null /* profileOwnerPackage */,
-                        null /* primaryVpn */,
-                        null /* profileVpn */,
-                        MANAGING_ORGANIZATION,
-                        false /* hasProfileOwner */,
-                        false /* isBranded */));
+    public void testWorkProfileVpnEnabled() {
+        when(mSecurityController.isVpnEnabled()).thenReturn(true);
+        when(mSecurityController.getWorkProfileVpnName()).thenReturn(VPN_PACKAGE_2);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        assertEquals(R.drawable.ic_qs_vpn, mFooterIcon.getLastImageResource());
+        assertEquals(mContext.getString(
+                             R.string.quick_settings_disclosure_managed_profile_named_vpn,
+                             VPN_PACKAGE_2),
+                     mFooterText.getText());
     }
 
     @Test
-    public void testGetMessageWithOrganizationAndVPN() {
-        assertEquals(getExpectedMessage(true /* hasDeviceOwnerOrganization */, true /* hasVPN */),
-                mFooter.getMessage(DEVICE_OWNER_PACKAGE,
-                        null /* profileOwnerPackage */,
-                        VPN_PACKAGE,
-                        null /* profileVpn */,
-                        MANAGING_ORGANIZATION,
-                        false /* hasProfileOwner */,
-                        false /* isBranded */));
+    public void testVpnEnabled() {
+        when(mSecurityController.isVpnEnabled()).thenReturn(true);
+        when(mSecurityController.getPrimaryVpnName()).thenReturn(VPN_PACKAGE);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        assertEquals(R.drawable.ic_qs_vpn, mFooterIcon.getLastImageResource());
+        assertEquals(mContext.getString(R.string.quick_settings_disclosure_named_vpn,
+                                        VPN_PACKAGE),
+                     mFooterText.getText());
+
+        when(mSecurityController.hasWorkProfile()).thenReturn(true);
+        mFooter.refreshState();
+
+        waitForIdleSync(mFooter.mHandler);
+        assertEquals(mContext.getString(
+                             R.string.quick_settings_disclosure_personal_profile_named_vpn,
+                             VPN_PACKAGE),
+                     mFooterText.getText());
     }
 
-    private CharSequence getExpectedMessage(boolean hasDeviceOwnerOrganization, boolean hasVPN) {
+    @Test
+    public void testGetManagementMessage() {
+        assertEquals(null, mFooter.getManagementMessage(false, MANAGING_ORGANIZATION));
+        assertEquals(mContext.getString(R.string.monitoring_description_named_management,
+                                        MANAGING_ORGANIZATION),
+                     mFooter.getManagementMessage(true, MANAGING_ORGANIZATION));
+        assertEquals(mContext.getString(R.string.monitoring_description_management),
+                     mFooter.getManagementMessage(true, null));
+    }
+
+    @Test
+    public void testGetCaCertsMessage() {
+        assertEquals(null, mFooter.getCaCertsMessage(true, false, false));
+        assertEquals(null, mFooter.getCaCertsMessage(false, false, false));
+        assertEquals(mContext.getString(R.string.monitoring_description_management_ca_certificate),
+                     mFooter.getCaCertsMessage(true, true, true));
+        assertEquals(mContext.getString(R.string.monitoring_description_management_ca_certificate),
+                     mFooter.getCaCertsMessage(true, false, true));
+        assertEquals(mContext.getString(
+                         R.string.monitoring_description_managed_profile_ca_certificate),
+                     mFooter.getCaCertsMessage(false, false, true));
+        assertEquals(mContext.getString(
+                         R.string.monitoring_description_ca_certificate),
+                     mFooter.getCaCertsMessage(false, true, false));
+    }
+
+    @Test
+    public void testGetNetworkLoggingMessage() {
+        assertEquals(null, mFooter.getNetworkLoggingMessage(false));
+        assertEquals(mContext.getString(R.string.monitoring_description_management_network_logging),
+                     mFooter.getNetworkLoggingMessage(true));
+    }
+
+    @Test
+    public void testGetVpnMessage() {
+        assertEquals(null, mFooter.getVpnMessage(true, true, null, null));
+        assertEquals(addLink(mContext.getString(R.string.monitoring_description_two_named_vpns,
+                                 VPN_PACKAGE, VPN_PACKAGE_2)),
+                     mFooter.getVpnMessage(true, true, VPN_PACKAGE, VPN_PACKAGE_2));
+        assertEquals(addLink(mContext.getString(R.string.monitoring_description_two_named_vpns,
+                                 VPN_PACKAGE, VPN_PACKAGE_2)),
+                     mFooter.getVpnMessage(false, true, VPN_PACKAGE, VPN_PACKAGE_2));
+        assertEquals(addLink(mContext.getString(R.string.monitoring_description_named_vpn,
+                                 VPN_PACKAGE)),
+                     mFooter.getVpnMessage(true, false, VPN_PACKAGE, null));
+        assertEquals(addLink(mContext.getString(R.string.monitoring_description_named_vpn,
+                                 VPN_PACKAGE)),
+                     mFooter.getVpnMessage(false, false, VPN_PACKAGE, null));
+        assertEquals(addLink(mContext.getString(R.string.monitoring_description_named_vpn,
+                                 VPN_PACKAGE_2)),
+                     mFooter.getVpnMessage(true, true, null, VPN_PACKAGE_2));
+        assertEquals(addLink(mContext.getString(
+                                 R.string.monitoring_description_managed_profile_named_vpn,
+                                 VPN_PACKAGE_2)),
+                     mFooter.getVpnMessage(false, true, null, VPN_PACKAGE_2));
+        assertEquals(addLink(mContext.getString(
+                                 R.string.monitoring_description_personal_profile_named_vpn,
+                                 VPN_PACKAGE)),
+                     mFooter.getVpnMessage(false, true, VPN_PACKAGE, null));
+    }
+
+    private CharSequence addLink(CharSequence description) {
         final SpannableStringBuilder message = new SpannableStringBuilder();
-        message.append(hasDeviceOwnerOrganization ?
-                mContext.getString(R.string.monitoring_description_do_header_with_name,
-                        MANAGING_ORGANIZATION, DEVICE_OWNER_PACKAGE) :
-                mContext.getString(R.string.monitoring_description_do_header_generic,
-                        DEVICE_OWNER_PACKAGE));
-        message.append("\n\n");
-        message.append(mContext.getString(R.string.monitoring_description_do_body));
-        message.append(mContext.getString(
-                R.string.monitoring_description_do_learn_more_separator));
-        message.append(mContext.getString(R.string.monitoring_description_do_learn_more),
-                mFooter.new EnterprisePrivacySpan(), 0);
+        message.append(description);
+        message.append(mContext.getString(R.string.monitoring_description_vpn_settings_separator));
+        message.append(mContext.getString(R.string.monitoring_description_vpn_settings),
+                mFooter.new VpnSpan(), 0);
         return message;
     }
 }

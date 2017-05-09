@@ -125,6 +125,7 @@ import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.WindowManagerPolicy;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.ToBooleanFunction;
 import com.android.internal.view.IInputMethodClient;
 
@@ -665,8 +666,9 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                     }
                 }
             }
-            if ((!winAnimator.isAnimationStarting() && !winAnimator.isWaitingForOpening()) ||
-                    winAnimator.isDummyAnimation()) {
+            final TaskStack stack = w.getStack();
+            if ((!winAnimator.isAnimationStarting() && !winAnimator.isWaitingForOpening())
+                    || (stack != null && stack.isAnimatingBounds())) {
                 // Updates the shown frame before we set up the surface. This is needed
                 // because the resizing could change the top-left position (in addition to
                 // size) of the window. setSurfaceBoundariesLocked uses mShownPosition to
@@ -674,7 +676,10 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                 //
                 // If an animation is being started, we can't call this method because the
                 // animation hasn't processed its initial transformation yet, but in general
-                // we do want to update the position if the window is animating.
+                // we do want to update the position if the window is animating. We make an exception
+                // for the bounds animating state, where an application may have been waiting
+                // for an exit animation to start, but instead enters PiP. We need to ensure
+                // we always recompute the top-left in this case.
                 winAnimator.computeShownFrameLocked();
             }
             winAnimator.setSurfaceBoundariesLocked(mTmpRecoveringMemory /* recoveringMemory */);
@@ -1396,6 +1401,22 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         return null;
     }
 
+    @VisibleForTesting
+    int getStackCount() {
+        return mTaskStackContainers.size();
+    }
+
+    @VisibleForTesting
+    int getStaskPosById(int stackId) {
+        for (int i = mTaskStackContainers.size() - 1; i >= 0; --i) {
+            final TaskStack stack = mTaskStackContainers.get(i);
+            if (stack.mStackId == stackId) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     @Override
     void onConfigurationChanged(Configuration newParentConfig) {
         super.onConfigurationChanged(newParentConfig);
@@ -1419,6 +1440,13 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             if (stack.updateBoundsAfterConfigChange()) {
                 changedStackList.add(stack.mStackId);
             }
+        }
+
+        // If there was no pinned stack, we still need to notify the controller of the display info
+        // update as a result of the config change.  We do this here to consolidate the flow between
+        // changes when there is and is not a stack.
+        if (getStackById(PINNED_STACK_ID) == null) {
+            mPinnedStackControllerLocked.onDisplayInfoChanged();
         }
     }
 
@@ -1926,7 +1954,8 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             for (int i = mTaskStackContainers.size() - 1; i >= 0; --i) {
                 final TaskStack stack = mTaskStackContainers.get(i);
                 final boolean isDockedOnBottom = stack.getDockSide() == DOCKED_BOTTOM;
-                if (stack.isVisible() && (imeOnBottom || isDockedOnBottom)) {
+                if (stack.isVisible() && (imeOnBottom || isDockedOnBottom) &&
+                        StackId.isStackAffectedByDragResizing(stack.mStackId)) {
                     stack.setAdjustedForIme(imeWin, imeOnBottom && imeHeightChanged);
                 } else {
                     stack.resetAdjustedForIme(false);
@@ -2221,7 +2250,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                 wsa.destroySurface();
                 mService.mForceRemoves.add(w);
                 mTmpWindow = w;
-            } else if (w.mAppToken != null && w.mAppToken.clientHidden) {
+            } else if (w.mAppToken != null && w.mAppToken.isClientHidden()) {
                 Slog.w(TAG_WM, "LEAKED SURFACE (app token hidden): "
                         + w + " surface=" + wsa.mSurfaceController
                         + " token=" + w.mAppToken
@@ -2701,7 +2730,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
             final AppWindowToken atoken = mTmpUpdateAllDrawn.removeLast();
             // See if any windows have been drawn, so they (and others associated with them)
             // can now be shown.
-            atoken.updateAllDrawn(this);
+            atoken.updateAllDrawn();
         }
 
         return mTmpApplySurfaceChangesTransactionState.focusDisplayed;
@@ -3267,8 +3296,9 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                     : requestedPosition >= topChildPosition;
             int targetPosition = requestedPosition;
 
-            if (toTop && isStackVisible(PINNED_STACK_ID) && stack.mStackId != PINNED_STACK_ID) {
-                // The pinned stack is always the top most stack (always-on-top) when it is visible.
+            if (toTop && stack.mStackId != PINNED_STACK_ID
+                    && getStackById(PINNED_STACK_ID) != null) {
+                // The pinned stack is always the top most stack (always-on-top) when it is present.
                 TaskStack topStack = mChildren.get(topChildPosition);
                 if (topStack.mStackId != PINNED_STACK_ID) {
                     throw new IllegalStateException("Pinned stack isn't top stack??? " + mChildren);

@@ -145,6 +145,7 @@ import android.content.res.TypedArray;
 import android.database.ContentObserver;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.hardware.display.DisplayManager;
 import android.hardware.hdmi.HdmiControlManager;
 import android.hardware.hdmi.HdmiPlaybackClient;
@@ -183,7 +184,6 @@ import android.provider.Settings;
 import android.service.dreams.DreamManagerInternal;
 import android.service.dreams.DreamService;
 import android.service.dreams.IDreamManager;
-import android.service.vr.IPersistentVrStateCallbacks;
 import android.speech.RecognizerIntent;
 import android.telecom.TelecomManager;
 import android.util.DisplayMetrics;
@@ -221,6 +221,7 @@ import android.view.accessibility.AccessibilityManager;
 import android.view.animation.Animation;
 import android.view.animation.AnimationSet;
 import android.view.animation.AnimationUtils;
+import android.view.inputmethod.InputMethodManagerInternal;
 
 import com.android.internal.R;
 import com.android.internal.logging.MetricsLogger;
@@ -277,6 +278,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static final int SHORT_PRESS_POWER_REALLY_GO_TO_SLEEP = 2;
     static final int SHORT_PRESS_POWER_REALLY_GO_TO_SLEEP_AND_GO_HOME = 3;
     static final int SHORT_PRESS_POWER_GO_HOME = 4;
+    static final int SHORT_PRESS_POWER_CLOSE_IME_OR_GO_HOME = 5;
 
     static final int LONG_PRESS_POWER_NOTHING = 0;
     static final int LONG_PRESS_POWER_GLOBAL_ACTIONS = 1;
@@ -405,6 +407,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     PowerManager mPowerManager;
     ActivityManagerInternal mActivityManagerInternal;
     InputManagerInternal mInputManagerInternal;
+    InputMethodManagerInternal mInputMethodManagerInternal;
     DreamManagerInternal mDreamManagerInternal;
     PowerManagerInternal mPowerManagerInternal;
     IStatusBarService mStatusBarService;
@@ -509,8 +512,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     volatile boolean mGoingToSleep;
     volatile boolean mRecentsVisible;
     volatile boolean mPictureInPictureVisible;
-    // Written by vr manager thread, only read in this class
-    volatile boolean mPersistentVrModeEnabled;
+    volatile private boolean mDismissImeOnBackKeyPressed;
 
     // Used to hold the last user key used to wake the device.  This helps us prevent up events
     // from being passed to the foregrounded app without a corresponding down event
@@ -1000,14 +1002,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
     MyOrientationListener mOrientationListener;
 
-    final IPersistentVrStateCallbacks mPersistentVrModeListener =
-            new IPersistentVrStateCallbacks.Stub() {
-        @Override
-        public void onPersistentVrStateChanged(boolean enabled) {
-            mPersistentVrModeEnabled = enabled;
-        }
-    };
-
     private final StatusBarController mStatusBarController = new StatusBarController();
 
     private final BarController mNavigationBarController = new BarController("NavigationBar",
@@ -1394,6 +1388,21 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 case SHORT_PRESS_POWER_GO_HOME:
                     launchHomeFromHotKey(true /* awakenFromDreams */, false /*respectKeyguard*/);
                     break;
+                case SHORT_PRESS_POWER_CLOSE_IME_OR_GO_HOME: {
+                    if (mDismissImeOnBackKeyPressed) {
+                        if (mInputMethodManagerInternal == null) {
+                            mInputMethodManagerInternal =
+                                    LocalServices.getService(InputMethodManagerInternal.class);
+                        }
+                        if (mInputMethodManagerInternal != null) {
+                            mInputMethodManagerInternal.hideCurrentInputMethod();
+                        }
+                    } else {
+                        launchHomeFromHotKey(true /* awakenFromDreams */,
+                                false /*respectKeyguard*/);
+                    }
+                    break;
+                }
             }
         }
     }
@@ -1945,17 +1954,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         if (mStatusBar != null) {
                             requestTransientBars(mStatusBar);
                         }
-                        if (mPersistentVrModeEnabled) {
-                            exitPersistentVrMode();
-                        }
                     }
                     @Override
                     public void onSwipeFromBottom() {
                         if (mNavigationBar != null && mNavigationBarPosition == NAV_BAR_BOTTOM) {
                             requestTransientBars(mNavigationBar);
-                        }
-                        if (mPersistentVrModeEnabled) {
-                            exitPersistentVrMode();
                         }
                     }
                     @Override
@@ -1963,17 +1966,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         if (mNavigationBar != null && mNavigationBarPosition == NAV_BAR_RIGHT) {
                             requestTransientBars(mNavigationBar);
                         }
-                        if (mPersistentVrModeEnabled) {
-                            exitPersistentVrMode();
-                        }
                     }
                     @Override
                     public void onSwipeFromLeft() {
                         if (mNavigationBar != null && mNavigationBarPosition == NAV_BAR_LEFT) {
                             requestTransientBars(mNavigationBar);
-                        }
-                        if (mPersistentVrModeEnabled) {
-                            exitPersistentVrMode();
                         }
                     }
                     @Override
@@ -2809,6 +2806,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             + overrideConfig + " to starting window resId=" + resId);
                     context = overrideContext;
                 }
+                typedArray.recycle();
             }
 
             final PhoneWindow win = new PhoneWindow(context);
@@ -2868,6 +2866,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
 
             params.setTitle("Splash Screen " + packageName);
+            addSplashscreenContent(win, context);
+
             wm = (WindowManager) context.getSystemService(WINDOW_SERVICE);
             view = win.getDecorView();
 
@@ -2896,6 +2896,24 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         return null;
+    }
+
+    private void addSplashscreenContent(PhoneWindow win, Context ctx) {
+        final TypedArray a = ctx.obtainStyledAttributes(R.styleable.Window);
+        final int resId = a.getResourceId(R.styleable.Window_windowSplashscreenContent, 0);
+        a.recycle();
+        if (resId == 0) {
+            return;
+        }
+        final Drawable drawable = ctx.getDrawable(resId);
+        if (drawable == null) {
+            return;
+        }
+
+        // We wrap this into a view so the system insets get applied to the drawable.
+        final View v = new View(ctx);
+        v.setBackground(drawable);
+        win.setContentView(v);
     }
 
     /** Obtain proper context for showing splash screen on the provided display. */
@@ -5238,7 +5256,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     @Override
     public void applyPostLayoutPolicyLw(WindowState win, WindowManager.LayoutParams attrs,
             WindowState attached, WindowState imeTarget) {
-        final boolean visible = !win.isGoneForLayoutLw();
+        final boolean visible = !win.isGoneForLayoutLw() && win.getAttrs().alpha > 0f;
         if (DEBUG_LAYOUT) Slog.i(TAG, "Win " + win + ": isVisible=" + visible);
         applyKeyguardPolicyLw(win, imeTarget);
         final int fl = PolicyControl.getWindowFlags(win, attrs);
@@ -5475,9 +5493,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      */
     private boolean setKeyguardOccludedLw(boolean isOccluded, boolean force) {
         if (DEBUG_KEYGUARD) Slog.d(TAG, "setKeyguardOccluded occluded=" + isOccluded);
-        boolean wasOccluded = mKeyguardOccluded;
-        boolean showing = mKeyguardDelegate.isShowing();
-        if (wasOccluded && !isOccluded && showing) {
+        final boolean wasOccluded = mKeyguardOccluded;
+        final boolean showing = mKeyguardDelegate.isShowing();
+        final boolean changed = wasOccluded != isOccluded || force;
+        if (!isOccluded && changed && showing) {
             mKeyguardOccluded = false;
             mKeyguardDelegate.setOccluded(false, true /* animate */);
             if (mStatusBar != null) {
@@ -5487,7 +5506,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
             }
             return true;
-        } else if (!wasOccluded && isOccluded && showing) {
+        } else if (isOccluded && changed && showing) {
             mKeyguardOccluded = true;
             mKeyguardDelegate.setOccluded(true, false /* animate */);
             if (mStatusBar != null) {
@@ -5495,7 +5514,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 mStatusBar.getAttrs().flags &= ~FLAG_SHOW_WALLPAPER;
             }
             return true;
-        } else if (wasOccluded != isOccluded) {
+        } else if (changed) {
             mKeyguardOccluded = isOccluded;
             mKeyguardDelegate.setOccluded(isOccluded, false /* animate */);
             return false;
@@ -5890,7 +5909,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     // handled it send it to the session manager to
                     // figure out.
                     MediaSessionLegacyHelper.getHelper(mContext).sendVolumeKeyEvent(
-                            event, AudioManager.USE_DEFAULT_STREAM_TYPE, false);
+                            event, AudioManager.USE_DEFAULT_STREAM_TYPE, true);
                 }
                 break;
             }
@@ -6577,13 +6596,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mVrManagerInternal.onScreenStateChanged(isScreenOn);
     }
 
-    private void exitPersistentVrMode() {
-        if (mVrManagerInternal == null) {
-            return;
-        }
-        mVrManagerInternal.setPersistentVrModeEnabled(false);
-    }
-
     private void finishWindowsDrawn() {
         synchronized (mLock) {
             if (!mScreenOnEarly || mWindowManagerDrawComplete) {
@@ -7071,9 +7083,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mKeyguardDelegate.onSystemReady();
 
         mVrManagerInternal = LocalServices.getService(VrManagerInternal.class);
-        if (mVrManagerInternal != null) {
-            mVrManagerInternal.addPersistentVrModeStateListener(mPersistentVrModeListener);
-        }
 
         readCameraLensCoverState();
         updateUiMode();
@@ -7932,6 +7941,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     @Override
+    public void setDismissImeOnBackKeyPressed(boolean newValue) {
+        mDismissImeOnBackKeyPressed = newValue;
+    }
+
+    @Override
     public int getInputMethodWindowVisibleHeightLw() {
         return mDockBottom - mCurBottom;
     }
@@ -8147,6 +8161,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             pw.print(prefix); pw.print("mLastInputMethodTargetWindow=");
                     pw.println(mLastInputMethodTargetWindow);
         }
+        pw.print(prefix); pw.print("mDismissImeOnBackKeyPressed=");
+                pw.println(mDismissImeOnBackKeyPressed);
         if (mStatusBar != null) {
             pw.print(prefix); pw.print("mStatusBar=");
                     pw.print(mStatusBar); pw.print(" isStatusBarKeyguard=");

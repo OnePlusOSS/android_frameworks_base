@@ -323,7 +323,7 @@ public class AppWindowContainerController
         }
     }
 
-    public void setVisibility(boolean visible) {
+    public void setVisibility(boolean visible, boolean deferHidingClient) {
         synchronized(mWindowMap) {
             if (mContainer == null) {
                 Slog.w(TAG_WM, "Attempted to set visibility of non-existing app token: "
@@ -342,6 +342,7 @@ public class AppWindowContainerController
             mService.mClosingApps.remove(wtoken);
             wtoken.waitingToShow = false;
             wtoken.hiddenRequested = !visible;
+            wtoken.mDeferHidingClient = deferHidingClient;
 
             if (!visible) {
                 // If the app is dead while it was visible, we kept its dead window on screen.
@@ -368,15 +369,12 @@ public class AppWindowContainerController
                         wtoken.waitingToShow = true;
                     }
 
-                    if (wtoken.clientHidden) {
-                        // In the case where we are making an app visible
-                        // but holding off for a transition, we still need
-                        // to tell the client to make its windows visible so
-                        // they get drawn.  Otherwise, we will wait on
-                        // performing the transition until all windows have
-                        // been drawn, they never will be, and we are sad.
-                        wtoken.clientHidden = false;
-                        wtoken.sendAppVisibilityToClients();
+                    if (wtoken.isClientHidden()) {
+                        // In the case where we are making an app visible but holding off for a
+                        // transition, we still need to tell the client to make its windows visible
+                        // so they get drawn. Otherwise, we will wait on performing the transition
+                        // until all windows have been drawn, they never will be, and we are sad.
+                        wtoken.setClientHidden(false);
                     }
                 }
                 wtoken.requestUpdateWallpaperIfNeeded();
@@ -449,7 +447,8 @@ public class AppWindowContainerController
 
     public boolean addStartingWindow(String pkg, int theme, CompatibilityInfo compatInfo,
             CharSequence nonLocalizedLabel, int labelRes, int icon, int logo, int windowFlags,
-            IBinder transferFrom, boolean newTask, boolean taskSwitch, boolean processRunning) {
+            IBinder transferFrom, boolean newTask, boolean taskSwitch, boolean processRunning,
+            boolean allowTaskSnapshot) {
         synchronized(mWindowMap) {
             if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "setAppStartingWindow: token=" + mToken
                     + " pkg=" + pkg + " transferFrom=" + transferFrom);
@@ -469,7 +468,15 @@ public class AppWindowContainerController
                 return false;
             }
 
-            final int type = getStartingWindowType(newTask, taskSwitch, processRunning);
+            final WindowState mainWin = mContainer.findMainWindow();
+            if (mainWin != null && mainWin.isVisible() && mainWin.isDrawnLw()) {
+                // App already has a visible window that is drawn...why would you want a starting
+                // window?
+                return false;
+            }
+
+            final int type = getStartingWindowType(newTask, taskSwitch, processRunning,
+                    allowTaskSnapshot);
 
             if (type == STARTING_WINDOW_TYPE_SNAPSHOT) {
                 return createSnapshot();
@@ -539,10 +546,11 @@ public class AppWindowContainerController
         return true;
     }
 
-    private int getStartingWindowType(boolean newTask, boolean taskSwitch, boolean processRunning) {
+    private int getStartingWindowType(boolean newTask, boolean taskSwitch, boolean processRunning,
+            boolean allowTaskSnapshot) {
         if (newTask || !processRunning) {
             return STARTING_WINDOW_TYPE_SPLASH_SCREEN;
-        } else if (taskSwitch) {
+        } else if (taskSwitch && allowTaskSnapshot) {
             return STARTING_WINDOW_TYPE_SNAPSHOT;
         } else {
             return STARTING_WINDOW_TYPE_NONE;
@@ -612,13 +620,13 @@ public class AppWindowContainerController
         }
     }
 
-    public void notifyAppResumed(boolean wasStopped, boolean allowSavedSurface) {
+    public void notifyAppResumed(boolean wasStopped) {
         synchronized(mWindowMap) {
             if (mContainer == null) {
                 Slog.w(TAG_WM, "Attempted to notify resumed of non-existing app token: " + mToken);
                 return;
             }
-            mContainer.notifyAppResumed(wasStopped, allowSavedSurface);
+            mContainer.notifyAppResumed(wasStopped);
         }
     }
 
@@ -712,6 +720,10 @@ public class AppWindowContainerController
 
     @Override
     public String toString() {
-        return "{AppWindowContainerController token=" + mToken + "}";
+        return "AppWindowContainerController{"
+                + " token=" + mToken
+                + " mContainer=" + mContainer
+                + " mListener=" + mListener
+                + "}";
     }
 }

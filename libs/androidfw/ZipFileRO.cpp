@@ -252,3 +252,11 @@ bool ZipFileRO::uncompressEntry(ZipEntryRO entry, int fd) const
 
     return true;
 }
+
+/*
+ * Fetch ZIP file Descriptor.
+ */
+int ZipFileRO::fetchFileDescriptor() const
+{
+    return GetFileDescriptor(mHandle);
+}

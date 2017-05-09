@@ -32,6 +32,7 @@ import android.hardware.SystemSensorManager;
 import android.hardware.display.DisplayManagerInternal;
 import android.hardware.display.DisplayManagerInternal.DisplayPowerRequest;
 import android.hardware.power.V1_0.PowerHint;
+import android.metrics.LogMaker;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.BatteryManagerInternal;
@@ -46,6 +47,8 @@ import android.os.PowerManagerInternal;
 import android.os.PowerSaveState;
 import android.os.Process;
 import android.os.RemoteException;
+import android.os.ResultReceiver;
+import android.os.ShellCallback;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Trace;
@@ -62,6 +65,7 @@ import android.service.vr.IVrManager;
 import android.service.vr.IVrStateCallbacks;
 import android.util.EventLog;
 import android.util.KeyValueListParser;
+import android.util.Log;
 import android.util.PrintWriterPrinter;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -73,6 +77,8 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IAppOpsService;
 import com.android.internal.app.IBatteryStats;
 import com.android.internal.hardware.AmbientDisplayConfiguration;
+import com.android.internal.logging.MetricsLogger;
+import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.internal.os.BackgroundThread;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.DumpUtils;
@@ -86,6 +92,10 @@ import com.android.server.am.BatteryStatsService;
 import com.android.server.lights.Light;
 import com.android.server.lights.LightsManager;
 import com.android.server.power.BatterySaverPolicy.ServiceType;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import libcore.util.Objects;
 
 import java.io.FileDescriptor;
@@ -186,6 +196,17 @@ public final class PowerManagerService extends SystemService
     // System property indicating that the screen should remain off until an explicit user action
     private static final String SYSTEM_PROPERTY_QUIESCENT = "ro.boot.quiescent";
 
+    // Possible reasons for shutting down for use in data/misc/reboot/last_shutdown_reason
+    private static final String REASON_SHUTDOWN = "shutdown";
+    private static final String REASON_REBOOT = "reboot";
+    private static final String REASON_USERREQUESTED = "userrequested";
+    private static final String REASON_THERMAL_SHUTDOWN = "thermal-shutdown";
+
+    private static final String TRACE_SCREEN_ON = "Screen turning on";
+
+    /** If turning screen on takes more than this long, we show a warning on logcat. */
+    private static final int SCREEN_ON_LATENCY_WARNING_MS = 200;
+
     /** Constants for {@link #shutdownOrRebootInternal} */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({HALT_MODE_SHUTDOWN, HALT_MODE_REBOOT, HALT_MODE_REBOOT_SAFE_MODE})
@@ -193,6 +214,9 @@ public final class PowerManagerService extends SystemService
     private static final int HALT_MODE_SHUTDOWN = 0;
     private static final int HALT_MODE_REBOOT = 1;
     private static final int HALT_MODE_REBOOT_SAFE_MODE = 2;
+
+    // File location for last reboot reason
+    private static final String LAST_REBOOT_LOCATION = "/data/misc/reboot/last_reboot_reason";
 
     private final Context mContext;
     private final ServiceThread mHandlerThread;
@@ -981,7 +1005,7 @@ public final class PowerManagerService extends SystemService
                     }
                     intent = new Intent(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
                     intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY);
-                    mContext.sendBroadcast(intent);
+                    mContext.sendBroadcastAsUser(intent, UserHandle.ALL);
                     // Send internal version that requires signature permission.
                     intent = new Intent(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED_INTERNAL);
                     intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY);
@@ -1367,6 +1391,8 @@ public final class PowerManagerService extends SystemService
             return false;
         }
 
+        Trace.asyncTraceBegin(Trace.TRACE_TAG_POWER, TRACE_SCREEN_ON, 0);
+
         Trace.traceBegin(Trace.TRACE_TAG_POWER, "wakeUp");
         try {
             switch (mWakefulness) {
@@ -1549,6 +1575,23 @@ public final class PowerManagerService extends SystemService
         }
     }
 
+    private void logScreenOn() {
+        Trace.asyncTraceEnd(Trace.TRACE_TAG_POWER, TRACE_SCREEN_ON, 0);
+
+        final int latencyMs = (int) (SystemClock.uptimeMillis() - mLastWakeTime);
+
+        LogMaker log = new LogMaker(MetricsEvent.SCREEN);
+        log.setType(MetricsEvent.TYPE_OPEN);
+        log.setSubtype(0); // not user initiated
+        log.setLatency(latencyMs); // How long it took.
+        MetricsLogger.action(log);
+        EventLogTags.writePowerScreenState(1, 0, 0, 0, latencyMs);
+
+        if (latencyMs >= SCREEN_ON_LATENCY_WARNING_MS) {
+            Slog.w(TAG, "Screen on took " + latencyMs+ " ms");
+        }
+    }
+
     private void finishWakefulnessChangeIfNeededLocked() {
         if (mWakefulnessChanging && mDisplayReady) {
             if (mWakefulness == WAKEFULNESS_DOZING
@@ -1557,6 +1600,9 @@ public final class PowerManagerService extends SystemService
             }
             if (mWakefulness == WAKEFULNESS_DOZING || mWakefulness == WAKEFULNESS_ASLEEP) {
                 logSleepTimeoutRecapturedLocked();
+            }
+            if (mWakefulness == WAKEFULNESS_AWAKE) {
+                logScreenOn();
             }
             mWakefulnessChanging = false;
             mNotifier.onWakefulnessChangeFinished();
@@ -4027,6 +4073,14 @@ public final class PowerManagerService extends SystemService
     }
 
     private final class BinderService extends IPowerManager.Stub {
+        @Override
+        public void onShellCommand(FileDescriptor in, FileDescriptor out,
+                FileDescriptor err, String[] args, ShellCallback callback,
+                ResultReceiver resultReceiver) {
+            (new PowerManagerShellCommand(this)).exec(
+                    this, in, out, err, args, callback, resultReceiver);
+        }
+
         @Override // Binder call
         public void acquireWakeLockWithUid(IBinder lock, int flags, String tag,
                 String packageName, int uid) {
@@ -4300,6 +4354,25 @@ public final class PowerManagerService extends SystemService
         }
 
         /**
+         * Gets the reason for the last time the phone had to reboot.
+         *
+         * @return The reason the phone last shut down as an int or
+         * {@link PowerManager.SHUTDOWN_REASON_UNKNOWN} if the file could not be opened.
+         */
+        @Override // Binder call
+        public int getLastShutdownReason() {
+            mContext.enforceCallingOrSelfPermission(
+                    android.Manifest.permission.DEVICE_POWER, null);
+
+            final long ident = Binder.clearCallingIdentity();
+            try {
+                return getLastShutdownReasonInternal(new File(LAST_REBOOT_LOCATION));
+            } finally {
+                Binder.restoreCallingIdentity(ident);
+            }
+        }
+
+        /**
          * Reboots the device.
          *
          * @param confirm If true, shows a reboot confirmation dialog.
@@ -4523,6 +4596,28 @@ public final class PowerManagerService extends SystemService
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }
+        }
+    }
+
+    @VisibleForTesting
+    int getLastShutdownReasonInternal(File lastRebootReason) {
+        String line = "";
+        try (BufferedReader bufferedReader = new BufferedReader(new FileReader(lastRebootReason))){
+            line = bufferedReader.readLine();
+        } catch (IOException e) {
+            Slog.e(TAG, "Failed to read last_reboot_reason file", e);
+        }
+        switch (line) {
+            case REASON_SHUTDOWN:
+                return PowerManager.SHUTDOWN_REASON_SHUTDOWN;
+            case REASON_REBOOT:
+                return PowerManager.SHUTDOWN_REASON_REBOOT;
+            case REASON_USERREQUESTED:
+                return PowerManager.SHUTDOWN_REASON_USER_REQUESTED;
+            case REASON_THERMAL_SHUTDOWN:
+                return PowerManager.SHUTDOWN_REASON_THERMAL_SHUTDOWN;
+            default:
+                return PowerManager.SHUTDOWN_REASON_UNKNOWN;
         }
     }
 

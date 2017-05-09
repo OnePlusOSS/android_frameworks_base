@@ -145,8 +145,10 @@ public class NotificationManager
             = "android.app.action.INTERRUPTION_FILTER_CHANGED_INTERNAL";
 
     /** @hide */
-    @IntDef({INTERRUPTION_FILTER_NONE, INTERRUPTION_FILTER_PRIORITY, INTERRUPTION_FILTER_ALARMS,
-            INTERRUPTION_FILTER_ALL, INTERRUPTION_FILTER_UNKNOWN})
+    @IntDef(prefix = { "INTERRUPTION_FILTER_" }, value = {
+            INTERRUPTION_FILTER_NONE, INTERRUPTION_FILTER_PRIORITY, INTERRUPTION_FILTER_ALARMS,
+            INTERRUPTION_FILTER_ALL, INTERRUPTION_FILTER_UNKNOWN
+    })
     @Retention(RetentionPolicy.SOURCE)
     public @interface InterruptionFilter {}
 
@@ -186,8 +188,10 @@ public class NotificationManager
     public static final int INTERRUPTION_FILTER_UNKNOWN = 0;
 
     /** @hide */
-    @IntDef({IMPORTANCE_UNSPECIFIED, IMPORTANCE_NONE,
-            IMPORTANCE_MIN, IMPORTANCE_LOW, IMPORTANCE_DEFAULT, IMPORTANCE_HIGH})
+    @IntDef(prefix = { "IMPORTANCE_" }, value = {
+            IMPORTANCE_UNSPECIFIED, IMPORTANCE_NONE,
+            IMPORTANCE_MIN, IMPORTANCE_LOW, IMPORTANCE_DEFAULT, IMPORTANCE_HIGH
+    })
     @Retention(RetentionPolicy.SOURCE)
     public @interface Importance {}
 
@@ -294,7 +298,6 @@ public class NotificationManager
      */
     public void notifyAsUser(String tag, int id, Notification notification, UserHandle user)
     {
-        int[] idOut = new int[1];
         INotificationManager service = getService();
         String pkg = mContext.getPackageName();
         // Fix the notification as best we can.
@@ -316,10 +319,7 @@ public class NotificationManager
         final Notification copy = Builder.maybeCloneStrippedForDelivery(notification);
         try {
             service.enqueueNotificationWithTag(pkg, mContext.getOpPackageName(), tag, id,
-                    copy, idOut, user.getIdentifier());
-            if (localLOGV && id != idOut[0]) {
-                Log.v(TAG, "notify: id corrupted: sent " + id + ", got back " + idOut[0]);
-            }
+                    copy, user.getIdentifier());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -422,7 +422,9 @@ public class NotificationManager
      * Creates a notification channel that notifications can be posted to.
      *
      * This can also be used to restore a deleted channel and to update an existing channel's
-     * name and description. The name and description should only be changed if the locale changes
+     * name and description.
+     *
+     * <p>The name and description should only be changed if the locale changes
      * or in response to the user renaming this channel. For example, if a user has a channel
      * named 'John Doe' that represents messages from a 'John Doe', and 'John Doe' changes his name
      * to 'John Smith,' the channel can be renamed to match.
@@ -454,6 +456,8 @@ public class NotificationManager
 
     /**
      * Returns the notification channel settings for a given channel id.
+     *
+     * The channel must belong to your package, or it will not be returned.
      */
     public NotificationChannel getNotificationChannel(String channelId) {
         INotificationManager service = getService();
@@ -465,7 +469,7 @@ public class NotificationManager
     }
 
     /**
-     * Returns all notification channels belonging to the calling app.
+     * Returns all notification channels belonging to the calling package.
      */
     public List<NotificationChannel> getNotificationChannels() {
         INotificationManager service = getService();
@@ -478,6 +482,10 @@ public class NotificationManager
 
     /**
      * Deletes the given notification channel.
+     *
+     * <p>If you {@link #createNotificationChannel(NotificationChannel) create} a new channel with
+     * this same id, the deleted channel will be un-deleted with all of the same settings it
+     * had before it was deleted.
      */
     public void deleteNotificationChannel(String channelId) {
         INotificationManager service = getService();
@@ -501,7 +509,8 @@ public class NotificationManager
     }
 
     /**
-     * Deletes the given notification channel group.
+     * Deletes the given notification channel group, and all notification channels that
+     * belong to it.
      */
     public void deleteNotificationChannelGroup(String groupId) {
         INotificationManager service = getService();
@@ -717,9 +726,8 @@ public class NotificationManager
     }
 
     /**
-     * Returns the user specified importance for notifications from the calling package.
-     *
-     * @return An importance level, such as {@link #IMPORTANCE_DEFAULT}.
+     * Returns the user specified importance for notifications from the calling
+     * package.
      */
     public @Importance int getImportance() {
         INotificationManager service = getService();
@@ -1095,12 +1103,10 @@ public class NotificationManager
 
     /**
      * Gets the current notification interruption filter.
-     *
      * <p>
-     * The interruption filter defines which notifications are allowed to interrupt the user
-     * (e.g. via sound &amp; vibration) and is applied globally.
-     * @return One of the INTERRUPTION_FILTER_ constants, or INTERRUPTION_FILTER_UNKNOWN when
-     * unavailable.
+     * The interruption filter defines which notifications are allowed to
+     * interrupt the user (e.g. via sound &amp; vibration) and is applied
+     * globally.
      */
     public final @InterruptionFilter int getCurrentInterruptionFilter() {
         final INotificationManager service = getService();
@@ -1113,18 +1119,15 @@ public class NotificationManager
 
     /**
      * Sets the current notification interruption filter.
-     *
      * <p>
-     * The interruption filter defines which notifications are allowed to interrupt the user
-     * (e.g. via sound &amp; vibration) and is applied globally.
-     * @return One of the INTERRUPTION_FILTER_ constants, or INTERRUPTION_FILTER_UNKNOWN when
-     * unavailable.
-     *
+     * The interruption filter defines which notifications are allowed to
+     * interrupt the user (e.g. via sound &amp; vibration) and is applied
+     * globally.
      * <p>
-     * Only available if policy access is granted to this package.
-     * See {@link #isNotificationPolicyAccessGranted}.
+     * Only available if policy access is granted to this package. See
+     * {@link #isNotificationPolicyAccessGranted}.
      */
-    public final void setInterruptionFilter(int interruptionFilter) {
+    public final void setInterruptionFilter(@InterruptionFilter int interruptionFilter) {
         final INotificationManager service = getService();
         try {
             service.setInterruptionFilter(mContext.getOpPackageName(), interruptionFilter);
@@ -1153,42 +1156,6 @@ public class NotificationManager
             case INTERRUPTION_FILTER_NONE:  return Global.ZEN_MODE_NO_INTERRUPTIONS;
             default: return defValue;
         }
-    }
-
-    /**
-     * Start a service directly into the "foreground service" state.  Unlike
-     * {@link android.content.Context#startService(Intent)}, this method
-     * can be used from within background operations like broadcast receivers
-     * or scheduled jobs.
-     *
-     * @param service Description of the service to be started.  The Intent must be either
-     *      fully explicit (supplying a component name) or specify a specific package
-     *      name it is targeted to.
-     * @param id The identifier for this notification as per
-     *      {@link #notify(int, Notification) NotificationManager.notify(int, Notification)};
-     *      must not be 0.
-     * @param notification The Notification to be displayed.
-     * @return If the service is being started or is already running, the
-     *      {@link ComponentName} of the actual service that was started is
-     *      returned; else if the service does not exist null is returned.
-     *
-     * @deprecated STOPSHIP transition away from this for O
-     */
-    @Nullable
-    @Deprecated
-    public ComponentName startServiceInForeground(Intent service,
-            int id, Notification notification) {
-        return mContext.startServiceInForeground(service, id, notification);
-    }
-
-    /**
-     * @hide like {@link #startServiceInForeground(Intent, int, Notification)}
-     * but for a specific user.
-     */
-    @Nullable
-    public ComponentName startServiceInForegroundAsUser(Intent service,
-            int id, Notification notification, UserHandle user) {
-        return mContext.startServiceInForegroundAsUser(service, id, notification, user);
     }
 
 }

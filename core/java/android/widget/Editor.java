@@ -41,6 +41,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.metrics.LogMaker;
 import android.os.Bundle;
 import android.os.LocaleList;
 import android.os.Parcel;
@@ -105,7 +106,7 @@ import android.view.inputmethod.ExtractedText;
 import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
-import android.view.textclassifier.TextClassificationResult;
+import android.view.textclassifier.TextClassification;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.TextView.Drawables;
 import android.widget.TextView.OnEditorActionListener;
@@ -146,7 +147,7 @@ public class Editor {
     private static final String UNDO_OWNER_TAG = "Editor";
 
     // Ordering constants used to place the Action Mode or context menu items in their menu.
-    private static final int MENU_ITEM_ORDER_ASSIST = 1;
+    private static final int MENU_ITEM_ORDER_ASSIST = 0;
     private static final int MENU_ITEM_ORDER_UNDO = 2;
     private static final int MENU_ITEM_ORDER_REDO = 3;
     private static final int MENU_ITEM_ORDER_CUT = 4;
@@ -156,14 +157,16 @@ public class Editor {
     private static final int MENU_ITEM_ORDER_PASTE_AS_PLAIN_TEXT = 8;
     private static final int MENU_ITEM_ORDER_SELECT_ALL = 9;
     private static final int MENU_ITEM_ORDER_REPLACE = 10;
-    private static final int MENU_ITEM_ORDER_PROCESS_TEXT_INTENT_ACTIONS_START = 11;
-    private static final int MENU_ITEM_ORDER_AUTOFILL = 12;
+    private static final int MENU_ITEM_ORDER_AUTOFILL = 11;
+    private static final int MENU_ITEM_ORDER_PROCESS_TEXT_INTENT_ACTIONS_START = 100;
 
     // Each Editor manages its own undo stack.
     private final UndoManager mUndoManager = new UndoManager();
     private UndoOwner mUndoOwner = mUndoManager.getOwner(UNDO_OWNER_TAG, this);
     final UndoInputFilter mUndoInputFilter = new UndoInputFilter(this);
     boolean mAllowUndo = true;
+
+    private final MetricsLogger mMetricsLogger = new MetricsLogger();
 
     // Cursor Controllers.
     private InsertionPointCursorController mInsertionPointCursorController;
@@ -1915,11 +1918,10 @@ public class Editor {
         }
 
         boolean clamped = layout.shouldClampCursor(line);
-        updateCursorPosition(0, top, middle, layout.getPrimaryHorizontal(offset, clamped, true));
+        updateCursorPosition(0, top, middle, layout.getPrimaryHorizontal(offset, clamped));
 
         if (mCursorCount == 2) {
-            updateCursorPosition(1, middle, bottom,
-                    layout.getSecondaryHorizontal(offset, clamped, true));
+            updateCursorPosition(1, middle, bottom, layout.getSecondaryHorizontal(offset, clamped));
         }
     }
 
@@ -3834,9 +3836,11 @@ public class Editor {
             }
 
             if (mTextView.canRequestAutofill()) {
+                final int mode = mTextView.getText().length() <= 0
+                        ? MenuItem.SHOW_AS_ACTION_IF_ROOM : MenuItem.SHOW_AS_ACTION_NEVER;
                 menu.add(Menu.NONE, TextView.ID_AUTOFILL, MENU_ITEM_ORDER_AUTOFILL,
                         com.android.internal.R.string.autofill)
-                        .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+                        .setShowAsAction(mode);
             }
 
             updateSelectAllItem(menu);
@@ -3882,19 +3886,23 @@ public class Editor {
 
         private void updateAssistMenuItem(Menu menu) {
             menu.removeItem(TextView.ID_ASSIST);
-            final TextClassificationResult textClassificationResult =
-                    getSelectionActionModeHelper().getTextClassificationResult();
-            if (textClassificationResult != null) {
-                final Drawable icon = textClassificationResult.getIcon();
-                final CharSequence label = textClassificationResult.getLabel();
+            final TextClassification textClassification =
+                    getSelectionActionModeHelper().getTextClassification();
+            if (textClassification != null) {
+                final Drawable icon = textClassification.getIcon();
+                final CharSequence label = textClassification.getLabel();
                 final OnClickListener onClickListener =
-                        textClassificationResult.getOnClickListener();
-                final Intent intent = textClassificationResult.getIntent();
+                        textClassification.getOnClickListener();
+                final Intent intent = textClassification.getIntent();
                 if ((icon != null || !TextUtils.isEmpty(label))
                         && (onClickListener != null || intent != null)) {
                     menu.add(TextView.ID_ASSIST, TextView.ID_ASSIST, MENU_ITEM_ORDER_ASSIST, label)
                             .setIcon(icon)
                             .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+                    mMetricsLogger.write(
+                            new LogMaker(MetricsEvent.TEXT_SELECTION_MENU_ITEM_ASSIST)
+                                    .setType(MetricsEvent.TYPE_OPEN)
+                                    .setSubtype(textClassification.getLogType()));
                 }
             }
         }
@@ -3908,21 +3916,24 @@ public class Editor {
             if (customCallback != null && customCallback.onActionItemClicked(mode, item)) {
                 return true;
             }
-            final TextClassificationResult textClassificationResult =
-                    getSelectionActionModeHelper().getTextClassificationResult();
-            if (TextView.ID_ASSIST == item.getItemId() && textClassificationResult != null) {
+            final TextClassification textClassification =
+                    getSelectionActionModeHelper().getTextClassification();
+            if (TextView.ID_ASSIST == item.getItemId() && textClassification != null) {
                 final OnClickListener onClickListener =
-                        textClassificationResult.getOnClickListener();
+                        textClassification.getOnClickListener();
                 if (onClickListener != null) {
                     onClickListener.onClick(mTextView);
                 } else {
-                    final Intent intent = textClassificationResult.getIntent();
+                    final Intent intent = textClassification.getIntent();
                     if (intent != null) {
-                        TextClassificationResult.createStartActivityOnClickListener(
+                        TextClassification.createStartActivityOnClickListener(
                                 mTextView.getContext(), intent)
                                 .onClick(mTextView);
                     }
                 }
+                mMetricsLogger.action(
+                        MetricsEvent.ACTION_TEXT_SELECTION_MENU_ITEM_ASSIST,
+                        textClassification.getLogType());
                 stopTextActionMode();
                 return true;
             }
@@ -4340,7 +4351,7 @@ public class Editor {
                     updateSelection(offset);
                     addPositionToTouchUpFilter(offset);
                 }
-                final int line = getLineForOffset(layout, offset);
+                final int line = layout.getLineForOffset(offset);
                 mPrevLine = line;
 
                 mPositionX = getCursorHorizontalPosition(layout, offset) - mHotspotX
@@ -4365,15 +4376,6 @@ public class Editor {
          */
         int getCursorHorizontalPosition(Layout layout, int offset) {
             return (int) (getHorizontal(layout, offset) - 0.5f);
-        }
-
-        /**
-         * @param layout Text layout.
-         * @param offset Character offset for the cursor.
-         * @return The line the cursor should be at.
-         */
-        int getLineForOffset(Layout layout, int offset) {
-            return layout.getLineForOffset(offset);
         }
 
         @Override
@@ -4804,7 +4806,7 @@ public class Editor {
                     || !isStartHandle() && initialOffset <= anotherHandleOffset) {
                 // Handles have crossed, bound it to the first selected line and
                 // adjust by word / char as normal.
-                currLine = getLineForOffset(layout, anotherHandleOffset, !isStartHandle());
+                currLine = layout.getLineForOffset(anotherHandleOffset);
                 initialOffset = getOffsetAtCoordinate(layout, currLine, x);
             }
 
@@ -4876,18 +4878,14 @@ public class Editor {
             if (isExpanding) {
                 // User is increasing the selection.
                 int wordBoundary = isStartHandle() ? wordStart : wordEnd;
-                final boolean atLineBoundary = layout.getLineStart(currLine) == offset
-                        || layout.getLineEnd(currLine) == offset;
-                final boolean atWordBoundary = getWordIteratorWithText().isBoundary(offset);
-                final boolean snapToWord = !(atLineBoundary && atWordBoundary)
-                        && (!mInWord
-                                || (isStartHandle() ? currLine < mPrevLine : currLine > mPrevLine))
-                                        && atRtl == isAtRtlRun(layout, wordBoundary);
+                final boolean snapToWord = (!mInWord
+                        || (isStartHandle() ? currLine < mPrevLine : currLine > mPrevLine))
+                                && atRtl == isAtRtlRun(layout, wordBoundary);
                 if (snapToWord) {
                     // Sometimes words can be broken across lines (Chinese, hyphenation).
                     // We still snap to the word boundary but we only use the letters on the
                     // current line to determine if the user is far enough into the word to snap.
-                    if (getLineForOffset(layout, wordBoundary) != currLine) {
+                    if (layout.getLineForOffset(wordBoundary) != currLine) {
                         wordBoundary = isStartHandle()
                                 ? layout.getLineStart(currLine) : layout.getLineEnd(currLine);
                     }
@@ -5035,29 +5033,12 @@ public class Editor {
         }
 
         private float getHorizontal(@NonNull Layout layout, int offset, boolean startHandle) {
-            final int line = getLineForOffset(layout, offset);
+            final int line = layout.getLineForOffset(offset);
             final int offsetToCheck = startHandle ? offset : Math.max(offset - 1, 0);
             final boolean isRtlChar = layout.isRtlCharAt(offsetToCheck);
             final boolean isRtlParagraph = layout.getParagraphDirection(line) == -1;
             return (isRtlChar == isRtlParagraph)
-                    ? layout.getPrimaryHorizontal(offset, false, startHandle)
-                            : layout.getSecondaryHorizontal(offset, false, startHandle);
-        }
-
-        @Override
-        public int getLineForOffset(@NonNull Layout layout, int offset) {
-            return getLineForOffset(layout, offset, isStartHandle());
-        }
-
-        private int getLineForOffset(@NonNull Layout layout, int offset, boolean startHandle) {
-            final int line = layout.getLineForOffset(offset);
-            if (!startHandle && line > 0 && layout.getLineStart(line) == offset
-                    && mTextView.getText().charAt(offset - 1) != '\n') {
-                // If end handle is at a line break in a paragraph, the handle should be at the
-                // previous line.
-                return line - 1;
-            }
-            return line;
+                    ? layout.getPrimaryHorizontal(offset) : layout.getSecondaryHorizontal(offset);
         }
 
         @Override
@@ -6353,9 +6334,10 @@ public class Editor {
          * Adds "PROCESS_TEXT" menu items to the specified menu.
          */
         public void onInitializeMenu(Menu menu) {
-            int i = 0;
+            final int size = mSupportedActivities.size();
             loadSupportedActivities();
-            for (ResolveInfo resolveInfo : mSupportedActivities) {
+            for (int i = 0; i < size; i++) {
+                final ResolveInfo resolveInfo = mSupportedActivities.get(i);
                 menu.add(Menu.NONE, Menu.NONE,
                         Editor.MENU_ITEM_ORDER_PROCESS_TEXT_INTENT_ACTIONS_START + i++,
                         getLabel(resolveInfo))

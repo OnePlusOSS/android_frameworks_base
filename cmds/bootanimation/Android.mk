@@ -12,7 +12,8 @@ LOCAL_CFLAGS += -Wall -Werror -Wunused -Wunreachable-code
 
 LOCAL_C_INCLUDES += \
     external/tinyalsa/include \
-    frameworks/wilhelm/include
+    frameworks/wilhelm/include \
+    $(LOCAL_PATH)/../../libs/regionalization
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
@@ -27,7 +28,8 @@ LOCAL_SHARED_LIBRARIES := \
     libgui \
     libOpenSLES \
     libtinyalsa \
-    libbase
+    libbase \
+    libregionalization
 
 LOCAL_MODULE:= bootanimation
 

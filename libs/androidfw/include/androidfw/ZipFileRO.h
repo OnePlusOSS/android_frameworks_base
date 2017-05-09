@@ -154,6 +154,11 @@ public:
 
     ~ZipFileRO();
 
+    /*
+     * fetch ZIP file descriptor.
+     */
+    int fetchFileDescriptor() const;
+
 private:
     /* these are private and not defined */
     ZipFileRO(const ZipFileRO& src);

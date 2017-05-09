@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2014 The Android Open Source Project
  *
@@ -32,6 +31,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.View.OnClickListener;
+import android.view.Window;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -51,24 +51,21 @@ public class QSSecurityFooter implements OnClickListener, DialogInterface.OnClic
     private final View mRootView;
     private final TextView mFooterText;
     private final ImageView mFooterIcon;
-    private final ImageView mFooterIcon2;
     private final Context mContext;
     private final Callback mCallback = new Callback();
     private final SecurityController mSecurityController;
     private final ActivityStarter mActivityStarter;
     private final Handler mMainHandler;
+    private final View mDivider;
 
     private AlertDialog mDialog;
     private QSTileHost mHost;
     protected H mHandler;
 
     private boolean mIsVisible;
-    private boolean mIsIconVisible;
-    private boolean mIsIcon2Visible;
     private CharSequence mFooterTextContent = null;
     private int mFooterTextId;
     private int mFooterIconId;
-    private int mFooterIcon2Id;
 
     public QSSecurityFooter(QSPanel qsPanel, Context context) {
         mRootView = LayoutInflater.from(context)
@@ -76,14 +73,13 @@ public class QSSecurityFooter implements OnClickListener, DialogInterface.OnClic
         mRootView.setOnClickListener(this);
         mFooterText = (TextView) mRootView.findViewById(R.id.footer_text);
         mFooterIcon = (ImageView) mRootView.findViewById(R.id.footer_icon);
-        mFooterIcon2 = (ImageView) mRootView.findViewById(R.id.footer_icon2);
-        mFooterIconId = R.drawable.ic_qs_vpn;
-        mFooterIcon2Id = R.drawable.ic_qs_network_logging;
+        mFooterIconId = R.drawable.ic_info_outline;
         mContext = context;
         mMainHandler = new Handler(Looper.getMainLooper());
         mActivityStarter = Dependency.get(ActivityStarter.class);
         mSecurityController = Dependency.get(SecurityController.class);
         mHandler = new H(Dependency.get(Dependency.BG_LOOPER));
+        mDivider = qsPanel == null ? null : qsPanel.getDivider();
     }
 
     public void setHostEnvironment(QSTileHost host) {
@@ -130,167 +126,251 @@ public class QSSecurityFooter implements OnClickListener, DialogInterface.OnClic
     }
 
     private void handleRefreshState() {
-        boolean isVpnEnabled = mSecurityController.isVpnEnabled();
-        boolean isNetworkLoggingEnabled = mSecurityController.isNetworkLoggingEnabled();
-        mIsIconVisible = isVpnEnabled || isNetworkLoggingEnabled;
-        mIsIcon2Visible = isVpnEnabled && isNetworkLoggingEnabled;
-        if (mSecurityController.isDeviceManaged()) {
-            final CharSequence organizationName =
-                    mSecurityController.getDeviceOwnerOrganizationName();
-            if (organizationName != null) {
-                mFooterTextContent = mContext.getResources().getString(
-                        R.string.do_disclosure_with_name, organizationName);
-            } else {
-                mFooterTextContent =
-                        mContext.getResources().getString(R.string.do_disclosure_generic);
-            }
-            mIsVisible = true;
-            int footerIconId = isVpnEnabled
-                    ? R.drawable.ic_qs_vpn
-                    : R.drawable.ic_qs_network_logging;
-            if (mFooterIconId != footerIconId) {
-                mFooterIconId = footerIconId;
-                mMainHandler.post(mUpdateIcon);
-            }
-        } else {
-            boolean isBranded = mSecurityController.isVpnBranded();
-            mFooterTextContent = mContext.getResources().getText(
-                    isBranded ? R.string.branded_vpn_footer : R.string.vpn_footer);
-            // Update the VPN footer icon, if needed.
-            int footerIconId = isVpnEnabled
-                    ? (isBranded ? R.drawable.ic_qs_branded_vpn : R.drawable.ic_qs_vpn)
-                    : R.drawable.ic_qs_network_logging;
-            if (mFooterIconId != footerIconId) {
-                mFooterIconId = footerIconId;
-                mMainHandler.post(mUpdateIcon);
-            }
-            mIsVisible = mIsIconVisible;
+        final boolean isDeviceManaged = mSecurityController.isDeviceManaged();
+        final boolean hasWorkProfile = mSecurityController.hasWorkProfile();
+        final boolean hasCACerts = mSecurityController.hasCACertInCurrentUser();
+        final boolean hasCACertsInWorkProfile = mSecurityController.hasCACertInWorkProfile();
+        final boolean isNetworkLoggingEnabled = mSecurityController.isNetworkLoggingEnabled();
+        final String vpnName = mSecurityController.getPrimaryVpnName();
+        final String vpnNameWorkProfile = mSecurityController.getWorkProfileVpnName();
+        final CharSequence organizationName = mSecurityController.getDeviceOwnerOrganizationName();
+        final CharSequence workProfileName = mSecurityController.getWorkProfileOrganizationName();
+        // Update visibility of footer
+        mIsVisible = isDeviceManaged || hasCACerts || hasCACertsInWorkProfile ||
+            vpnName != null || vpnNameWorkProfile != null;
+        // Update the string
+        mFooterTextContent = getFooterText(isDeviceManaged, hasWorkProfile,
+                hasCACerts, hasCACertsInWorkProfile, isNetworkLoggingEnabled, vpnName,
+                vpnNameWorkProfile, organizationName, workProfileName);
+        // Update the icon
+        int footerIconId = vpnName != null || vpnNameWorkProfile != null
+                ? R.drawable.ic_qs_vpn
+                : R.drawable.ic_info_outline;
+        if (mFooterIconId != footerIconId) {
+            mFooterIconId = footerIconId;
+            mMainHandler.post(mUpdateIcon);
         }
         mMainHandler.post(mUpdateDisplayState);
+    }
+
+    protected CharSequence getFooterText(boolean isDeviceManaged, boolean hasWorkProfile,
+            boolean hasCACerts, boolean hasCACertsInWorkProfile, boolean isNetworkLoggingEnabled,
+            String vpnName, String vpnNameWorkProfile, CharSequence organizationName,
+            CharSequence workProfileName) {
+        if (isDeviceManaged) {
+            if (hasCACerts || hasCACertsInWorkProfile || isNetworkLoggingEnabled) {
+                if (organizationName == null) {
+                    return mContext.getString(
+                            R.string.quick_settings_disclosure_management_monitoring);
+                }
+                return mContext.getString(
+                        R.string.quick_settings_disclosure_named_management_monitoring,
+                        organizationName);
+            }
+            if (vpnName != null && vpnNameWorkProfile != null) {
+                if (organizationName == null) {
+                    return mContext.getString(R.string.quick_settings_disclosure_management_vpns);
+                }
+                return mContext.getString(R.string.quick_settings_disclosure_named_management_vpns,
+                        organizationName);
+            }
+            if (vpnName != null || vpnNameWorkProfile != null) {
+                if (organizationName == null) {
+                    return mContext.getString(
+                            R.string.quick_settings_disclosure_management_named_vpn,
+                            vpnName != null ? vpnName : vpnNameWorkProfile);
+                }
+                return mContext.getString(
+                        R.string.quick_settings_disclosure_named_management_named_vpn,
+                        organizationName,
+                        vpnName != null ? vpnName : vpnNameWorkProfile);
+            }
+            if (organizationName == null) {
+                return mContext.getString(R.string.quick_settings_disclosure_management);
+            }
+            return mContext.getString(R.string.quick_settings_disclosure_named_management,
+                    organizationName);
+        } // end if(isDeviceManaged)
+        if (hasCACertsInWorkProfile) {
+            if (workProfileName == null) {
+                return mContext.getString(
+                        R.string.quick_settings_disclosure_managed_profile_monitoring);
+            }
+            return mContext.getString(
+                    R.string.quick_settings_disclosure_named_managed_profile_monitoring,
+                    workProfileName);
+        }
+        if (hasCACerts) {
+            return mContext.getString(R.string.quick_settings_disclosure_monitoring);
+        }
+        if (vpnName != null && vpnNameWorkProfile != null) {
+            return mContext.getString(R.string.quick_settings_disclosure_vpns);
+        }
+        if (vpnNameWorkProfile != null) {
+            return mContext.getString(R.string.quick_settings_disclosure_managed_profile_named_vpn,
+                    vpnNameWorkProfile);
+        }
+        if (vpnName != null) {
+            if (hasWorkProfile) {
+                return mContext.getString(
+                        R.string.quick_settings_disclosure_personal_profile_named_vpn,
+                        vpnName);
+            }
+            return mContext.getString(R.string.quick_settings_disclosure_named_vpn,
+                    vpnName);
+        }
+        return null;
     }
 
     @Override
     public void onClick(DialogInterface dialog, int which) {
         if (which == DialogInterface.BUTTON_NEGATIVE) {
-            final Intent settingsIntent = new Intent(ACTION_VPN_SETTINGS);
-            mActivityStarter.postStartActivityDismissingKeyguard(settingsIntent, 0);
+            final Intent intent = new Intent(Settings.ACTION_ENTERPRISE_PRIVACY_SETTINGS);
+            mDialog.dismiss();
+            mActivityStarter.postStartActivityDismissingKeyguard(intent, 0);
         }
     }
 
     private void createDialog() {
-        final String deviceOwnerPackage = mSecurityController.getDeviceOwnerName();
-        final String profileOwnerPackage = mSecurityController.getProfileOwnerName();
-        final boolean isNetworkLoggingEnabled = mSecurityController.isNetworkLoggingEnabled();
-        final String primaryVpn = mSecurityController.getPrimaryVpnName();
-        final String profileVpn = mSecurityController.getProfileVpnName();
+        final boolean isDeviceManaged = mSecurityController.isDeviceManaged();
+        final boolean hasWorkProfile = mSecurityController.hasWorkProfile();
         final CharSequence deviceOwnerOrganization =
                 mSecurityController.getDeviceOwnerOrganizationName();
-        boolean hasProfileOwner = mSecurityController.hasProfileOwner();
-        boolean isBranded = deviceOwnerPackage == null && mSecurityController.isVpnBranded();
+        final boolean hasCACerts = mSecurityController.hasCACertInCurrentUser();
+        final boolean hasCACertsInWorkProfile = mSecurityController.hasCACertInWorkProfile();
+        final boolean isNetworkLoggingEnabled = mSecurityController.isNetworkLoggingEnabled();
+        final String vpnName = mSecurityController.getPrimaryVpnName();
+        final String vpnNameWorkProfile = mSecurityController.getWorkProfileVpnName();
 
         mDialog = new SystemUIDialog(mContext);
-        if (!isBranded) {
-            mDialog.setTitle(getTitle(deviceOwnerPackage));
-        }
-        CharSequence msg = getMessage(deviceOwnerPackage, profileOwnerPackage, primaryVpn,
-                profileVpn, deviceOwnerOrganization, hasProfileOwner, isBranded);
-        if (deviceOwnerPackage == null) {
-            mDialog.setMessage(msg);
-            if (mSecurityController.isVpnEnabled() && !mSecurityController.isVpnRestricted()) {
-                mDialog.setButton(DialogInterface.BUTTON_NEGATIVE, getSettingsButton(), this);
-            }
+        mDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        View dialogView = LayoutInflater.from(mContext)
+               .inflate(R.layout.quick_settings_footer_dialog, null, false);
+        mDialog.setView(dialogView);
+        mDialog.setButton(DialogInterface.BUTTON_POSITIVE, getPositiveButton(), this);
+
+        // device management section
+        CharSequence managementMessage = getManagementMessage(isDeviceManaged,
+                deviceOwnerOrganization);
+        if (managementMessage == null) {
+            dialogView.findViewById(R.id.device_management_disclosures).setVisibility(View.GONE);
         } else {
-            View dialogView = LayoutInflater.from(mContext)
-                   .inflate(R.layout.quick_settings_footer_dialog, null, false);
-            mDialog.setView(dialogView);
-            TextView deviceOwnerWarning =
-                    (TextView) dialogView.findViewById(R.id.device_owner_warning);
-            deviceOwnerWarning.setText(msg);
-            // Make the link "learn more" clickable.
-            deviceOwnerWarning.setMovementMethod(new LinkMovementMethod());
-            if (primaryVpn == null) {
-                dialogView.findViewById(R.id.vpn_icon).setVisibility(View.GONE);
-                dialogView.findViewById(R.id.vpn_subtitle).setVisibility(View.GONE);
-                dialogView.findViewById(R.id.vpn_warning).setVisibility(View.GONE);
-            } else {
-                final SpannableStringBuilder message = new SpannableStringBuilder();
-                message.append(mContext.getString(R.string.monitoring_description_do_body_vpn,
-                        primaryVpn));
-                if (!mSecurityController.isVpnRestricted()) {
-                    message.append(mContext.getString(
-                            R.string.monitoring_description_vpn_settings_separator));
-                    message.append(mContext.getString(R.string.monitoring_description_vpn_settings),
-                            new VpnSpan(), 0);
-                }
-
-                TextView vpnWarning = (TextView) dialogView.findViewById(R.id.vpn_warning);
-                vpnWarning.setText(message);
-                // Make the link "Open VPN Settings" clickable.
-                vpnWarning.setMovementMethod(new LinkMovementMethod());
-            }
-            if (!isNetworkLoggingEnabled) {
-                dialogView.findViewById(R.id.network_logging_icon).setVisibility(View.GONE);
-                dialogView.findViewById(R.id.network_logging_subtitle).setVisibility(View.GONE);
-                dialogView.findViewById(R.id.network_logging_warning).setVisibility(View.GONE);
-            }
+            dialogView.findViewById(R.id.device_management_disclosures).setVisibility(View.VISIBLE);
+            TextView deviceManagementWarning =
+                    (TextView) dialogView.findViewById(R.id.device_management_warning);
+            deviceManagementWarning.setText(managementMessage);
+            mDialog.setButton(DialogInterface.BUTTON_NEGATIVE, getSettingsButton(), this);
         }
 
-        mDialog.setButton(DialogInterface.BUTTON_POSITIVE, getPositiveButton(isBranded), this);
+        // ca certificate section
+        CharSequence caCertsMessage = getCaCertsMessage(isDeviceManaged, hasCACerts,
+                hasCACertsInWorkProfile);
+        if (caCertsMessage == null) {
+            dialogView.findViewById(R.id.ca_certs_disclosures).setVisibility(View.GONE);
+        } else {
+            dialogView.findViewById(R.id.ca_certs_disclosures).setVisibility(View.VISIBLE);
+            TextView caCertsWarning = (TextView) dialogView.findViewById(R.id.ca_certs_warning);
+            caCertsWarning.setText(caCertsMessage);
+            // Make "Open trusted credentials"-link clickable
+            caCertsWarning.setMovementMethod(new LinkMovementMethod());
+        }
+
+        // network logging section
+        CharSequence networkLoggingMessage = getNetworkLoggingMessage(isNetworkLoggingEnabled);
+        if (networkLoggingMessage == null) {
+            dialogView.findViewById(R.id.network_logging_disclosures).setVisibility(View.GONE);
+        } else {
+            dialogView.findViewById(R.id.network_logging_disclosures).setVisibility(View.VISIBLE);
+            TextView networkLoggingWarning =
+                    (TextView) dialogView.findViewById(R.id.network_logging_warning);
+            networkLoggingWarning.setText(networkLoggingMessage);
+        }
+
+        // vpn section
+        CharSequence vpnMessage = getVpnMessage(isDeviceManaged, hasWorkProfile, vpnName,
+                vpnNameWorkProfile);
+        if (vpnMessage == null) {
+            dialogView.findViewById(R.id.vpn_disclosures).setVisibility(View.GONE);
+        } else {
+            dialogView.findViewById(R.id.vpn_disclosures).setVisibility(View.VISIBLE);
+            TextView vpnWarning = (TextView) dialogView.findViewById(R.id.vpn_warning);
+            vpnWarning.setText(vpnMessage);
+            // Make "Open VPN Settings"-link clickable
+            vpnWarning.setMovementMethod(new LinkMovementMethod());
+        }
+
         mDialog.show();
-        mDialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        mDialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
     private String getSettingsButton() {
-        return mContext.getString(R.string.status_bar_settings_settings_button);
+        return mContext.getString(R.string.monitoring_button_view_policies);
     }
 
-    private String getPositiveButton(boolean isBranded) {
-        return mContext.getString(isBranded ? android.R.string.ok : R.string.quick_settings_done);
+    private String getPositiveButton() {
+        return mContext.getString(R.string.quick_settings_done);
     }
 
-    protected CharSequence getMessage(String deviceOwnerPackage, String profileOwnerPackage,
-            String primaryVpn, String profileVpn, CharSequence deviceOwnerOrganization,
-            boolean hasProfileOwner, boolean isBranded) {
-        if (deviceOwnerPackage != null) {
-            final SpannableStringBuilder message = new SpannableStringBuilder();
-            if (deviceOwnerOrganization != null) {
-                message.append(mContext.getString(
-                        R.string.monitoring_description_do_header_with_name,
-                        deviceOwnerOrganization, deviceOwnerPackage));
-            } else {
-                message.append(mContext.getString(R.string.monitoring_description_do_header_generic,
-                        deviceOwnerPackage));
-            }
-            message.append("\n\n");
-            message.append(mContext.getString(R.string.monitoring_description_do_body));
-            message.append(mContext.getString(
-                    R.string.monitoring_description_do_learn_more_separator));
-            message.append(mContext.getString(R.string.monitoring_description_do_learn_more),
-                    new EnterprisePrivacySpan(), 0);
-            return message;
-        } else if (primaryVpn != null) {
-            if (profileVpn != null) {
-                return mContext.getString(R.string.monitoring_description_app_personal_work,
-                        profileOwnerPackage, profileVpn, primaryVpn);
-            } else {
-                if (isBranded) {
-                    return mContext.getString(R.string.branded_monitoring_description_app_personal,
-                            primaryVpn);
-                } else {
-                    return mContext.getString(R.string.monitoring_description_app_personal,
-                            primaryVpn);
-                }
-            }
-        } else if (profileVpn != null) {
-            return mContext.getString(R.string.monitoring_description_app_work,
-                    profileOwnerPackage, profileVpn);
-        } else if (profileOwnerPackage != null && hasProfileOwner) {
-            return mContext.getString(R.string.do_disclosure_with_name,
-                    profileOwnerPackage);
-        } else {
-            // No device owner, no personal VPN, no work VPN, no user owner. Why are we here?
-            return null;
+    protected CharSequence getManagementMessage(boolean isDeviceManaged,
+            CharSequence organizationName) {
+        if (!isDeviceManaged) return null;
+        if (organizationName != null)
+            return mContext.getString(
+                    R.string.monitoring_description_named_management, organizationName);
+        return mContext.getString(R.string.monitoring_description_management);
+    }
+
+    protected CharSequence getCaCertsMessage(boolean isDeviceManaged, boolean hasCACerts,
+            boolean hasCACertsInWorkProfile) {
+        if (!(hasCACerts || hasCACertsInWorkProfile)) return null;
+        if (isDeviceManaged) {
+            return mContext.getString(R.string.monitoring_description_management_ca_certificate);
         }
+        if (hasCACertsInWorkProfile) {
+            return mContext.getString(
+                    R.string.monitoring_description_managed_profile_ca_certificate);
+        }
+        return mContext.getString(R.string.monitoring_description_ca_certificate);
+    }
+
+    protected CharSequence getNetworkLoggingMessage(boolean isNetworkLoggingEnabled) {
+        if (!isNetworkLoggingEnabled) return null;
+        return mContext.getString(R.string.monitoring_description_management_network_logging);
+    }
+
+    protected CharSequence getVpnMessage(boolean isDeviceManaged, boolean hasWorkProfile,
+            String vpnName, String vpnNameWorkProfile) {
+        if (vpnName == null && vpnNameWorkProfile == null) return null;
+        final SpannableStringBuilder message = new SpannableStringBuilder();
+        if (isDeviceManaged) {
+            if (vpnName != null && vpnNameWorkProfile != null) {
+                message.append(mContext.getString(R.string.monitoring_description_two_named_vpns,
+                        vpnName, vpnNameWorkProfile));
+            } else {
+                message.append(mContext.getString(R.string.monitoring_description_named_vpn,
+                        vpnName != null ? vpnName : vpnNameWorkProfile));
+            }
+        } else {
+            if (vpnName != null && vpnNameWorkProfile != null) {
+                message.append(mContext.getString(R.string.monitoring_description_two_named_vpns,
+                        vpnName, vpnNameWorkProfile));
+            } else if (vpnNameWorkProfile != null) {
+                message.append(mContext.getString(
+                        R.string.monitoring_description_managed_profile_named_vpn,
+                        vpnNameWorkProfile));
+            } else if (hasWorkProfile) {
+                message.append(mContext.getString(
+                        R.string.monitoring_description_personal_profile_named_vpn, vpnName));
+            } else {
+                message.append(mContext.getString(R.string.monitoring_description_named_vpn,
+                        vpnName));
+            }
+        }
+        message.append(mContext.getString(R.string.monitoring_description_vpn_settings_separator));
+        message.append(mContext.getString(R.string.monitoring_description_vpn_settings),
+                new VpnSpan(), 0);
+        return message;
     }
 
     private int getTitle(String deviceOwner) {
@@ -305,7 +385,6 @@ public class QSSecurityFooter implements OnClickListener, DialogInterface.OnClic
         @Override
         public void run() {
             mFooterIcon.setImageResource(mFooterIconId);
-            mFooterIcon2.setImageResource(mFooterIcon2Id);
         }
     };
 
@@ -316,8 +395,7 @@ public class QSSecurityFooter implements OnClickListener, DialogInterface.OnClic
                 mFooterText.setText(mFooterTextContent);
             }
             mRootView.setVisibility(mIsVisible ? View.VISIBLE : View.GONE);
-            mFooterIcon.setVisibility(mIsIconVisible ? View.VISIBLE : View.INVISIBLE);
-            mFooterIcon2.setVisibility(mIsIcon2Visible ? View.VISIBLE : View.INVISIBLE);
+            if (mDivider != null) mDivider.setVisibility(mIsVisible ? View.GONE : View.VISIBLE);
         }
     };
 
@@ -355,26 +433,23 @@ public class QSSecurityFooter implements OnClickListener, DialogInterface.OnClic
         }
     }
 
-    protected class EnterprisePrivacySpan extends ClickableSpan {
-        @Override
-        public void onClick(View widget) {
-            final Intent intent = new Intent(Settings.ACTION_ENTERPRISE_PRIVACY_SETTINGS);
-            mDialog.dismiss();
-            mActivityStarter.postStartActivityDismissingKeyguard(intent, 0);
-        }
-
-        @Override
-        public boolean equals(Object object) {
-            return object instanceof EnterprisePrivacySpan;
-        }
-    }
-
     protected class VpnSpan extends ClickableSpan {
         @Override
         public void onClick(View widget) {
             final Intent intent = new Intent(Settings.ACTION_VPN_SETTINGS);
             mDialog.dismiss();
             mActivityStarter.postStartActivityDismissingKeyguard(intent, 0);
+        }
+
+        // for testing, to compare two CharSequences containing VpnSpans
+        @Override
+        public boolean equals(Object object) {
+            return object instanceof VpnSpan;
+        }
+
+        @Override
+        public int hashCode() {
+            return 314159257; // prime
         }
     }
 }

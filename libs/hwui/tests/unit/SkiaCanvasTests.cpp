@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 #include <RecordingCanvas.h>
 #include <SkBlurDrawLooper.h>
+#include <SkCanvasStateUtils.h>
 #include <SkPicture.h>
 #include <SkPictureRecorder.h>
 
@@ -103,14 +104,20 @@ TEST(SkiaCanvas, colorSpaceXform) {
     skBitmap.lockPixels();
     ASSERT_EQ(0xFF0000FF, *skBitmap.getAddr32(0, 0));
 
+    // Create a software canvas with an Adobe color space.
+    SkiaCanvas adobeSkCanvas(adobeSkBitmap);
+    adobeSkCanvas.drawBitmap(*bitmap, 0, 0, nullptr);
+    // The result should be less than fully red, since we convert to Adobe RGB at draw time.
+    ASSERT_EQ(0xFF0000DC, *adobeSkBitmap.getAddr32(0, 0));
+
     // Now try in kDefer mode.  This is a little strange given that, in practice, all software
     // canvases are kImmediate.
     SkCanvas skCanvas(skBitmap);
     SkiaCanvas deferCanvas(&skCanvas, Canvas::XformToSRGB::kDefer);
     deferCanvas.drawBitmap(*adobeBitmap, 0, 0, nullptr);
-    // The result should be as initialized, since we deferred the conversion to sRGB.
+    // The result should be as before, since we deferred the conversion to sRGB.
     skBitmap.lockPixels();
-    ASSERT_EQ(0xFF0000F0, *skBitmap.getAddr32(0, 0));
+    ASSERT_EQ(0xFF0000DC, *skBitmap.getAddr32(0, 0));
 
     // Test picture recording.  We will kDefer the xform at recording time, but handle it when
     // we playback to the software canvas.
@@ -120,11 +127,40 @@ TEST(SkiaCanvas, colorSpaceXform) {
     picCanvas.drawBitmap(*adobeBitmap, 0, 0, nullptr);
     sk_sp<SkPicture> picture = recorder.finishRecordingAsPicture();
 
-    // Playback to a deferred canvas.  The result should be as initialized.
+    // Playback to a deferred canvas.  The result should be as before.
     deferCanvas.asSkCanvas()->drawPicture(picture);
-    ASSERT_EQ(0xFF0000F0, *skBitmap.getAddr32(0, 0));
+    ASSERT_EQ(0xFF0000DC, *skBitmap.getAddr32(0, 0));
 
     // Playback to an immediate canvas.  The result should be fully red.
     canvas.asSkCanvas()->drawPicture(picture);
     ASSERT_EQ(0xFF0000FF, *skBitmap.getAddr32(0, 0));
+}
+
+TEST(SkiaCanvas, captureCanvasState) {
+    // Create a software canvas.
+    SkImageInfo info = SkImageInfo::Make(1, 1, kN32_SkColorType, kOpaque_SkAlphaType);
+    sk_sp<Bitmap> bitmap = Bitmap::allocateHeapBitmap(info);
+    SkBitmap skBitmap;
+    bitmap->getSkBitmap(&skBitmap);
+    skBitmap.eraseColor(0);
+    SkiaCanvas canvas(skBitmap);
+
+    // Translate, then capture and verify the CanvasState.
+    canvas.translate(1.0f, 1.0f);
+    SkCanvasState* state = canvas.captureCanvasState();
+    ASSERT_NE(state, nullptr);
+    std::unique_ptr<SkCanvas> newCanvas = SkCanvasStateUtils::MakeFromCanvasState(state);
+    ASSERT_NE(newCanvas.get(), nullptr);
+    newCanvas->translate(-1.0f, -1.0f);
+    ASSERT_TRUE(newCanvas->getTotalMatrix().isIdentity());
+    SkCanvasStateUtils::ReleaseCanvasState(state);
+
+    // Create a picture canvas.
+    SkPictureRecorder recorder;
+    SkCanvas* skPicCanvas = recorder.beginRecording(1, 1, NULL, 0);
+    SkiaCanvas picCanvas(skPicCanvas, Canvas::XformToSRGB::kDefer);
+    state = picCanvas.captureCanvasState();
+
+    // Verify that we cannot get the CanvasState.
+    ASSERT_EQ(state, nullptr);
 }

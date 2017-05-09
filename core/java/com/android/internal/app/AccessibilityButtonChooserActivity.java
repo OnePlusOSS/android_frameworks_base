@@ -34,6 +34,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.android.internal.R;
+import com.android.internal.widget.ResolverDrawerLayout;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -56,16 +57,21 @@ public class AccessibilityButtonChooserActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.accessibility_button_chooser);
 
+        final ResolverDrawerLayout rdl = findViewById(R.id.contentPanel);
+        if (rdl != null) {
+            rdl.setOnDismissedListener(this::finish);
+        }
+
         String component = Settings.Secure.getString(getContentResolver(),
                 Settings.Secure.ACCESSIBILITY_BUTTON_TARGET_COMPONENT);
         if (TextUtils.isEmpty(component)) {
-            TextView prompt = (TextView) findViewById(R.id.accessibility_button_prompt);
+            TextView prompt = findViewById(R.id.accessibility_button_prompt);
             prompt.setVisibility(View.VISIBLE);
         }
 
         mMagnificationTarget = new AccessibilityButtonTarget(this, MAGNIFICATION_COMPONENT_ID,
                 R.string.accessibility_magnification_chooser_text,
-                R.drawable.resolver_icon_placeholder);
+                R.drawable.ic_accessibility_magnification);
 
         mTargets = getServiceAccessibilityButtonTargets(this);
         if (Settings.Secure.getInt(getContentResolver(),
@@ -78,7 +84,7 @@ public class AccessibilityButtonChooserActivity extends Activity {
             finish();
         }
 
-        GridView gridview = (GridView) findViewById(R.id.accessibility_button_chooser_grid);
+        GridView gridview = findViewById(R.id.accessibility_button_chooser_grid);
         gridview.setAdapter(new TargetAdapter());
         gridview.setOnItemClickListener((parent, view, position, id) -> {
             onTargetSelected(mTargets.get(position));

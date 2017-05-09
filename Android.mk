@@ -143,7 +143,6 @@ LOCAL_SRC_FILES += \
 	core/java/android/bluetooth/IBluetoothGatt.aidl \
 	core/java/android/bluetooth/IBluetoothGattCallback.aidl \
 	core/java/android/bluetooth/IBluetoothGattServerCallback.aidl \
-	core/java/android/bluetooth/le/IAdvertiserCallback.aidl \
 	core/java/android/bluetooth/le/IAdvertisingSetCallback.aidl \
 	core/java/android/bluetooth/le/IPeriodicAdvertisingCallback.aidl \
 	core/java/android/bluetooth/le/IScannerCallback.aidl \
@@ -309,6 +308,7 @@ LOCAL_SRC_FILES += \
 	core/java/android/companion/IFindDeviceCallback.aidl \
 	core/java/android/service/dreams/IDreamManager.aidl \
 	core/java/android/service/dreams/IDreamService.aidl \
+	core/java/android/service/oemlock/IOemLockService.aidl \
 	core/java/android/service/persistentdata/IPersistentDataBlockService.aidl \
 	core/java/android/service/trust/ITrustAgentService.aidl \
 	core/java/android/service/trust/ITrustAgentServiceCallback.aidl \
@@ -378,6 +378,7 @@ LOCAL_SRC_FILES += \
 	core/java/com/android/internal/policy/IShortcutService.aidl \
 	core/java/com/android/internal/os/IDropBoxManagerService.aidl \
 	core/java/com/android/internal/os/IParcelFileDescriptorFactory.aidl \
+	core/java/com/android/internal/os/IRegionalizationService.aidl \
 	core/java/com/android/internal/os/IResultReceiver.aidl \
 	core/java/com/android/internal/os/IShellCallback.aidl \
 	core/java/com/android/internal/statusbar/IStatusBar.aidl \
@@ -529,6 +530,8 @@ LOCAL_SRC_FILES += \
 	packages/services/Proxy/com/android/net/IProxyPortListener.aidl \
 	core/java/android/service/quicksettings/IQSService.aidl \
 	core/java/android/service/quicksettings/IQSTileService.aidl \
+	telephony/java/com/android/internal/telephony/ISmsSecurityService.aidl \
+	telephony/java/com/android/internal/telephony/ISmsSecurityAgent.aidl \
 
 # The following are native binders that need to go with the native component
 # at system/update_engine/binder_bindings/. Use relative path to refer to them.
@@ -569,11 +572,11 @@ LOCAL_JAVA_LIBRARIES := core-oj core-libart conscrypt okhttp bouncycastle ext
 
 LOCAL_STATIC_JAVA_LIBRARIES :=                          \
     framework-protos                                    \
-    android.hardware.health@1.0-java-constants          \
-    android.hardware.thermal@1.0-java-constants         \
-    android.hardware.tv.input@1.0-java-constants        \
-    android.hardware.usb@1.0-java-constants             \
-    android.hardware.vibrator@1.0-java-constants        \
+    android.hardware.health-V1.0-java-constants          \
+    android.hardware.thermal-V1.0-java-constants         \
+    android.hardware.tv.input-V1.0-java-constants        \
+    android.hardware.usb-V1.0-java-constants             \
+    android.hardware.vibrator-V1.0-java-constants        \
 
 # Loaded with System.loadLibrary by android.view.textclassifier
 LOCAL_REQUIRED_MODULES += libtextclassifier
@@ -907,7 +910,6 @@ framework_docs_LOCAL_API_CHECK_JAVA_LIBRARIES := \
 	ext \
 	icu4j \
 	framework \
-	telephony-common \
 	voip-common
 
 framework_docs_LOCAL_JAVA_LIBRARIES := \
@@ -922,6 +924,7 @@ framework_docs_LOCAL_DROIDDOC_HTML_DIR := docs/html
 # Conscrypt (com.android.org.conscrypt) is an implementation detail and should
 # not be referenced in the documentation.
 framework_docs_LOCAL_DROIDDOC_OPTIONS := \
+    -android \
     -knowntags ./frameworks/base/docs/knowntags.txt \
     -knowntags ./libcore/known_oj_tags.txt \
     -hidePackage com.android.org.conscrypt \
@@ -951,8 +954,8 @@ framework_docs_LOCAL_DROIDDOC_OPTIONS := \
     -since $(SRC_API_DIR)/24.txt 24 \
     -since $(SRC_API_DIR)/25.txt 25 \
     -since ./frameworks/base/api/current.txt O \
-		-werror -hide 111 -hide 113 \
-		-overview $(LOCAL_PATH)/core/java/overview.html
+    -werror -hide 111 -hide 113 -hide 121 \
+    -overview $(LOCAL_PATH)/core/java/overview.html \
 
 # Allow the support library to add its own droiddoc options.
 include $(LOCAL_PATH)/../support/droiddoc.mk

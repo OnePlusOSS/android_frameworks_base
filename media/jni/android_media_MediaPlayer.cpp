@@ -662,15 +662,15 @@ android_media_MediaPlayer_getSyncParams(JNIEnv *env, jobject thiz)
 }
 
 static void
-android_media_MediaPlayer_seekTo(JNIEnv *env, jobject thiz, jint msec, jint mode)
+android_media_MediaPlayer_seekTo(JNIEnv *env, jobject thiz, jlong msec, jint mode)
 {
     sp<MediaPlayer> mp = getMediaPlayer(env, thiz);
     if (mp == NULL ) {
         jniThrowException(env, "java/lang/IllegalStateException", NULL);
         return;
     }
-    ALOGV("seekTo: %d(msec), mode=%d", msec, mode);
-    process_media_player_call( env, thiz, mp->seekTo(msec, (MediaPlayerSeekMode)mode), NULL, NULL );
+    ALOGV("seekTo: %lld(msec), mode=%d", (long long)msec, mode);
+    process_media_player_call( env, thiz, mp->seekTo((int)msec, (MediaPlayerSeekMode)mode), NULL, NULL );
 }
 
 static jint
@@ -1393,12 +1393,12 @@ static const JNINativeMethod gMethods[] = {
     {"_stop",               "()V",                              (void *)android_media_MediaPlayer_stop},
     {"getVideoWidth",       "()I",                              (void *)android_media_MediaPlayer_getVideoWidth},
     {"getVideoHeight",      "()I",                              (void *)android_media_MediaPlayer_getVideoHeight},
-    {"native_getMetrics",          "()Landroid/os/Bundle;",            (void *)android_media_MediaPlayer_native_getMetrics},
+    {"native_getMetrics",   "()Landroid/os/PersistableBundle;", (void *)android_media_MediaPlayer_native_getMetrics},
     {"setPlaybackParams", "(Landroid/media/PlaybackParams;)V", (void *)android_media_MediaPlayer_setPlaybackParams},
     {"getPlaybackParams", "()Landroid/media/PlaybackParams;", (void *)android_media_MediaPlayer_getPlaybackParams},
     {"setSyncParams",     "(Landroid/media/SyncParams;)V",  (void *)android_media_MediaPlayer_setSyncParams},
     {"getSyncParams",     "()Landroid/media/SyncParams;",   (void *)android_media_MediaPlayer_getSyncParams},
-    {"_seekTo",             "(II)V",                            (void *)android_media_MediaPlayer_seekTo},
+    {"_seekTo",             "(JI)V",                            (void *)android_media_MediaPlayer_seekTo},
     {"_pause",              "()V",                              (void *)android_media_MediaPlayer_pause},
     {"isPlaying",           "()Z",                              (void *)android_media_MediaPlayer_isPlaying},
     {"getCurrentPosition",  "()I",                              (void *)android_media_MediaPlayer_getCurrentPosition},

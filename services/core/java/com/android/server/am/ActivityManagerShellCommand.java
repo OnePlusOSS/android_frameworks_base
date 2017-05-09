@@ -524,7 +524,7 @@ final class ActivityManagerShellCommand extends ShellCommand {
         pw.println("Starting service: " + intent);
         pw.flush();
         ComponentName cn = mInterface.startService(null, intent, intent.getType(),
-                -1, null, asForeground, SHELL_PACKAGE_NAME, mUserId);
+                asForeground, SHELL_PACKAGE_NAME, mUserId);
         if (cn == null) {
             err.println("Error: Not found; no service started.");
             return -1;
@@ -2496,6 +2496,10 @@ final class ActivityManagerShellCommand extends ShellCommand {
             pw.println("      --stack <STACK_ID>: Specify into which stack should the activity be put.");
             pw.println("  start-service [--user <USER_ID> | current] <INTENT>");
             pw.println("      Start a Service.  Options are:");
+            pw.println("      --user <USER_ID> | current: Specify which user to run as; if not");
+            pw.println("          specified then run as the current user.");
+            pw.println("  start-foreground-service [--user <USER_ID> | current] <INTENT>");
+            pw.println("      Start a foreground Service.  Options are:");
             pw.println("      --user <USER_ID> | current: Specify which user to run as; if not");
             pw.println("          specified then run as the current user.");
             pw.println("  stop-service [--user <USER_ID> | current] <INTENT>");

@@ -38,7 +38,6 @@ import com.android.internal.util.ArrayUtils;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.systemui.ChargingView;
 
-import java.util.Arrays;
 import java.util.Locale;
 
 public class KeyguardStatusView extends GridLayout {
@@ -115,14 +114,15 @@ public class KeyguardStatusView extends GridLayout {
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        mClockContainer = (ViewGroup) findViewById(R.id.keyguard_clock_container);
-        mAlarmStatusView = (TextView) findViewById(R.id.alarm_status);
-        mDateView = (TextClock) findViewById(R.id.date_view);
-        mClockView = (TextClock) findViewById(R.id.clock_view);
+        mClockContainer = findViewById(R.id.keyguard_clock_container);
+        mAlarmStatusView = findViewById(R.id.alarm_status);
+        mDateView = findViewById(R.id.date_view);
+        mClockView = findViewById(R.id.clock_view);
         mDateView.setShowCurrentUserTime(true);
         mClockView.setShowCurrentUserTime(true);
-        mOwnerInfo = (TextView) findViewById(R.id.owner_info);
-        mBatteryDoze = (ChargingView) findViewById(R.id.battery_doze);
+        mClockView.setAccessibilityDelegate(new KeyguardClockAccessibilityDelegate(mContext));
+        mOwnerInfo = findViewById(R.id.owner_info);
+        mBatteryDoze = findViewById(R.id.battery_doze);
         mVisibleInDoze = new View[]{mBatteryDoze, mClockView};
 
         boolean shouldMarquee = KeyguardUpdateMonitor.getInstance(mContext).isDeviceInteractive();

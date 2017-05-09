@@ -18,10 +18,10 @@ package com.android.server.autofill;
 
 import static com.android.server.autofill.AutofillManagerService.RECEIVER_BUNDLE_EXTRA_SESSIONS;
 
-import android.app.ActivityManager;
 import android.os.Bundle;
 import android.os.ShellCommand;
 import android.os.UserHandle;
+import android.view.autofill.AutofillManager;
 
 import com.android.internal.os.IResultReceiver;
 
@@ -45,14 +45,16 @@ public final class AutofillManagerServiceShellCommand extends ShellCommand {
         }
         final PrintWriter pw = getOutPrintWriter();
         switch (cmd) {
-            case "save":
-                return requestSave();
             case "list":
                 return requestList(pw);
             case "destroy":
                 return requestDestroy(pw);
             case "reset":
                 return requestReset();
+            case "get":
+                return requestGet(pw);
+            case "set":
+                return requestSet(pw);
             default:
                 return handleDefaultCommands(cmd);
         }
@@ -65,14 +67,17 @@ public final class AutofillManagerServiceShellCommand extends ShellCommand {
             pw.println("  help");
             pw.println("    Prints this help text.");
             pw.println("");
+            pw.println("  get log_level ");
+            pw.println("    Gets the Autofill log level (off | debug | verbose).");
+            pw.println("");
+            pw.println("  set log_level [off | debug | verbose]");
+            pw.println("    Sets the Autofill log level.");
+            pw.println("");
             pw.println("  list sessions [--user USER_ID]");
             pw.println("    List all pending sessions.");
             pw.println("");
             pw.println("  destroy sessions [--user USER_ID]");
             pw.println("    Destroy all pending sessions.");
-            pw.println("");
-            pw.println("  save [--user USER_ID]");
-            pw.println("    Request provider to save contents of the top activity.");
             pw.println("");
             pw.println("  reset");
             pw.println("    Reset all pending sessions and cached service connections.");
@@ -80,10 +85,46 @@ public final class AutofillManagerServiceShellCommand extends ShellCommand {
         }
     }
 
-    private int requestSave() {
-        final int userId = getUserIdFromArgsOrCurrentUser();
-        mService.requestSaveForUser(userId);
-        return 0;
+    private int requestGet(PrintWriter pw) {
+        if (!isNextArgLogLevel(pw, "get")) {
+            return -1;
+        }
+        final int logLevel = mService.getLogLevel();
+        switch (logLevel) {
+            case AutofillManager.FLAG_ADD_CLIENT_VERBOSE:
+                pw.println("verbose");
+                return 0;
+            case AutofillManager.FLAG_ADD_CLIENT_DEBUG:
+                pw.println("debug");
+                return 0;
+            case 0:
+                pw.println("off");
+                return 0;
+            default:
+                pw.println("unknow (" + logLevel + ")");
+                return 0;
+        }
+    }
+
+    private int requestSet(PrintWriter pw) {
+        if (!isNextArgLogLevel(pw, "set")) {
+            return -1;
+        }
+        final String logLevel = getNextArg();
+        switch (logLevel.toLowerCase()) {
+            case "verbose":
+                mService.setLogLevel(AutofillManager.FLAG_ADD_CLIENT_VERBOSE);
+                return 0;
+            case "debug":
+                mService.setLogLevel(AutofillManager.FLAG_ADD_CLIENT_DEBUG);
+                return 0;
+            case "off":
+                mService.setLogLevel(0);
+                return 0;
+            default:
+                pw.println("Invalid level: " + logLevel);
+                return -1;
+        }
     }
 
     private int requestDestroy(PrintWriter pw) {
@@ -132,6 +173,15 @@ public final class AutofillManagerServiceShellCommand extends ShellCommand {
         return true;
     }
 
+    private boolean isNextArgLogLevel(PrintWriter pw, String cmd) {
+        final String type = getNextArgRequired();
+        if (!type.equals("log_level")) {
+            pw.println("Error: invalid " + cmd + " type: " + type);
+            return false;
+        }
+        return true;
+    }
+
     private int requestSessionCommon(PrintWriter pw, CountDownLatch latch,
             Runnable command) {
         command.run();
@@ -153,13 +203,6 @@ public final class AutofillManagerServiceShellCommand extends ShellCommand {
     private int requestReset() {
         mService.reset();
         return 0;
-    }
-
-    private int getUserIdFromArgsOrCurrentUser() {
-        if ("--user".equals(getNextArg())) {
-            return UserHandle.parseUserArg(getNextArgRequired());
-        }
-        return ActivityManager.getCurrentUser();
     }
 
     private int getUserIdFromArgsOrAllUsers() {

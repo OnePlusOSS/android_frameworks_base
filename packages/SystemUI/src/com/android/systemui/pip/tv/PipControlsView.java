@@ -107,7 +107,7 @@ public class PipControlsView extends LinearLayout {
     public void onFinishInflate() {
         super.onFinishInflate();
 
-        mFullButtonView = (PipControlButtonView) findViewById(R.id.full_button);
+        mFullButtonView = findViewById(R.id.full_button);
         mFullButtonView.setOnFocusChangeListener(mFocusChangeListener);
         mFullButtonView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -116,7 +116,7 @@ public class PipControlsView extends LinearLayout {
             }
         });
 
-        mCloseButtonView = (PipControlButtonView) findViewById(R.id.close_button);
+        mCloseButtonView = findViewById(R.id.close_button);
         mCloseButtonView.setOnFocusChangeListener(mFocusChangeListener);
         mCloseButtonView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -128,7 +128,7 @@ public class PipControlsView extends LinearLayout {
             }
         });
 
-        mPlayPauseButtonView = (PipControlButtonView) findViewById(R.id.play_pause_button);
+        mPlayPauseButtonView = findViewById(R.id.play_pause_button);
         mPlayPauseButtonView.setOnFocusChangeListener(mFocusChangeListener);
         mPlayPauseButtonView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -186,10 +186,10 @@ public class PipControlsView extends LinearLayout {
         } else {
             mPlayPauseButtonView.setVisibility(View.VISIBLE);
             if (state == PipManager.PLAYBACK_STATE_PLAYING) {
-                mPlayPauseButtonView.setImageResource(R.drawable.ic_pause_white_24dp);
+                mPlayPauseButtonView.setImageResource(R.drawable.ic_pause_white);
                 mPlayPauseButtonView.setText(R.string.pip_pause);
             } else {
-                mPlayPauseButtonView.setImageResource(R.drawable.ic_play_arrow_white_24dp);
+                mPlayPauseButtonView.setImageResource(R.drawable.ic_play_arrow_white);
                 mPlayPauseButtonView.setText(R.string.pip_play);
             }
         }

@@ -428,6 +428,9 @@ public class NotificationContentView extends FrameLayout {
             mAmbientChild.animate().cancel();
             removeView(mAmbientChild);
         }
+        if (child == null) {
+            return;
+        }
         addView(child);
         mAmbientChild = child;
         mAmbientWrapper = NotificationViewWrapper.wrap(getContext(), child,
@@ -1359,5 +1362,12 @@ public class NotificationContentView extends FrameLayout {
 
     public void setIsLowPriority(boolean isLowPriority) {
         mIsLowPriority = isLowPriority;
+    }
+
+    public boolean isDimmable() {
+        if (!mContractedWrapper.isDimmable()) {
+            return false;
+        }
+        return true;
     }
 }

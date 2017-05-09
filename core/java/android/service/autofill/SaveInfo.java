@@ -16,13 +16,12 @@
 
 package android.service.autofill;
 
-import static android.view.autofill.Helper.DEBUG;
+import static android.view.autofill.Helper.sDebug;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.IntentSender;
-import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.DebugUtils;
@@ -39,7 +38,7 @@ import java.util.Arrays;
 /**
  * Information used to indicate that an {@link AutofillService} is interested on saving the
  * user-inputed data for future use, through a
- * {@link AutofillService#onSaveRequest(android.app.assist.AssistStructure, Bundle, SaveCallback)}
+ * {@link AutofillService#onSaveRequest(SaveRequest, SaveCallback)}
  * call.
  *
  * <p>A {@link SaveInfo} is always associated with a {@link FillResponse}, and it contains at least
@@ -93,7 +92,7 @@ import java.util.Arrays;
  * </pre>
  *
  * The
- * {@link AutofillService#onSaveRequest(android.app.assist.AssistStructure, Bundle, SaveCallback)}
+ * {@link AutofillService#onSaveRequest(SaveRequest, SaveCallback)}
  * is triggered after a call to {@link AutofillManager#commit()}, but only when all conditions
  * below are met:
  *
@@ -140,25 +139,80 @@ public final class SaveInfo implements Parcelable {
      */
     public static final int SAVE_DATA_TYPE_EMAIL_ADDRESS = 0x10;
 
-    private final int mType;
-    private final CharSequence mNegativeActionTitle;
+    /**
+     * Style for the negative button of the save UI to cancel the
+     * save operation. In this case, the user tapping the negative
+     * button signals that they would prefer to not save the filled
+     * content.
+     */
+    public static final int NEGATIVE_BUTTON_STYLE_CANCEL = 0;
+
+    /**
+     * Style for the negative button of the save UI to reject the
+     * save operation. This could be useful if the user needs to
+     * opt-in your service and the save prompt is an advertisement
+     * of the potential value you can add to the user. In this
+     * case, the user tapping the negative button sends a strong
+     * signal that the feature may not be useful and you may
+     * consider some backoff strategy.
+     */
+    public static final int NEGATIVE_BUTTON_STYLE_REJECT = 1;
+
+    /** @hide */
+    @IntDef(
+        value = {
+                NEGATIVE_BUTTON_STYLE_CANCEL,
+                NEGATIVE_BUTTON_STYLE_REJECT})
+    @Retention(RetentionPolicy.SOURCE)
+    @interface NegativeButtonStyle{}
+
+    /** @hide */
+    @IntDef(
+       flag = true,
+       value = {
+               SAVE_DATA_TYPE_GENERIC,
+               SAVE_DATA_TYPE_PASSWORD,
+               SAVE_DATA_TYPE_ADDRESS,
+               SAVE_DATA_TYPE_CREDIT_CARD,
+               SAVE_DATA_TYPE_EMAIL_ADDRESS})
+    @Retention(RetentionPolicy.SOURCE)
+    @interface SaveDataType{}
+
+    /**
+     * Usually {@link AutofillService#onSaveRequest(SaveRequest, SaveCallback)}
+     * is called once the activity finishes. If this flag is set it is called once all saved views
+     * become invisible.
+     */
+    public static final int FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE = 0x1;
+
+    /** @hide */
+    @IntDef(
+            flag = true,
+            value = {FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE})
+    @Retention(RetentionPolicy.SOURCE)
+    @interface SaveInfoFlags{}
+
+    private final @SaveDataType int mType;
+    private final @NegativeButtonStyle int mNegativeButtonStyle;
     private final IntentSender mNegativeActionListener;
     private final AutofillId[] mRequiredIds;
     private final AutofillId[] mOptionalIds;
     private final CharSequence mDescription;
+    private final int mFlags;
 
     private SaveInfo(Builder builder) {
         mType = builder.mType;
-        mNegativeActionTitle = builder.mNegativeActionTitle;
+        mNegativeButtonStyle = builder.mNegativeButtonStyle;
         mNegativeActionListener = builder.mNegativeActionListener;
         mRequiredIds = builder.mRequiredIds;
         mOptionalIds = builder.mOptionalIds;
         mDescription = builder.mDescription;
+        mFlags = builder.mFlags;
     }
 
     /** @hide */
-    public @Nullable CharSequence getNegativeActionTitle() {
-        return mNegativeActionTitle;
+    public @NegativeButtonStyle int getNegativeActionStyle() {
+        return mNegativeButtonStyle;
     }
 
     /** @hide */
@@ -177,8 +231,13 @@ public final class SaveInfo implements Parcelable {
     }
 
     /** @hide */
-    public int getType() {
+    public @SaveDataType int getType() {
         return mType;
+    }
+
+    /** @hide */
+    public @SaveInfoFlags int getFlags() {
+        return mFlags;
     }
 
     /** @hide */
@@ -191,14 +250,14 @@ public final class SaveInfo implements Parcelable {
      */
     public static final class Builder {
 
-        private final int mType;
-        private CharSequence mNegativeActionTitle;
+        private final @SaveDataType int mType;
+        private @NegativeButtonStyle int mNegativeButtonStyle = NEGATIVE_BUTTON_STYLE_CANCEL;
         private IntentSender mNegativeActionListener;
-        // TODO(b/33197203): make mRequiredIds final once addSavableIds() is gone
-        private AutofillId[] mRequiredIds;
+        private final AutofillId[] mRequiredIds;
         private AutofillId[] mOptionalIds;
         private CharSequence mDescription;
         private boolean mDestroyed;
+        private int mFlags;
 
         /**
          * Creates a new builder.
@@ -215,34 +274,23 @@ public final class SaveInfo implements Parcelable {
          *
          * @throws IllegalArgumentException if {@code requiredIds} is {@code null} or empty.
          */
-        public Builder(int type, @NonNull AutofillId[] requiredIds) {
-            if (false) {// TODO(b/33197203): re-move when clients use it
+        public Builder(@SaveDataType int type, @NonNull AutofillId[] requiredIds) {
             Preconditions.checkArgument(requiredIds != null && requiredIds.length > 0,
                     "must have at least one required id: " + Arrays.toString(requiredIds));
-            }
             mType = type;
             mRequiredIds = requiredIds;
         }
 
         /**
-         * @hide
-         * @deprecated
-         * // TODO(b/33197203): make sure is removed when clients migrated
+         * Set flags changing the save behavior.
+         *
+         * @param flags {@link #FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE} or 0.
+         * @return This builder.
          */
-        @Deprecated
-        public Builder(int type) {
-            this(type, null);
-        }
-
-        /**
-         * @hide
-         * @deprecated
-         * // TODO(b/33197203): make sure is removed when clients migrated
-         */
-        @Deprecated
-        public @NonNull Builder addSavableIds(@Nullable AutofillId... ids) {
+        public @NonNull Builder setFlags(@SaveInfoFlags int flags) {
             throwIfDestroyed();
-            mRequiredIds = ids;
+
+            mFlags = Preconditions.checkFlagsArgument(flags, FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE);
             return this;
         }
 
@@ -277,38 +325,42 @@ public final class SaveInfo implements Parcelable {
             return this;
         }
 
-        /**
-         * Sets the title and listener for the negative save action.
-         *
-         * <p>This allows a fill-provider to customize the text and be
-         * notified when the user selects the negative action in the save
-         * UI. Note that selecting the negative action regardless of its text
-         * and listener being customized would dismiss the save UI and if a
-         * custom listener intent is provided then this intent will be
-         * started.</p>
-         *
-         * <p>This customization could be useful for providing additional
-         * semantics to the negative action. For example, a fill-provider
-         * can use this mechanism to add a "Disable" function or a "More info"
-         * function, etc. Note that the save action is exclusively controlled
-         * by the platform to ensure user consent is collected to release
-         * data from the filled app to the fill-provider.</p>
-         *
-         * @param title The action title.
-         * @param listener The action listener.
-         * @return This builder.
-         *
-         * @throws IllegalArgumentException If the title and the listener
-         *     are not both either null or non-null.
-         */
+        /** @hide */
+        // TODO (b/37563972): Remove when callers migrate
         public @NonNull Builder setNegativeAction(@Nullable CharSequence title,
                 @Nullable IntentSender listener) {
             throwIfDestroyed();
-            if (title == null ^ listener == null) {
-                throw new IllegalArgumentException("title and listener"
-                        + " must be both non-null or null");
+            setNegativeAction(NEGATIVE_BUTTON_STYLE_CANCEL, listener);
+            return this;
+        }
+
+        /**
+         * Sets the style and listener for the negative save action.
+         *
+         * <p>This allows a fill-provider to customize the style and be
+         * notified when the user selects the negative action in the save
+         * UI. Note that selecting the negative action regardless of its style
+         * and listener being customized would dismiss the save UI and if a
+         * custom listener intent is provided then this intent will be
+         * started. The default style is {@link #NEGATIVE_BUTTON_STYLE_CANCEL}</p>
+         *
+         * @param style The action style.
+         * @param listener The action listener.
+         * @return This builder.
+         *
+         * @see #NEGATIVE_BUTTON_STYLE_CANCEL
+         * @see #NEGATIVE_BUTTON_STYLE_REJECT
+         *
+         * @throws IllegalArgumentException If the style is invalid
+         */
+        public @NonNull Builder setNegativeAction(@NegativeButtonStyle int style,
+                @Nullable IntentSender listener) {
+            throwIfDestroyed();
+            if (style != NEGATIVE_BUTTON_STYLE_CANCEL
+                    && style != NEGATIVE_BUTTON_STYLE_REJECT) {
+                throw new IllegalArgumentException("Invalid style: " + style);
             }
-            mNegativeActionTitle = title;
+            mNegativeButtonStyle = style;
             mNegativeActionListener = listener;
             return this;
         }
@@ -335,13 +387,16 @@ public final class SaveInfo implements Parcelable {
     /////////////////////////////////////
     @Override
     public String toString() {
-        if (!DEBUG) return super.toString();
+        if (!sDebug) return super.toString();
 
         return new StringBuilder("SaveInfo: [type=")
                 .append(DebugUtils.flagsToString(SaveInfo.class, "SAVE_DATA_TYPE_", mType))
                 .append(", requiredIds=").append(Arrays.toString(mRequiredIds))
                 .append(", optionalIds=").append(Arrays.toString(mOptionalIds))
                 .append(", description=").append(mDescription)
+                .append(DebugUtils.flagsToString(SaveInfo.class, "NEGATIVE_BUTTON_STYLE_",
+                        mNegativeButtonStyle))
+                .append(", mFlags=").append(mFlags)
                 .append("]").toString();
     }
 
@@ -358,10 +413,11 @@ public final class SaveInfo implements Parcelable {
     public void writeToParcel(Parcel parcel, int flags) {
         parcel.writeInt(mType);
         parcel.writeParcelableArray(mRequiredIds, flags);
-        parcel.writeCharSequence(mNegativeActionTitle);
+        parcel.writeInt(mNegativeButtonStyle);
         parcel.writeParcelable(mNegativeActionListener, flags);
         parcel.writeParcelableArray(mOptionalIds, flags);
         parcel.writeCharSequence(mDescription);
+        parcel.writeInt(mFlags);
     }
 
     public static final Parcelable.Creator<SaveInfo> CREATOR = new Parcelable.Creator<SaveInfo>() {
@@ -372,9 +428,10 @@ public final class SaveInfo implements Parcelable {
             // using specially crafted parcels.
             final Builder builder = new Builder(parcel.readInt(),
                     parcel.readParcelableArray(null, AutofillId.class));
-            builder.setNegativeAction(parcel.readCharSequence(), parcel.readParcelable(null));
+            builder.setNegativeAction(parcel.readInt(), parcel.readParcelable(null));
             builder.setOptionalIds(parcel.readParcelableArray(null, AutofillId.class));
             builder.setDescription(parcel.readCharSequence());
+            builder.setFlags(parcel.readInt());
             return builder.build();
         }
 

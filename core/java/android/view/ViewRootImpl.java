@@ -435,8 +435,9 @@ public final class ViewRootImpl implements ViewParent,
 
     AccessibilityInteractionController mAccessibilityInteractionController;
 
-    AccessibilityInteractionConnectionManager mAccessibilityInteractionConnectionManager;
-    HighContrastTextManager mHighContrastTextManager;
+    final AccessibilityInteractionConnectionManager mAccessibilityInteractionConnectionManager =
+            new AccessibilityInteractionConnectionManager();
+    final HighContrastTextManager mHighContrastTextManager;
 
     SendWindowContentChangedAccessibilityEvent mSendWindowContentChangedAccessibilityEvent;
 
@@ -496,13 +497,11 @@ public final class ViewRootImpl implements ViewParent,
         mAttachInfo = new View.AttachInfo(mWindowSession, mWindow, display, this, mHandler, this,
                 context);
         mAccessibilityManager = AccessibilityManager.getInstance(context);
-        mAccessibilityInteractionConnectionManager =
-            new AccessibilityInteractionConnectionManager();
         mAccessibilityManager.addAccessibilityStateChangeListener(
-                mAccessibilityInteractionConnectionManager);
+                mAccessibilityInteractionConnectionManager, mHandler);
         mHighContrastTextManager = new HighContrastTextManager();
         mAccessibilityManager.addHighTextContrastStateChangeListener(
-                mHighContrastTextManager);
+                mHighContrastTextManager, mHandler);
         mViewConfiguration = ViewConfiguration.get(context);
         mDensity = context.getResources().getDisplayMetrics().densityDpi;
         mNoncompatDensity = context.getResources().getDisplayMetrics().noncompatDensityDpi;
@@ -1249,6 +1248,19 @@ public final class ViewRootImpl implements ViewParent,
         mIsAmbientMode = ambient;
     }
 
+    interface WindowStoppedCallback {
+        public void windowStopped(boolean stopped);
+    }
+    private final ArrayList<WindowStoppedCallback> mWindowStoppedCallbacks =  new ArrayList<>();
+
+    void addWindowStoppedCallback(WindowStoppedCallback c) {
+        mWindowStoppedCallbacks.add(c);
+    }
+
+    void removeWindowStoppedCallback(WindowStoppedCallback c) {
+        mWindowStoppedCallbacks.remove(c);
+    }
+
     void setWindowStopped(boolean stopped) {
         if (mStopped != stopped) {
             mStopped = stopped;
@@ -1263,6 +1275,10 @@ public final class ViewRootImpl implements ViewParent,
                 if (renderer != null) {
                     renderer.destroyHardwareResources(mView);
                 }
+            }
+
+            for (int i = 0; i < mWindowStoppedCallbacks.size(); i++) {
+                mWindowStoppedCallbacks.get(i).windowStopped(stopped);
             }
         }
     }
@@ -1542,6 +1558,16 @@ public final class ViewRootImpl implements ViewParent,
 
     void dispatchApplyInsets(View host) {
         host.dispatchApplyWindowInsets(getWindowInsets(true /* forceConstruct */));
+    }
+
+    /**
+     * @return the last content insets for use in adjusting the source hint rect for the
+     * picture-in-picture transition.
+     *
+     * @hide
+     */
+    public Rect getLastContentInsets() {
+        return mAttachInfo.mContentInsets;
     }
 
     private static boolean shouldUseDisplaySize(final WindowManager.LayoutParams lp) {
@@ -4648,7 +4674,8 @@ public final class ViewRootImpl implements ViewParent,
             if (focused == null && mView.restoreDefaultFocus()) {
                 return true;
             }
-            View cluster = focused.keyboardNavigationClusterSearch(null, direction);
+            View cluster = focused == null ? keyboardNavigationClusterSearch(null, direction)
+                    : focused.keyboardNavigationClusterSearch(null, direction);
 
             // Since requestFocus only takes "real" focus directions (and therefore also
             // restoreFocusInCluster), convert forward/backward focus into FOCUS_DOWN.

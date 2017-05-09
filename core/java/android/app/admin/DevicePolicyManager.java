@@ -56,6 +56,7 @@ import android.provider.Settings;
 import android.security.Credentials;
 import android.service.restrictions.RestrictionsReceiver;
 import android.telephony.TelephonyManager;
+import android.util.ArraySet;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -80,6 +81,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Public interface for managing policies enforced on a device. Most clients of this class must be
@@ -1518,7 +1520,8 @@ public class DevicePolicyManager {
      * Service action: Action for a service that device owner and profile owner can optionally
      * own.  If a device owner or a profile owner has such a service, the system tries to keep
      * a bound connection to it, in order to keep their process always running.
-     * The service must not be exported.
+     * The service must be protected with the {@link android.Manifest.permission#BIND_DEVICE_ADMIN}
+     * permission.
      */
     @SdkConstant(SdkConstantType.SERVICE_ACTION)
     public static final String ACTION_DEVICE_ADMIN_SERVICE
@@ -2753,8 +2756,8 @@ public class DevicePolicyManager {
 
     /**
      * Called by a profile or device owner to provision a token which can later be used to reset the
-     * device lockscreen password (if called by device owner), or work challenge (if called by
-     * profile owner), via {@link #resetPasswordWithToken}.
+     * device lockscreen password (if called by device owner), or managed profile challenge (if
+     * called by profile owner), via {@link #resetPasswordWithToken}.
      * <p>
      * If the user currently has a lockscreen password, the provisioned token will not be
      * immediately usable; it only becomes active after the user performs a confirm credential
@@ -2832,8 +2835,8 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Called by device or profile owner to force set a new device unlock password or a work profile
-     * challenge on current user. This takes effect immediately.
+     * Called by device or profile owner to force set a new device unlock password or a managed
+     * profile challenge on current user. This takes effect immediately.
      * <p>
      * Unlike {@link #resetPassword}, this API can change the password even before the user or
      * device is unlocked or decrypted. The supplied token must have been previously provisioned via
@@ -2972,9 +2975,9 @@ public class DevicePolicyManager {
      * profile.
      *
      * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
-     * @param timeoutMs The new timeout, after which the user will have to unlock with strong
-     *         authentication method. A value of 0 means the admin is not participating in
-     *         controlling the timeout.
+     * @param timeoutMs The new timeout in milliseconds, after which the user will have to unlock
+     *         with strong authentication method. A value of 0 means the admin is not participating
+     *         in controlling the timeout.
      *         The minimum and maximum timeouts are platform-defined and are typically 1 hour and
      *         72 hours, respectively. Though discouraged, the admin may choose to require strong
      *         auth at all times using {@link #KEYGUARD_DISABLE_FINGERPRINT} and/or
@@ -3004,7 +3007,7 @@ public class DevicePolicyManager {
      *
      * @param admin The name of the admin component to check, or {@code null} to aggregate
      *         accross all participating admins.
-     * @return The timeout or 0 if not configured for the provided admin.
+     * @return The timeout in milliseconds or 0 if not configured for the provided admin.
      */
     public long getRequiredStrongAuthTimeout(@Nullable ComponentName admin) {
         return getRequiredStrongAuthTimeout(admin, myUserId());
@@ -3027,17 +3030,24 @@ public class DevicePolicyManager {
      * keyring. The user's credential will need to be entered again in order to derive the
      * credential encryption key that will be stored back in the keyring for future use.
      * <p>
-     * This flag can only be used by a profile owner when locking a managed profile on an FBE
-     * device.
+     * This flag can only be used by a profile owner when locking a managed profile when
+     * {@link #getStorageEncryptionStatus} returns {@link #ENCRYPTION_STATUS_ACTIVE_PER_USER}.
      * <p>
      * In order to secure user data, the user will be stopped and restarted so apps should wait
      * until they are next run to perform further actions.
      */
+    public static final int FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY = 1;
+
+    /**
+     * Instead use {@link #FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY}.
+     * @removed
+     */
+    @Deprecated
     public static final int FLAG_EVICT_CE_KEY = 1;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
-    @IntDef(flag=true, value={FLAG_EVICT_CE_KEY})
+    @IntDef(flag=true, value={FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY})
     public @interface LockNowFlag {}
 
     /**
@@ -3069,15 +3079,17 @@ public class DevicePolicyManager {
      * This method can be called on the {@link DevicePolicyManager} instance returned by
      * {@link #getParentProfileInstance(ComponentName)} in order to lock the parent profile.
      *
-     * @param flags May be 0 or {@link #FLAG_EVICT_CE_KEY}.
+     * @param flags May be 0 or {@link #FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY}.
      * @throws SecurityException if the calling application does not own an active administrator
      *             that uses {@link DeviceAdminInfo#USES_POLICY_FORCE_LOCK} or the
-     *             {@link #FLAG_EVICT_CE_KEY} flag is passed by an application that is not a profile
+     *             {@link #FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY} flag is passed by an application
+     *             that is not a profile
      *             owner of a managed profile.
-     * @throws IllegalArgumentException if the {@link #FLAG_EVICT_CE_KEY} flag is passed when
-     *             locking the parent profile.
-     * @throws UnsupportedOperationException if the {@link #FLAG_EVICT_CE_KEY} flag is passed on a
-     *             non-FBE device.
+     * @throws IllegalArgumentException if the {@link #FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY} flag is
+     *             passed when locking the parent profile.
+     * @throws UnsupportedOperationException if the {@link #FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY}
+     *             flag is passed when {@link #getStorageEncryptionStatus} does not return
+     *             {@link #ENCRYPTION_STATUS_ACTIVE_PER_USER}.
      */
     public void lockNow(@LockNowFlag int flags) {
         if (mService != null) {
@@ -5550,7 +5562,7 @@ public class DevicePolicyManager {
      * Calling with a null value for the list disables the restriction so that all services can be
      * used, calling with an empty list only allows the builtin system's services.
      * <p>
-     * System accesibility services are always available to the user the list can't modify this.
+     * System accessibility services are always available to the user the list can't modify this.
      *
      * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
      * @param packageNames List of accessibility service package names.
@@ -5660,7 +5672,8 @@ public class DevicePolicyManager {
      *         non-system input methods currently enabled that are not in the packageNames list.
      * @throws SecurityException if {@code admin} is not a device or profile owner.
      */
-    public boolean setPermittedInputMethods(@NonNull ComponentName admin, List<String> packageNames) {
+    public boolean setPermittedInputMethods(
+            @NonNull ComponentName admin, List<String> packageNames) {
         throwIfParentInstance("setPermittedInputMethods");
         if (mService != null) {
             try {
@@ -5739,6 +5752,85 @@ public class DevicePolicyManager {
             }
         }
         return null;
+    }
+
+    /**
+     * Called by a profile owner of a managed profile to set the packages that are allowed to use
+     * a {@link android.service.notification.NotificationListenerService} in the primary user to
+     * see notifications from the managed profile. By default all packages are permitted by this
+     * policy. When zero or more packages have been added, notification listeners installed on the
+     * primary user that are not in the list and are not part of the system won't receive events
+     * for managed profile notifications.
+     * <p>
+     * Calling with a {@code null} value for the list disables the restriction so that all
+     * notification listener services be used. Calling with an empty list disables all but the
+     * system's own notification listeners. System notification listener services are always
+     * available to the user.
+     * <p>
+     * If a device or profile owner want to stop notification listeners in their user from seeing
+     * that user's notifications they should prevent that service from running instead (e.g. via
+     * {@link #setApplicationHidden(ComponentName, String, boolean)})
+     *
+     * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
+     * @param packageList List of package names to whitelist
+     * @return true if setting the restriction succeeded. It will fail if called outside a managed
+     * profile
+     * @throws SecurityException if {@code admin} is not a profile owner.
+     *
+     * @see android.service.notification.NotificationListenerService
+     */
+    public boolean setPermittedCrossProfileNotificationListeners(
+            @NonNull ComponentName admin, @Nullable List<String> packageList) {
+        throwIfParentInstance("setPermittedCrossProfileNotificationListeners");
+        if (mService != null) {
+            try {
+                return mService.setPermittedCrossProfileNotificationListeners(admin, packageList);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns the list of packages installed on the primary user that allowed to use a
+     * {@link android.service.notification.NotificationListenerService} to receive
+     * notifications from this managed profile, as set by the profile owner.
+     * <p>
+     * An empty list means no notification listener services except system ones are allowed.
+     * A {@code null} return value indicates that all notification listeners are allowed.
+     */
+    public @Nullable List<String> getPermittedCrossProfileNotificationListeners(
+            @NonNull ComponentName admin) {
+        throwIfParentInstance("getPermittedCrossProfileNotificationListeners");
+        if (mService != null) {
+            try {
+                return mService.getPermittedCrossProfileNotificationListeners(admin);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns true if {@code NotificationListenerServices} from the given package are allowed to
+     * receive events for notifications from the given user id. Can only be called by the system uid
+     *
+     * @see #setPermittedCrossProfileNotificationListeners(ComponentName, List)
+     *
+     * @hide
+     */
+    public boolean isNotificationListenerServicePermitted(
+            @NonNull String packageName, @UserIdInt int userId) {
+        if (mService != null) {
+            try {
+                return mService.isNotificationListenerServicePermitted(packageName, userId);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return true;
     }
 
     /**
@@ -7507,13 +7599,31 @@ public class DevicePolicyManager {
      * created.
      *
      * @param admin Which profile or device owner this request is associated with.
-     * @param ids A list of opaque non-empty affiliation ids. Duplicate elements will be ignored.
+     * @param ids A set of opaque non-empty affiliation ids.
      *
-     * @throws NullPointerException if {@code ids} is null or contains null elements.
-     * @throws IllegalArgumentException if {@code ids} contains an empty string.
+     * @throws IllegalArgumentException if {@code ids} is null or contains an empty string.
+     */
+    public void setAffiliationIds(@NonNull ComponentName admin, @NonNull Set<String> ids) {
+        throwIfParentInstance("setAffiliationIds");
+        if (ids == null) {
+            throw new IllegalArgumentException("ids must not be null");
+        }
+        try {
+            mService.setAffiliationIds(admin, new ArrayList<>(ids));
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * STOPSHIP (b/37622682) Remove it before release.
+     * @removed
      */
     public void setAffiliationIds(@NonNull ComponentName admin, @NonNull List<String> ids) {
         throwIfParentInstance("setAffiliationIds");
+        if (ids == null) {
+            throw new IllegalArgumentException("ids must not be null");
+        }
         try {
             mService.setAffiliationIds(admin, ids);
         } catch (RemoteException e) {
@@ -7522,13 +7632,12 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Returns the list of affiliation ids previously set via {@link #setAffiliationIds}, or an
-     * empty list if none have been set.
+     * Returns the set of affiliation ids previously set via {@link #setAffiliationIds}, or an
+     * empty set if none have been set.
      */
-    public @NonNull List<String> getAffiliationIds(@NonNull ComponentName admin) {
-        throwIfParentInstance("getAffiliationIds");
+    public @NonNull Set<String> getAffiliationIds(@NonNull ComponentName admin) {
         try {
-            return mService.getAffiliationIds(admin);
+            return new ArraySet<>(mService.getAffiliationIds(admin));
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -7681,6 +7790,8 @@ public class DevicePolicyManager {
      *
      * <p> Backup service is off by default when device owner is present.
      *
+     * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
+     * @param enabled {@code true} to enable the backup service, {@code false} to disable it.
      * @throws SecurityException if {@code admin} is not a device owner.
      */
     public void setBackupServiceEnabled(@NonNull ComponentName admin, boolean enabled) {
@@ -7823,7 +7934,8 @@ public class DevicePolicyManager {
      * See {@link #getBindDeviceAdminTargetUsers} for a definition of which
      * device/profile owners are allowed to bind to services of another profile/device owner.
      * <p>
-     * The service must be unexported. Note that the {@link Context} used to obtain this
+     * The service must be protected by {@link android.Manifest.permission#BIND_DEVICE_ADMIN}.
+     * Note that the {@link Context} used to obtain this
      * {@link DevicePolicyManager} instance via {@link Context#getSystemService(Class)} will be used
      * to bind to the {@link android.app.Service}.
      *

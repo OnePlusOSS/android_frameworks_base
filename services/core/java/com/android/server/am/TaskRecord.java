@@ -48,6 +48,7 @@ import android.service.voice.IVoiceInteractionSession;
 import android.util.DisplayMetrics;
 import android.util.Slog;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IVoiceInteractor;
 import com.android.internal.util.XmlUtils;
 
@@ -96,6 +97,8 @@ import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE_VIA_SDK_VER
 import static android.content.pm.ApplicationInfo.PRIVATE_FLAG_PRIVILEGED;
 import static android.os.Trace.TRACE_TAG_ACTIVITY_MANAGER;
 import static android.provider.Settings.Secure.USER_SETUP_COMPLETE;
+import static android.view.Display.DEFAULT_DISPLAY;
+
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_ADD_REMOVE;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_LOCKTASK;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_RECENTS;
@@ -445,10 +448,23 @@ final class TaskRecord extends ConfigurationContainer implements TaskWindowConta
 
         final Rect bounds = updateOverrideConfigurationFromLaunchBounds();
         final Configuration overrideConfig = getOverrideConfiguration();
-        mWindowContainerController = new TaskWindowContainerController(taskId, this,
+        setWindowContainerController(new TaskWindowContainerController(taskId, this,
                 getStack().getWindowContainerController(), userId, bounds, overrideConfig,
                 mResizeMode, mSupportsPictureInPicture, isHomeTask(), onTop, showForAllUsers,
-                lastTaskDescription);
+                lastTaskDescription));
+    }
+
+    /**
+     * Should only be invoked from {@link #createWindowContainer(boolean, boolean)}.
+     */
+    @VisibleForTesting
+    protected void setWindowContainerController(TaskWindowContainerController controller) {
+        if (mWindowContainerController != null) {
+            throw new IllegalArgumentException("Window container=" + mWindowContainerController
+                    + " already created for task=" + this);
+        }
+
+        mWindowContainerController = controller;
     }
 
     void removeWindowContainer() {
@@ -534,15 +550,11 @@ final class TaskRecord extends ConfigurationContainer implements TaskWindowConta
         boolean kept = true;
         if (updatedConfig) {
             final ActivityRecord r = topRunningActivityLocked();
-            if (r != null) {
+            if (r != null && !deferResume) {
                 kept = r.ensureActivityConfigurationLocked(0 /* globalChanges */, preserveWindow);
-
-                if (!deferResume) {
-                    // All other activities must be made visible with their correct configuration.
-                    mService.mStackSupervisor.ensureActivitiesVisibleLocked(r, 0, !PRESERVE_WINDOWS);
-                    if (!kept) {
-                        mService.mStackSupervisor.resumeFocusedStackTopActivityLocked();
-                    }
+                mService.mStackSupervisor.ensureActivitiesVisibleLocked(r, 0, !PRESERVE_WINDOWS);
+                if (!kept) {
+                    mService.mStackSupervisor.resumeFocusedStackTopActivityLocked();
                 }
             }
         }
@@ -658,7 +670,8 @@ final class TaskRecord extends ConfigurationContainer implements TaskWindowConta
 
             // Must reparent first in window manager to avoid a situation where AM can delete the
             // we are coming from in WM before we reparent because it became empty.
-            mWindowContainerController.reparent(toStack.getWindowContainerController(), position);
+            mWindowContainerController.reparent(toStack.getWindowContainerController(), position,
+                    moveStackMode == REPARENT_MOVE_STACK_TO_FRONT);
 
             // Move the task
             sourceStack.removeTask(this, reason, REMOVE_TASK_MODE_MOVING);
@@ -733,7 +746,8 @@ final class TaskRecord extends ConfigurationContainer implements TaskWindowConta
             supervisor.resumeFocusedStackTopActivityLocked();
         }
 
-        supervisor.handleNonResizableTaskIfNeeded(this, preferredStackId, stackId);
+        // TODO: Handle incorrect request to move before the actual move, not after.
+        supervisor.handleNonResizableTaskIfNeeded(this, preferredStackId, DEFAULT_DISPLAY, stackId);
 
         boolean successful = (preferredStackId == stackId);
         if (successful && stackId == DOCKED_STACK_ID) {
@@ -1546,6 +1560,17 @@ final class TaskRecord extends ConfigurationContainer implements TaskWindowConta
     }
 
     /**
+     * Check whether this task can be launched on the specified display.
+     * @param displayId Target display id.
+     * @return {@code true} if either it is the default display or this activity is resizeable and
+     *         can be put a secondary screen.
+     */
+    boolean canBeLaunchedOnDisplay(int displayId) {
+        return mService.mStackSupervisor.canPlaceEntityOnDisplay(displayId,
+                isResizeable(false /* checkSupportsPip */));
+    }
+
+    /**
      * Check that a given bounds matches the application requested orientation.
      *
      * @param bounds The bounds to be tested.
@@ -2183,11 +2208,6 @@ final class TaskRecord extends ConfigurationContainer implements TaskWindowConta
 
     /** Returns the bounds that should be used to launch this task. */
     Rect getLaunchBounds() {
-        // If we're over lockscreen, forget about stack bounds and use fullscreen.
-        if (mService.mStackSupervisor.mKeyguardController.isKeyguardShowing()) {
-            return null;
-        }
-
         if (mStack == null) {
             return null;
         }

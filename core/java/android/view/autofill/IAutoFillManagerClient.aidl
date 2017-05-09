@@ -35,31 +35,44 @@ oneway interface IAutoFillManagerClient {
     /**
      * Notifies the client when the autofill enabled state changed.
      */
-    void setState(boolean enabled);
+    void setState(boolean enabled, boolean resetSession, boolean resetClient);
 
     /**
       * Autofills the activity with the contents of a dataset.
       */
-    void autofill(in IBinder windowToken, in List<AutofillId> ids, in List<AutofillValue> values);
+    void autofill(int sessionId, in IBinder windowToken, in List<AutofillId> ids,
+            in List<AutofillValue> values);
 
     /**
       * Authenticates a fill response or a data set.
       */
-    void authenticate(in IntentSender intent, in Intent fillInIntent);
+    void authenticate(int sessionId, in IntentSender intent, in Intent fillInIntent);
+
+    /**
+      * Sets the views to track. If saveOnAllViewsInvisible is set and all these view are invisible
+      * the session is finished automatically.
+      */
+    void setTrackedViews(int sessionId, in List<AutofillId> ids,
+            boolean saveOnAllViewsInvisible);
 
     /**
      * Requests showing the fill UI.
      */
-    void requestShowFillUi(in IBinder windowToken, in AutofillId id, int width,
+    void requestShowFillUi(int sessionId, in IBinder windowToken, in AutofillId id, int width,
             int height, in Rect anchorBounds, in IAutofillWindowPresenter presenter);
 
     /**
      * Requests hiding the fill UI.
      */
-    void requestHideFillUi(in IBinder windowToken, in AutofillId id);
+    void requestHideFillUi(int sessionId, in IBinder windowToken, in AutofillId id);
 
     /**
-     * Nitifies no fill UI will be shown.
+     * Notifies no fill UI will be shown.
      */
-    void notifyNoFillUi(in IBinder windowToken, in AutofillId id);
+    void notifyNoFillUi(int sessionId, in IBinder windowToken, in AutofillId id);
+
+    /**
+     * Starts the provided intent sender
+     */
+    void startIntentSender(in IntentSender intentSender);
 }

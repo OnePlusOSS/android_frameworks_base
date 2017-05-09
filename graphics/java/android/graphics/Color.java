@@ -24,7 +24,7 @@ import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.Size;
-
+import android.annotation.SuppressAutoDoc;
 import android.util.Half;
 import com.android.internal.util.XmlUtils;
 
@@ -289,6 +289,7 @@ import java.util.function.DoubleUnaryOperator;
  * and <code>(1.0, 0.0, 0.0, 0.5)</code>.</p>
  */
 @AnyThread
+@SuppressAutoDoc
 public class Color {
     @ColorInt public static final int BLACK       = 0xFF000000;
     @ColorInt public static final int DKGRAY      = 0xFF444444;
@@ -538,7 +539,7 @@ public class Color {
     /**
      * Returns the value of the alpha component in the range \([0..1]\).
      * Calling this method is equivalent to
-     * <code>getComponent(getComponentCount())</code>.
+     * <code>getComponent(getComponentCount() - 1)</code>.
      *
      * @see #red()
      * @see #green()
@@ -690,9 +691,8 @@ public class Color {
      * Returns the color space encoded in the specified color long.
      *
      * @param color The color long whose color space to extract
-     * @return A non-null color space instance. If the color long encodes
-     * an unknown or invalid color space, the {@link ColorSpace.Named#SRGB sRGB}
-     * color space is returned
+     * @return A non-null color space instance
+     * @throws IllegalArgumentException If the encoded color space is invalid or unknown
      *
      * @see #red(long)
      * @see #green(long)
@@ -787,6 +787,7 @@ public class Color {
      *
      * @param color The color to test
      * @return True if the color is in the sRGB color space, false otherwise
+     * @throws IllegalArgumentException If the encoded color space is invalid or unknown
      *
      * @see #isInColorSpace(long, ColorSpace)
      * @see #isWideGamut(long)
@@ -802,6 +803,7 @@ public class Color {
      *
      * @param color The color to test
      * @return True if the color is in a wide-gamut color space, false otherwise
+     * @throws IllegalArgumentException If the encoded color space is invalid or unknown
      *
      * @see #isInColorSpace(long, ColorSpace)
      * @see #isSrgb(long)
@@ -831,6 +833,7 @@ public class Color {
      * a color space conversion is applied if needed.
      *
      * @return An ARGB color in the sRGB color space
+     * @throws IllegalArgumentException If the encoded color space is invalid or unknown
      */
     @ColorInt
     public static int toArgb(@ColorLong long color) {
@@ -873,6 +876,7 @@ public class Color {
      *
      * @param color The color long to create a <code>Color</code> from
      * @return A non-null instance of {@link Color}
+     * @throws IllegalArgumentException If the encoded color space is invalid or unknown
      */
     @NonNull
     public static Color valueOf(@ColorLong long color) {
@@ -1100,6 +1104,7 @@ public class Color {
      * @param color The color long to convert
      * @param colorSpace The destination color space
      * @return A color long in the destination color space
+     * @throws IllegalArgumentException If the encoded color space is invalid or unknown
      */
     @ColorLong
     public static long convert(@ColorLong long color, @NonNull ColorSpace colorSpace) {
@@ -1206,7 +1211,7 @@ public class Color {
      * @return A value between 0 (darkest black) and 1 (lightest white)
      *
      * @throws IllegalArgumentException If the specified color's color space
-     * does not use the {@link ColorSpace.Model#RGB RGB} color model
+     * is unknown or does not use the {@link ColorSpace.Model#RGB RGB} color model
      */
     public static float luminance(@ColorLong long color) {
         ColorSpace colorSpace = colorSpace(color);

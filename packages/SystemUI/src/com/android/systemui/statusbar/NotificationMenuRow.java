@@ -16,13 +16,13 @@
 
 package com.android.systemui.statusbar;
 
+import static com.android.systemui.SwipeHelper.SWIPED_FAR_ENOUGH_SIZE_FRACTION;
+
 import java.util.ArrayList;
 
 import com.android.systemui.Interpolators;
 import com.android.systemui.R;
 import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin;
-import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin.MenuItem;
-import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin.OnMenuEventListener;
 import com.android.systemui.plugins.statusbar.NotificationSwipeActionHelper;
 import com.android.systemui.statusbar.NotificationGuts.GutsContent;
 import com.android.systemui.statusbar.stack.NotificationStackScrollLayout;
@@ -30,11 +30,13 @@ import com.android.systemui.statusbar.stack.NotificationStackScrollLayout;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
+import android.app.Notification;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.util.Log;
+import android.service.notification.StatusBarNotification;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -44,16 +46,27 @@ import android.widget.FrameLayout.LayoutParams;
 
 public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnClickListener {
 
+    private static final boolean DEBUG = false;
+    private static final String TAG = "swipe";
+
     private static final int ICON_ALPHA_ANIM_DURATION = 200;
     private static final long SHOW_MENU_DELAY = 60;
     private static final long SWIPE_MENU_TIMING = 200;
 
-    private static final int NOTIFICATION_INFO_INDEX = 1;
+    // Notification must be swiped at least this fraction of a single menu item to show menu
+    private static final float SWIPED_FAR_ENOUGH_MENU_FRACTION = 0.25f;
+    private static final float SWIPED_FAR_ENOUGH_MENU_UNCLEARABLE_FRACTION = 0.15f;
+
+    // When the menu is displayed, the notification must be swiped within this fraction of a single
+    // menu item to snap back to menu (else it will cover the menu or it'll be dismissed)
+    private static final float SWIPED_BACK_ENOUGH_TO_COVER_FRACTION = 0.2f;
 
     private ExpandableNotificationRow mParent;
 
     private Context mContext;
     private FrameLayout mMenuContainer;
+    private MenuItem mSnoozeItem;
+    private MenuItem mInfoItem;
     private ArrayList<MenuItem> mMenuItems;
     private OnMenuEventListener mMenuListener;
 
@@ -76,6 +89,7 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
     private int mIconPadding;
 
     private float mAlpha = 0f;
+    private float mPrevX;
 
     private CheckForDrag mCheckForDrag;
     private Handler mHandler;
@@ -94,7 +108,11 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
         mVertSpaceForIcons = res.getDimensionPixelSize(R.dimen.notification_min_height);
         mIconPadding = res.getDimensionPixelSize(R.dimen.notification_menu_icon_padding);
         mHandler = new Handler();
-        mMenuItems = getDefaultMenuItems(context);
+        mMenuItems = new ArrayList<>();
+        mSnoozeItem = createSnoozeItem(context);
+        mInfoItem = createInfoItem(context);
+        mMenuItems.add(mSnoozeItem);
+        mMenuItems.add(mInfoItem);
     }
 
     @Override
@@ -104,7 +122,7 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
 
     @Override
     public MenuItem getLongpressMenuItem(Context context) {
-        return mMenuItems.get(NOTIFICATION_INFO_INDEX);
+        return mInfoItem;
     }
 
     @Override
@@ -120,14 +138,7 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
     @Override
     public void createMenu(ViewGroup parent) {
         mParent = (ExpandableNotificationRow) parent;
-        if (mMenuContainer != null) {
-            mMenuContainer.removeAllViews();
-        }
-        mMenuContainer = new FrameLayout(mContext);
-        for (int i = 0; i < mMenuItems.size(); i++) {
-            addMenuView(mMenuItems.get(i), mMenuContainer);
-        }
-        resetState(false);
+        createMenuViews();
     }
 
     @Override
@@ -143,6 +154,40 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
     @Override
     public void resetMenu() {
         resetState(true);
+    }
+
+    @Override
+    public void onNotificationUpdated() {
+        if (mMenuContainer == null) {
+            // Menu hasn't been created yet, no need to do anything.
+            return;
+        }
+        createMenuViews();
+    }
+
+    private void createMenuViews() {
+        // Filter the menu items based on the notification
+        if (mParent != null && mParent.getStatusBarNotification() != null) {
+            int flags = mParent.getStatusBarNotification().getNotification().flags;
+            boolean isForeground = (flags & Notification.FLAG_FOREGROUND_SERVICE) != 0;
+            if (isForeground) {
+                // Don't show snooze for foreground services
+                mMenuItems.remove(mSnoozeItem);
+            } else if (!mMenuItems.contains(mSnoozeItem)) {
+                // Was a foreground service but is no longer, add snooze back
+                mMenuItems.add(mSnoozeItem);
+            }
+        }
+        // Recreate the menu
+        if (mMenuContainer != null) {
+            mMenuContainer.removeAllViews();
+        } else {
+            mMenuContainer = new FrameLayout(mContext);
+        }
+        for (int i = 0; i < mMenuItems.size(); i++) {
+            addMenuView(mMenuItems.get(i), mMenuContainer);
+        }
+        resetState(false /* notify */);
     }
 
     private void resetState(boolean notify) {
@@ -170,14 +215,14 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
                 }
                 mHandler.removeCallbacks(mCheckForDrag);
                 mCheckForDrag = null;
+                mPrevX = ev.getRawX();
                 break;
 
             case MotionEvent.ACTION_MOVE:
                 mSnapping = false;
-                // If the menu is visible and the movement is towards it it's not a location change.
-                boolean locationChange = isTowardsMenu(mTranslation)
-                        ? false : isMenuLocationChange();
-                if (locationChange) {
+                float diffX = ev.getRawX() - mPrevX;
+                mPrevX = ev.getRawX();
+                if (!isTowardsMenu(diffX) && isMenuLocationChange()) {
                     // Don't consider it "snapped" if location has changed.
                     mMenuSnappedTo = false;
 
@@ -194,6 +239,7 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
                 if (mShouldShowMenu
                         && !NotificationStackScrollLayout.isPinnedHeadsUp(view)
                         && !mParent.areGutsExposed()
+                        && !mParent.isDark()
                         && (mCheckForDrag == null || !mHandler.hasCallbacks(mCheckForDrag))) {
                     // Only show the menu if we're not a heads up view and guts aren't exposed.
                     mCheckForDrag = new CheckForDrag();
@@ -228,36 +274,53 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
         final double timeForGesture = ev.getEventTime() - ev.getDownTime();
         final boolean showMenuForSlowOnGoing = !mParent.canViewBeDismissed()
                 && timeForGesture >= SWIPE_MENU_TIMING;
+        final float menuSnapTarget = mOnLeft ? getSpaceForMenu() : -getSpaceForMenu();
 
-        final float targetLeft = mOnLeft ? getSpaceForMenu() : -getSpaceForMenu();
-        if (mMenuSnappedTo && isMenuVisible()) {
-            if (mMenuSnappedOnLeft == mOnLeft) {
-                boolean coveringMenu = Math.abs(mTranslation) <= getSpaceForMenu() * 0.6f;
-                if (gestureTowardsMenu || coveringMenu) {
-                    // Gesture is towards or covering the menu or a dismiss
-                    snapBack(animView, 0);
-                } else if (mSwipeHelper.isDismissGesture(ev)) {
-                    dismiss(animView, velocity);
-                } else {
-                    // Didn't move enough to dismiss or cover, snap to the menu
-                    showMenu(animView, targetLeft, velocity);
-                }
-            } else if ((!gestureFastEnough && swipedEnoughToShowMenu())
-                    || (gestureTowardsMenu && !gestureFarEnough)) {
-                // The menu has been snapped to previously, however, the menu is now on the
-                // other side. If gesture is towards menu and not too far snap to the menu.
-                showMenu(animView, targetLeft, velocity);
-            } else if (mSwipeHelper.isDismissGesture(ev)) {
+        if (DEBUG) {
+            Log.d(TAG, "mTranslation= " + mTranslation
+                    + " mAlpha= " + mAlpha
+                    + " velocity= " + velocity
+                    + " mMenuSnappedTo= " + mMenuSnappedTo
+                    + " mMenuSnappedOnLeft= " + mMenuSnappedOnLeft
+                    + " mOnLeft= " + mOnLeft
+                    + " minDismissVel= " + mSwipeHelper.getMinDismissVelocity()
+                    + " isDismissGesture= " + mSwipeHelper.isDismissGesture(ev)
+                    + " gestureTowardsMenu= " + gestureTowardsMenu
+                    + " gestureFastEnough= " + gestureFastEnough
+                    + " gestureFarEnough= " + gestureFarEnough);
+        }
+
+        if (mMenuSnappedTo && isMenuVisible() && mMenuSnappedOnLeft == mOnLeft) {
+            // Menu was snapped to previously and we're on the same side, figure out if
+            // we should stick to the menu, snap back into place, or dismiss
+            final float maximumSwipeDistance = mHorizSpaceForIcon
+                    * SWIPED_BACK_ENOUGH_TO_COVER_FRACTION;
+            final float targetLeft = getSpaceForMenu() - maximumSwipeDistance;
+            final float targetRight = mParent.getWidth() * SWIPED_FAR_ENOUGH_SIZE_FRACTION;
+            boolean withinSnapMenuThreshold = mOnLeft
+                    ? mTranslation > targetLeft && mTranslation < targetRight
+                    : mTranslation < -targetLeft && mTranslation > -targetRight;
+            boolean shouldSnapTo = mOnLeft ? mTranslation < targetLeft : mTranslation > -targetLeft;
+            if (DEBUG) {
+                Log.d(TAG, "   withinSnapMenuThreshold= " + withinSnapMenuThreshold
+                        + "   shouldSnapTo= " + shouldSnapTo
+                        + "   targetLeft= " + targetLeft
+                        + "   targetRight= " + targetRight);
+            }
+            if (withinSnapMenuThreshold && !mSwipeHelper.isDismissGesture(ev)) {
+                // Haven't moved enough to unsnap from the menu
+                showMenu(animView, menuSnapTarget, velocity);
+            } else if (mSwipeHelper.isDismissGesture(ev) && !shouldSnapTo) {
+                // Only dismiss if we're not moving towards the menu
                 dismiss(animView, velocity);
             } else {
                 snapBack(animView, velocity);
             }
-        } else if (((!gestureFastEnough || showMenuForSlowOnGoing)
-                && swipedEnoughToShowMenu())
-                || gestureTowardsMenu) {
+        } else if ((swipedEnoughToShowMenu() && (!gestureFastEnough || showMenuForSlowOnGoing))
+                || (gestureTowardsMenu && !mSwipeHelper.isDismissGesture(ev))) {
             // Menu has not been snapped to previously and this is menu revealing gesture
-            showMenu(animView, targetLeft, velocity);
-        } else if (mSwipeHelper.isDismissGesture(ev)) {
+            showMenu(animView, menuSnapTarget, velocity);
+        } else if (mSwipeHelper.isDismissGesture(ev) && !gestureTowardsMenu) {
             dismiss(animView, velocity);
         } else {
             snapBack(animView, velocity);
@@ -273,25 +336,37 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
     }
 
     private void snapBack(View animView, float velocity) {
+        if (mFadeAnimator != null) {
+            mFadeAnimator.cancel();
+        }
+        mHandler.removeCallbacks(mCheckForDrag);
         mMenuSnappedTo = false;
         mSnapping = true;
         mSwipeHelper.snap(animView, 0 /* leftTarget */, velocity);
     }
 
     private void dismiss(View animView, float velocity) {
+        if (mFadeAnimator != null) {
+            mFadeAnimator.cancel();
+        }
+        mHandler.removeCallbacks(mCheckForDrag);
         mMenuSnappedTo = false;
         mDismissing = true;
         mSwipeHelper.dismiss(animView, velocity);
     }
 
+    /**
+     * @return whether the notification has been translated enough to show the menu and not enough
+     *         to be dismissed.
+     */
     private boolean swipedEnoughToShowMenu() {
-        // If the notification can't be dismissed then how far it can move is
-        // restricted -- reduce the distance it needs to move in this case.
-        final float multiplier = mParent.canViewBeDismissed() ? 0.4f : 0.2f;
-        final float snapBackThreshold = getSpaceForMenu() * multiplier;
-        return !mSwipeHelper.swipedFarEnough(0, 0) && isMenuVisible() && (mOnLeft
-                ? mTranslation > snapBackThreshold
-                : mTranslation < -snapBackThreshold);
+        final float multiplier = mParent.canViewBeDismissed()
+                ? SWIPED_FAR_ENOUGH_MENU_FRACTION
+                : SWIPED_FAR_ENOUGH_MENU_UNCLEARABLE_FRACTION;
+        final float minimumSwipeDistance = mHorizSpaceForIcon * multiplier;
+        return !mSwipeHelper.swipedFarEnough(0, 0) && isMenuVisible()
+                && (mOnLeft ? mTranslation > minimumSwipeDistance
+                        : mTranslation < -minimumSwipeDistance);
     }
 
     /**
@@ -495,24 +570,24 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
         // TODO -- handle / allow custom menu items!
     }
 
-    public static ArrayList<MenuItem> getDefaultMenuItems(Context context) {
-        ArrayList<MenuItem> items = new ArrayList<MenuItem>();
+    public static MenuItem createSnoozeItem(Context context) {
         Resources res = context.getResources();
-
         NotificationSnooze content = (NotificationSnooze) LayoutInflater.from(context)
                 .inflate(R.layout.notification_snooze, null, false);
         String snoozeDescription = res.getString(R.string.notification_menu_snooze_description);
         MenuItem snooze = new NotificationMenuItem(context, snoozeDescription, content,
                 R.drawable.ic_snooze);
-        items.add(snooze);
+        return snooze;
+    }
 
-        String settingsDescription = res.getString(R.string.notification_menu_gear_description);
-        NotificationInfo settingsContent = (NotificationInfo) LayoutInflater.from(context).inflate(
+    public static MenuItem createInfoItem(Context context) {
+        Resources res = context.getResources();
+        String infoDescription = res.getString(R.string.notification_menu_gear_description);
+        NotificationInfo infoContent = (NotificationInfo) LayoutInflater.from(context).inflate(
                 R.layout.notification_info, null, false);
-        MenuItem settings = new NotificationMenuItem(context, settingsDescription, settingsContent,
+        MenuItem info = new NotificationMenuItem(context, infoDescription, infoContent,
                 R.drawable.ic_settings);
-        items.add(settings);
-        return items;
+        return info;
     }
 
     private void addMenuView(MenuItem item, ViewGroup parent) {

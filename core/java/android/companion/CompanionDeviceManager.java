@@ -22,11 +22,13 @@ import static com.android.internal.util.Preconditions.checkNotNull;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.PendingIntent;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.RemoteException;
+import android.service.notification.NotificationListenerService;
 import android.util.Log;
 
 import java.util.Collections;
@@ -116,6 +118,9 @@ public final class CompanionDeviceManager {
      * association is no longer relevant to avoid unnecessary battery and/or data drain resulting
      * from special privileges that the association provides</p>
      *
+     * <p>Calling this API requires a uses-feature
+     * {@link PackageManager#FEATURE_COMPANION_DEVICE_SETUP} declaration in the manifest</p>
+     *
      * @param request specific details about this request
      * @param callback will be called once there's at least one device found for user to choose from
      * @param handler A handler to control which thread the callback will be delivered on, or null,
@@ -158,6 +163,9 @@ public final class CompanionDeviceManager {
     }
 
     /**
+     * <p>Calling this API requires a uses-feature
+     * {@link PackageManager#FEATURE_COMPANION_DEVICE_SETUP} declaration in the manifest</p>
+     *
      * @return a list of MAC addresses of devices that have been previously associated with the
      * current app. You can use these with {@link #disassociate}
      */
@@ -182,6 +190,9 @@ public final class CompanionDeviceManager {
      * association is no longer relevant to avoid unnecessary battery and/or data drain resulting
      * from special privileges that the association provides</p>
      *
+     * <p>Calling this API requires a uses-feature
+     * {@link PackageManager#FEATURE_COMPANION_DEVICE_SETUP} declaration in the manifest</p>
+     *
      * @param deviceMacAddress the MAC address of device to disassociate from this app
      */
     public void disassociate(@NonNull String deviceMacAddress) {
@@ -195,22 +206,53 @@ public final class CompanionDeviceManager {
         }
     }
 
-    /** @hide */
-    public void requestNotificationAccess() {
+    /**
+     * Request notification access for the given component.
+     *
+     * The given component must follow the protocol specified in {@link NotificationListenerService}
+     *
+     * Only components from the same {@link ComponentName#getPackageName package} as the calling app
+     * are allowed.
+     *
+     * Your app must have an association with a device before calling this API
+     *
+     * <p>Calling this API requires a uses-feature
+     * {@link PackageManager#FEATURE_COMPANION_DEVICE_SETUP} declaration in the manifest</p>
+     */
+    public void requestNotificationAccess(ComponentName component) {
         if (!checkFeaturePresent()) {
             return;
         }
-        //TODO implement
-        throw new UnsupportedOperationException("Not yet implemented");
+        try {
+            mService.requestNotificationAccess(component).send();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        } catch (PendingIntent.CanceledException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    /** @hide */
-    public boolean haveNotificationAccess() {
+    /**
+     * Check whether the given component can access the notifications via a
+     * {@link NotificationListenerService}
+     *
+     * Your app must have an association with a device before calling this API
+     *
+     * <p>Calling this API requires a uses-feature
+     * {@link PackageManager#FEATURE_COMPANION_DEVICE_SETUP} declaration in the manifest</p>
+     *
+     * @param component the name of the component
+     * @return whether the given component has the notification listener permission
+     */
+    public boolean hasNotificationAccess(ComponentName component) {
         if (!checkFeaturePresent()) {
             return false;
         }
-        //TODO implement
-        throw new UnsupportedOperationException("Not yet implemented");
+        try {
+            return mService.hasNotificationAccess(component);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
     }
 
     private boolean checkFeaturePresent() {

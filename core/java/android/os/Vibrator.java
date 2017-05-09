@@ -16,9 +16,11 @@
 
 package android.os;
 
+import android.annotation.RequiresPermission;
 import android.app.ActivityThread;
 import android.content.Context;
 import android.media.AudioAttributes;
+import android.util.Log;
 
 /**
  * Class that operates the vibrator on the device.
@@ -30,6 +32,7 @@ import android.media.AudioAttributes;
  * {@link Context#getSystemService} with {@link Context#VIBRATOR_SERVICE} as the argument.
  */
 public abstract class Vibrator {
+    private static final String TAG = "Vibrator";
 
     private final String mPackageName;
 
@@ -63,22 +66,19 @@ public abstract class Vibrator {
 
     /**
      * Vibrate constantly for the specified period of time.
-     * <p>This method requires the caller to hold the permission
-     * {@link android.Manifest.permission#VIBRATE}.
      *
      * @param milliseconds The number of milliseconds to vibrate.
      *
      * @deprecated Use {@link #vibrate(VibrationEffect)} instead.
      */
     @Deprecated
+    @RequiresPermission(android.Manifest.permission.VIBRATE)
     public void vibrate(long milliseconds) {
         vibrate(milliseconds, null);
     }
 
     /**
      * Vibrate constantly for the specified period of time.
-     * <p>This method requires the caller to hold the permission
-     * {@link android.Manifest.permission#VIBRATE}.
      *
      * @param milliseconds The number of milliseconds to vibrate.
      * @param attributes {@link AudioAttributes} corresponding to the vibration. For example,
@@ -89,10 +89,16 @@ public abstract class Vibrator {
      * @deprecated Use {@link #vibrate(VibrationEffect, AudioAttributes)} instead.
      */
     @Deprecated
+    @RequiresPermission(android.Manifest.permission.VIBRATE)
     public void vibrate(long milliseconds, AudioAttributes attributes) {
-        VibrationEffect effect =
-                VibrationEffect.createOneShot(milliseconds, VibrationEffect.DEFAULT_AMPLITUDE);
-        vibrate(effect, attributes);
+        try {
+            // This ignores all exceptions to stay compatible with pre-O implementations.
+            VibrationEffect effect =
+                    VibrationEffect.createOneShot(milliseconds, VibrationEffect.DEFAULT_AMPLITUDE);
+            vibrate(effect, attributes);
+        } catch (IllegalArgumentException iae) {
+            Log.e(TAG, "Failed to create VibrationEffect", iae);
+        }
     }
 
     /**
@@ -108,8 +114,6 @@ public abstract class Vibrator {
      * To cause the pattern to repeat, pass the index into the pattern array at which
      * to start the repeat, or -1 to disable repeating.
      * </p>
-     * <p>This method requires the caller to hold the permission
-     * {@link android.Manifest.permission#VIBRATE}.
      *
      * @param pattern an array of longs of times for which to turn the vibrator on or off.
      * @param repeat the index into pattern at which to repeat, or -1 if
@@ -118,6 +122,7 @@ public abstract class Vibrator {
      * @deprecated Use {@link #vibrate(VibrationEffect)} instead.
      */
     @Deprecated
+    @RequiresPermission(android.Manifest.permission.VIBRATE)
     public void vibrate(long[] pattern, int repeat) {
         vibrate(pattern, repeat, null);
     }
@@ -135,8 +140,6 @@ public abstract class Vibrator {
      * To cause the pattern to repeat, pass the index into the pattern array at which
      * to start the repeat, or -1 to disable repeating.
      * </p>
-     * <p>This method requires the caller to hold the permission
-     * {@link android.Manifest.permission#VIBRATE}.
      *
      * @param pattern an array of longs of times for which to turn the vibrator on or off.
      * @param repeat the index into pattern at which to repeat, or -1 if
@@ -149,19 +152,27 @@ public abstract class Vibrator {
      * @deprecated Use {@link #vibrate(VibrationEffect, AudioAttributes)} instead.
      */
     @Deprecated
+    @RequiresPermission(android.Manifest.permission.VIBRATE)
     public void vibrate(long[] pattern, int repeat, AudioAttributes attributes) {
-        // This call needs to continue throwing ArrayIndexOutOfBoundsException for compatibility
-        // purposes, whereas VibrationEffect throws an IllegalArgumentException.
+        // This call needs to continue throwing ArrayIndexOutOfBoundsException but ignore all other
+        // exceptions for compatibility purposes
         if (repeat < -1 || repeat >= pattern.length) {
             throw new ArrayIndexOutOfBoundsException();
         }
-        vibrate(VibrationEffect.createWaveform(pattern, repeat), attributes);
+
+        try {
+            vibrate(VibrationEffect.createWaveform(pattern, repeat), attributes);
+        } catch (IllegalArgumentException iae) {
+            Log.e(TAG, "Failed to create VibrationEffect", iae);
+        }
     }
 
+    @RequiresPermission(android.Manifest.permission.VIBRATE)
     public void vibrate(VibrationEffect vibe) {
         vibrate(vibe, null);
     }
 
+    @RequiresPermission(android.Manifest.permission.VIBRATE)
     public void vibrate(VibrationEffect vibe, AudioAttributes attributes) {
         vibrate(Process.myUid(), mPackageName, vibe, attributes);
     }
@@ -171,13 +182,13 @@ public abstract class Vibrator {
      * that the vibration is owned by someone else.
      * @hide
      */
+    @RequiresPermission(android.Manifest.permission.VIBRATE)
     public abstract void vibrate(int uid, String opPkg,
             VibrationEffect vibe, AudioAttributes attributes);
 
     /**
      * Turn the vibrator off.
-     * <p>This method requires the caller to hold the permission
-     * {@link android.Manifest.permission#VIBRATE}.
      */
+    @RequiresPermission(android.Manifest.permission.VIBRATE)
     public abstract void cancel();
 }

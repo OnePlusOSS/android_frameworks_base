@@ -16,8 +16,6 @@
 
 package android.os;
 
-import android.annotation.IntegerRes;
-import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.text.TextUtils;
 import android.util.ArrayMap;
@@ -28,6 +26,9 @@ import android.util.SizeF;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.util.SparseIntArray;
+
+import dalvik.annotation.optimization.FastNative;
+import dalvik.system.VMRuntime;
 
 import libcore.util.SneakyThrow;
 
@@ -49,9 +50,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import dalvik.annotation.optimization.FastNative;
-import dalvik.system.VMRuntime;
 
 /**
  * Container for a message (data and object references) that can
@@ -315,6 +313,7 @@ public final class Parcel {
     private static native byte[] nativeMarshall(long nativePtr);
     private static native long nativeUnmarshall(
             long nativePtr, byte[] data, int offset, int length);
+    private static native int nativeCompareData(long thisNativePtr, long otherNativePtr);
     private static native long nativeAppendFrom(
             long thisNativePtr, long otherNativePtr, int offset, int length);
     @FastNative
@@ -485,6 +484,11 @@ public final class Parcel {
 
     public final void appendFrom(Parcel parcel, int offset, int length) {
         updateNativeSize(nativeAppendFrom(mNativePtr, parcel.mNativePtr, offset, length));
+    }
+
+    /** @hide */
+    public final int compareData(Parcel other) {
+        return nativeCompareData(mNativePtr, other.mNativePtr);
     }
 
     /**

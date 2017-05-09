@@ -1167,7 +1167,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                 builder.setContentTitle(title);
                 builder.setContentText(body);
                 builder.setDefaults(Notification.DEFAULT_ALL);
-                builder.setChannel(SystemNotificationChannels.NETWORK_ALERTS);
+                builder.setChannelId(SystemNotificationChannels.NETWORK_ALERTS);
 
                 final Intent snoozeIntent = buildSnoozeWarningIntent(policy.template);
                 builder.setDeleteIntent(PendingIntent.getBroadcast(
@@ -1254,14 +1254,13 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         // TODO: move to NotificationManager once we can mock it
         try {
             final String packageName = mContext.getPackageName();
-            final int[] idReceived = new int[1];
             if (!TextUtils.isEmpty(body)) {
                 builder.setStyle(new Notification.BigTextStyle()
                         .bigText(body));
             }
             mNotifManager.enqueueNotificationWithTag(
                     packageName, packageName, notificationId.getTag(), notificationId.getId(),
-                    builder.build(), idReceived, UserHandle.USER_ALL);
+                    builder.build(), UserHandle.USER_ALL);
             mActiveNotifs.add(notificationId);
         } catch (RemoteException e) {
             // ignored; service lives in system_server
@@ -2880,17 +2879,11 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
             final List<UserInfo> users = mUserManager.getUsers();
             for (int ui = users.size() - 1; ui >= 0; ui--) {
                 UserInfo user = users.get(ui);
-                for (int i = mPowerSaveTempWhitelistAppIds.size() - 1; i >= 0; i--) {
-                    if (mPowerSaveTempWhitelistAppIds.valueAt(i)) {
-                        int appId = mPowerSaveTempWhitelistAppIds.keyAt(i);
-                        int uid = UserHandle.getUid(user.id, appId);
-                        uidRules.put(uid, FIREWALL_RULE_ALLOW);
-                    }
-                }
-                for (int i = mPowerSaveWhitelistAppIds.size() - 1; i >= 0; i--) {
-                    int appId = mPowerSaveWhitelistAppIds.keyAt(i);
-                    int uid = UserHandle.getUid(user.id, appId);
-                    uidRules.put(uid, FIREWALL_RULE_ALLOW);
+                updateRulesForWhitelistedAppIds(uidRules, mPowerSaveTempWhitelistAppIds, user.id);
+                updateRulesForWhitelistedAppIds(uidRules, mPowerSaveWhitelistAppIds, user.id);
+                if (chain == FIREWALL_CHAIN_POWERSAVE) {
+                    updateRulesForWhitelistedAppIds(uidRules,
+                            mPowerSaveWhitelistExceptIdleAppIds, user.id);
                 }
             }
             for (int i = mUidState.size() - 1; i >= 0; i--) {
@@ -2904,16 +2897,39 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         }
     }
 
-    private boolean isWhitelistedBatterySaverUL(int uid) {
+    private void updateRulesForWhitelistedAppIds(final SparseIntArray uidRules,
+            final SparseBooleanArray whitelistedAppIds, int userId) {
+        for (int i = whitelistedAppIds.size() - 1; i >= 0; --i) {
+            if (whitelistedAppIds.valueAt(i)) {
+                final int appId = whitelistedAppIds.keyAt(i);
+                final int uid = UserHandle.getUid(userId, appId);
+                uidRules.put(uid, FIREWALL_RULE_ALLOW);
+            }
+        }
+    }
+
+    /**
+     * @param deviceIdleMode if true then we don't consider
+     *        {@link #mPowerSaveWhitelistExceptIdleAppIds} for checking if the {@param uid} is
+     *        whitelisted.
+     */
+    private boolean isWhitelistedBatterySaverUL(int uid, boolean deviceIdleMode) {
         final int appId = UserHandle.getAppId(uid);
-        return mPowerSaveTempWhitelistAppIds.get(appId) || mPowerSaveWhitelistAppIds.get(appId);
+        boolean isWhitelisted = mPowerSaveTempWhitelistAppIds.get(appId)
+                || mPowerSaveWhitelistAppIds.get(appId);
+        if (!deviceIdleMode) {
+            isWhitelisted = isWhitelisted || mPowerSaveWhitelistExceptIdleAppIds.get(appId);
+        }
+        return isWhitelisted;
     }
 
     // NOTE: since both fw_dozable and fw_powersave uses the same map
     // (mPowerSaveTempWhitelistAppIds) for whitelisting, we can reuse their logic in this method.
     private void updateRulesForWhitelistedPowerSaveUL(int uid, boolean enabled, int chain) {
         if (enabled) {
-            if (isWhitelistedBatterySaverUL(uid) || isUidForegroundOnRestrictPowerUL(uid)) {
+            final boolean isWhitelisted = isWhitelistedBatterySaverUL(uid,
+                    chain == FIREWALL_CHAIN_DOZABLE);
+            if (isWhitelisted || isUidForegroundOnRestrictPowerUL(uid)) {
                 setUidFirewallRule(chain, uid, FIREWALL_RULE_ALLOW);
             } else {
                 setUidFirewallRule(chain, uid, FIREWALL_RULE_DEFAULT);
@@ -2992,7 +3008,12 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                 // Skip if it had no restrictions to begin with
                 if ((oldRules & MASK_ALL_NETWORKS) == 0) continue;
             }
-            updateRulesForPowerRestrictionsUL(uid, oldRules, paroled);
+            final int newUidRules = updateRulesForPowerRestrictionsUL(uid, oldRules, paroled);
+            if (newUidRules == RULE_NONE) {
+                mUidRules.delete(uid);
+            } else {
+                mUidRules.put(uid, newUidRules);
+            }
         }
     }
 
@@ -3426,7 +3447,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         final boolean restrictMode = isIdle || mRestrictPower || mDeviceIdleMode;
         final boolean isForeground = isUidForegroundOnRestrictPowerUL(uid);
 
-        final boolean isWhitelisted = isWhitelistedBatterySaverUL(uid);
+        final boolean isWhitelisted = isWhitelistedBatterySaverUL(uid, mDeviceIdleMode);
         final int oldRule = oldUidRules & MASK_ALL_NETWORKS;
         int newRule = RULE_NONE;
 

@@ -55,6 +55,7 @@ import com.android.internal.app.NightDisplayController;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.notification.SystemNotificationChannels;
 import com.android.internal.os.BinderInternal;
+import com.android.internal.os.RegionalizationEnvironment;
 import com.android.internal.os.SamplingProfilerIntegration;
 import com.android.internal.util.EmergencyAffordanceManager;
 import com.android.internal.util.ConcurrentUtils;
@@ -84,6 +85,7 @@ import com.android.server.net.NetworkPolicyManagerService;
 import com.android.server.net.NetworkStatsService;
 import com.android.server.notification.NotificationManagerService;
 import com.android.server.om.OverlayManagerService;
+import com.android.server.os.RegionalizationService;
 import com.android.server.os.DeviceIdentifiersPolicyService;
 import com.android.server.os.SchedulingPolicyService;
 import com.android.server.pm.BackgroundDexOptService;
@@ -159,7 +161,7 @@ public final class SystemServer {
     private static final String PRINT_MANAGER_SERVICE_CLASS =
             "com.android.server.print.PrintManagerService";
     private static final String COMPANION_DEVICE_MANAGER_SERVICE_CLASS =
-            "com.android.server.print.CompanionDeviceManagerService";
+            "com.android.server.companion.CompanionDeviceManagerService";
     private static final String USB_SERVICE_CLASS =
             "com.android.server.usb.UsbService$Lifecycle";
     private static final String MIDI_SERVICE_CLASS =
@@ -565,6 +567,12 @@ public final class SystemServer {
         } else if (ENCRYPTED_STATE.equals(cryptState)) {
             Slog.w(TAG, "Device encrypted - only parsing core apps");
             mOnlyCore = true;
+        }
+
+        if (RegionalizationEnvironment.isSupported()) {
+            Slog.i(TAG, "Regionalization Service");
+            RegionalizationService regionalizationService = new RegionalizationService();
+            ServiceManager.addService("regionalization", regionalizationService);
         }
 
         // Start the package manager.
@@ -980,6 +988,11 @@ public final class SystemServer {
                 if (!SystemProperties.get(PERSISTENT_DATA_BLOCK_PROP).equals("")) {
                     traceBeginAndSlog("StartPersistentDataBlock");
                     mSystemServiceManager.startService(PersistentDataBlockService.class);
+                    traceEnd();
+
+                    // Implementation depends on persistent data block
+                    traceBeginAndSlog("StartOemLockService");
+                    mSystemServiceManager.startService(OemLockService.class);
                     traceEnd();
                 }
 
@@ -1541,9 +1554,11 @@ public final class SystemServer {
         mSystemServiceManager.startService(RetailDemoModeService.class);
         traceEnd();
 
-        traceBeginAndSlog("StartAutoFillService");
-        mSystemServiceManager.startService(AUTO_FILL_MANAGER_SERVICE_CLASS);
-        traceEnd();
+        if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_AUTOFILL)) {
+            traceBeginAndSlog("StartAutoFillService");
+            mSystemServiceManager.startService(AUTO_FILL_MANAGER_SERVICE_CLASS);
+            traceEnd();
+        }
 
         // It is now time to start up the app processes...
 

@@ -31,7 +31,6 @@ import static android.os.Process.SHELL_UID;
 import static android.os.Process.SYSTEM_UID;
 import static android.os.Process.THREAD_PRIORITY_DISPLAY;
 import static android.os.Process.myPid;
-import static android.os.Process.myTid;
 import static android.os.UserHandle.USER_NULL;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.DOCKED_INVALID;
@@ -148,7 +147,6 @@ import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
 import android.os.PowerManagerInternal;
 import android.os.PowerSaveState;
-import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.StrictMode;
@@ -1472,7 +1470,7 @@ public class WindowManagerService extends IWindowManager.Stub
             if (mInTouchMode) {
                 res |= WindowManagerGlobal.ADD_FLAG_IN_TOUCH_MODE;
             }
-            if (win.mAppToken == null || !win.mAppToken.clientHidden) {
+            if (win.mAppToken == null || !win.mAppToken.isClientHidden()) {
                 res |= WindowManagerGlobal.ADD_FLAG_APP_VISIBLE;
             }
 
@@ -1952,7 +1950,7 @@ public class WindowManagerService extends IWindowManager.Stub
             }
             if (viewVisibility == View.VISIBLE &&
                     (win.mAppToken == null || win.mAttrs.type == TYPE_APPLICATION_STARTING
-                            || !win.mAppToken.clientHidden)) {
+                            || !win.mAppToken.isClientHidden())) {
                 result = win.relayoutVisibleWindow(mergedConfiguration, result, attrChanges,
                         oldVisibility);
                 try {
@@ -2143,7 +2141,12 @@ public class WindowManagerService extends IWindowManager.Stub
             if (mInputMethodWindow == win) {
                 setInputMethodWindowLocked(null);
             }
-            win.destroyOrSaveSurface();
+            boolean stopped = win.mAppToken != null ? win.mAppToken.mAppStopped : false;
+            // We set mDestroying=true so AppWindowToken#notifyAppStopped in-to destroy surfaces
+            // will later actually destroy the surface if we do not do so here. Normally we leave
+            // this to the exit animation.
+            win.mDestroying = true;
+            win.destroySurface(false, stopped);
         }
         // TODO(multidisplay): Magnification is supported only for the default display.
         if (mAccessibilityController != null && win.getDisplayId() == DEFAULT_DISPLAY) {
@@ -2756,39 +2759,6 @@ public class WindowManagerService extends IWindowManager.Stub
     void setDockedStackCreateStateLocked(int mode, Rect bounds) {
         mDockedStackCreateMode = mode;
         mDockedStackCreateBounds = bounds;
-    }
-
-    public Rect getPictureInPictureBounds(int displayId, float aspectRatio) {
-        synchronized (mWindowMap) {
-            if (!mSupportsPictureInPicture) {
-                return null;
-            }
-
-            final Rect stackBounds;
-            final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
-            if (displayContent == null) {
-                return null;
-            }
-
-            final PinnedStackController pinnedStackController =
-                    displayContent.getPinnedStackController();
-            final TaskStack stack = displayContent.getStackById(PINNED_STACK_ID);
-            if (stack != null) {
-                // If the stack exists, then use its final bounds to calculate the new aspect ratio
-                // bounds.
-                stackBounds = new Rect();
-                stack.getAnimatingBounds(stackBounds);
-            } else {
-                // Otherwise, just calculate the aspect ratio bounds from the default bounds
-                stackBounds = pinnedStackController.getDefaultBounds();
-            }
-
-            if (pinnedStackController.isValidPictureInPictureAspectRatio(aspectRatio)) {
-                return pinnedStackController.transformBoundsToAspectRatio(stackBounds, aspectRatio);
-            } else {
-                return stackBounds;
-            }
-        }
     }
 
     public boolean isValidPictureInPictureAspectRatio(int displayId, float aspectRatio) {
@@ -4310,7 +4280,10 @@ public class WindowManagerService extends IWindowManager.Stub
                     if (mWaitingForConfig) {
                         mWaitingForConfig = false;
                         mLastFinishedFreezeSource = "config-unchanged";
-                        mRoot.getDisplayContent(displayId).setLayoutNeeded();
+                        final DisplayContent dc = mRoot.getDisplayContent(displayId);
+                        if (dc != null) {
+                            dc.setLayoutNeeded();
+                        }
                         mWindowPlacerLocked.performSurfacePlacement();
                     }
                 }
@@ -5032,6 +5005,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     if (callback != null) {
                         callback.run();
                     }
+                    break;
                 }
                 case NEW_ANIMATOR_SCALE: {
                     float scale = getCurrentAnimatorScale();
@@ -5084,6 +5058,7 @@ public class WindowManagerService extends IWindowManager.Stub
                         }
                     }
                 }
+                break;
                 case UPDATE_DOCKED_STACK_DIVIDER: {
                     synchronized (mWindowMap) {
                         final DisplayContent displayContent = getDefaultDisplayContentLocked();
@@ -5101,6 +5076,7 @@ public class WindowManagerService extends IWindowManager.Stub
                         mWindowReplacementTimeouts.clear();
                     }
                 }
+                break;
                 case NOTIFY_APP_TRANSITION_STARTING: {
                     mAmInternal.notifyAppTransitionStarting((SparseIntArray) msg.obj);
                 }
@@ -5603,22 +5579,19 @@ public class WindowManagerService extends IWindowManager.Stub
         WindowState win = mWindowMap.get(client);
         if (localLOGV) Slog.v(TAG_WM, "Looking up client " + client + ": " + win);
         if (win == null) {
-            RuntimeException ex = new IllegalArgumentException(
-                    "Requested window " + client + " does not exist");
             if (throwOnError) {
-                throw ex;
+                throw new IllegalArgumentException(
+                        "Requested window " + client + " does not exist");
             }
-            Slog.w(TAG_WM, "Failed looking up window", ex);
+            Slog.w(TAG_WM, "Failed looking up window callers=" + Debug.getCallers(3));
             return null;
         }
         if (session != null && win.mSession != session) {
-            RuntimeException ex = new IllegalArgumentException(
-                    "Requested window " + client + " is in session " +
-                    win.mSession + ", not " + session);
             if (throwOnError) {
-                throw ex;
+                throw new IllegalArgumentException("Requested window " + client + " is in session "
+                        + win.mSession + ", not " + session);
             }
-            Slog.w(TAG_WM, "Failed looking up window", ex);
+            Slog.w(TAG_WM, "Failed looking up window callers=" + Debug.getCallers(3));
             return null;
         }
 
@@ -7264,13 +7237,16 @@ public class WindowManagerService extends IWindowManager.Stub
 
         @Override
         public void updateInputMethodWindowStatus(@NonNull IBinder imeToken,
-                boolean imeWindowVisible, @Nullable IBinder targetWindowToken) {
+                boolean imeWindowVisible, boolean dismissImeOnBackKeyPressed,
+                @Nullable IBinder targetWindowToken) {
             // TODO (b/34628091): Use this method to address the window animation issue.
             if (DEBUG_INPUT_METHOD) {
                 Slog.w(TAG_WM, "updateInputMethodWindowStatus: imeToken=" + imeToken
+                        + " dismissImeOnBackKeyPressed=" + dismissImeOnBackKeyPressed
                         + " imeWindowVisible=" + imeWindowVisible
                         + " targetWindowToken=" + targetWindowToken);
             }
+            mPolicy.setDismissImeOnBackKeyPressed(dismissImeOnBackKeyPressed);
         }
 
         @Override

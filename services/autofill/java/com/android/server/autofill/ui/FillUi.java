@@ -15,13 +15,20 @@
  */
 package com.android.server.autofill.ui;
 
+import static com.android.server.autofill.Helper.sDebug;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentSender;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.service.autofill.Dataset;
 import android.service.autofill.FillResponse;
 import android.util.Slog;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -47,6 +54,8 @@ final class FillUi {
 
     private static final int VISIBLE_OPTIONS_MAX_COUNT = 3;
 
+    private static final TypedValue sTempTypedValue = new TypedValue();
+
     interface Callback {
         void onResponsePicked(@NonNull FillResponse response);
         void onDatasetPicked(@NonNull Dataset dataset);
@@ -55,10 +64,15 @@ final class FillUi {
         void requestShowFillUi(int width, int height,
                 IAutofillWindowPresenter windowPresenter);
         void requestHideFillUi();
+        void startIntentSender(IntentSender intentSender);
     }
+
+    private final @NonNull Point mTempPoint = new Point();
 
     private final @NonNull AutofillWindowPresenter mWindowPresenter =
             new AutofillWindowPresenter();
+
+    private final @NonNull Context mContext;
 
     private final @NonNull AnchoredWindow mWindow;
 
@@ -69,7 +83,6 @@ final class FillUi {
     private final @Nullable ArrayAdapter<ViewItem> mAdapter;
 
     private @Nullable String mFilterText;
-    private final String mAccessibilityTitle;
 
     private int mContentWidth;
     private int mContentHeight;
@@ -79,9 +92,23 @@ final class FillUi {
     FillUi(@NonNull Context context, @NonNull FillResponse response,
             @NonNull AutofillId focusedViewId, @NonNull @Nullable String filterText,
             @NonNull Callback callback) {
+        mContext = context;
         mCallback = callback;
 
-        mAccessibilityTitle = context.getString(R.string.autofill_picker_accessibility_title);
+        final LayoutInflater inflater = LayoutInflater.from(context);
+        final ViewGroup decor = (ViewGroup) inflater.inflate(
+                R.layout.autofill_dataset_picker, null);
+
+        final RemoteViews.OnClickHandler interceptionHandler = new RemoteViews.OnClickHandler() {
+            @Override
+            public boolean onClickHandler(View view, PendingIntent pendingIntent,
+                    Intent fillInIntent) {
+                if (pendingIntent != null) {
+                    mCallback.startIntentSender(pendingIntent.getIntentSender());
+                }
+                return true;
+            }
+        };
 
         if (response.getAuthentication() != null) {
             mListView = null;
@@ -89,23 +116,28 @@ final class FillUi {
 
             final View content;
             try {
-                content = response.getPresentation().apply(context, null);
+                content = response.getPresentation().apply(context, decor, interceptionHandler);
+                decor.addView(content);
             } catch (RuntimeException e) {
                 callback.onCanceled();
                 Slog.e(TAG, "Error inflating remote views", e);
                 mWindow = null;
                 return;
             }
-            final int widthMeasureSpec = MeasureSpec.makeMeasureSpec(MeasureSpec.UNSPECIFIED, 0);
-            final int heightMeasureSpec = MeasureSpec.makeMeasureSpec(MeasureSpec.UNSPECIFIED, 0);
-            content.measure(widthMeasureSpec, heightMeasureSpec);
-            content.setOnClickListener(v -> mCallback.onResponsePicked(response));
-            content.setElevation(context.getResources().getDimension(R.dimen.floating_window_z));
-            // TODO(b/33197203 , b/36660292): temporary limiting maximum height and minimum width
-            mContentWidth = Math.max(content.getMeasuredWidth(), 1000);
-            mContentHeight = Math.min(content.getMeasuredHeight(), 500);
 
-            mWindow = new AnchoredWindow(content);
+            Point maxSize = mTempPoint;
+            resolveMaxWindowSize(context, maxSize);
+            final int widthMeasureSpec = MeasureSpec.makeMeasureSpec(maxSize.x,
+                    MeasureSpec.AT_MOST);
+            final int heightMeasureSpec = MeasureSpec.makeMeasureSpec(maxSize.y,
+                    MeasureSpec.AT_MOST);
+
+            decor.measure(widthMeasureSpec, heightMeasureSpec);
+            decor.setOnClickListener(v -> mCallback.onResponsePicked(response));
+            mContentWidth = content.getMeasuredWidth();
+            mContentHeight = content.getMeasuredHeight();
+
+            mWindow = new AnchoredWindow(decor);
             mCallback.requestShowFillUi(mContentWidth, mContentHeight, mWindowPresenter);
         } else {
             final int datasetCount = response.getDatasets().size();
@@ -117,7 +149,7 @@ final class FillUi {
                     final RemoteViews presentation = dataset.getFieldPresentation(index);
                     final View view;
                     try {
-                        view = presentation.apply(context, null);
+                        view = presentation.apply(context, null, interceptionHandler);
                     } catch (RuntimeException e) {
                         Slog.e(TAG, "Error inflating remote views", e);
                         continue;
@@ -139,9 +171,9 @@ final class FillUi {
                 }
             };
 
-            final LayoutInflater inflater = LayoutInflater.from(context);
-            mListView = (ListView) inflater.inflate(R.layout.autofill_dataset_picker, null);
+            mListView = decor.findViewById(R.id.autofill_dataset_list);
             mListView.setAdapter(mAdapter);
+            mListView.setVisibility(View.VISIBLE);
             mListView.setOnItemClickListener((adapter, view, position, id) -> {
                 final ViewItem vi = mAdapter.getItem(position);
                 mCallback.onDatasetPicked(vi.getDataset());
@@ -154,11 +186,12 @@ final class FillUi {
             }
 
             applyNewFilterText();
-            mWindow = new AnchoredWindow(mListView);
+            mWindow = new AnchoredWindow(decor);
         }
     }
 
     private void applyNewFilterText() {
+        final int oldCount = mAdapter.getCount();
         mAdapter.getFilter().filter(mFilterText, (count) -> {
             if (mDestroyed) {
                 return;
@@ -174,6 +207,9 @@ final class FillUi {
                     mListView.onVisibilityAggregated(true);
                 } else {
                     mListView.setVerticalScrollBarEnabled(false);
+                }
+                if (mAdapter.getCount() != oldCount) {
+                    mListView.requestLayout();
                 }
             }
         });
@@ -223,6 +259,9 @@ final class FillUi {
             return changed;
         }
 
+        Point maxSize = mTempPoint;
+        resolveMaxWindowSize(mContext, maxSize);
+
         mContentWidth = 0;
         mContentHeight = 0;
 
@@ -232,12 +271,14 @@ final class FillUi {
         for (int i = 0; i < itemCount; i++) {
             View view = mAdapter.getItem(i).getView();
             view.measure(widthMeasureSpec, heightMeasureSpec);
-            final int newContentWidth = Math.max(mContentWidth, view.getMeasuredWidth());
+            final int clampedMeasuredWidth = Math.min(view.getMeasuredWidth(), maxSize.x);
+            final int newContentWidth = Math.max(mContentWidth, clampedMeasuredWidth);
             if (newContentWidth != mContentWidth) {
                 mContentWidth = newContentWidth;
                 changed = true;
             }
-            final int newContentHeight = mContentHeight + view.getMeasuredHeight();
+            final int clampedMeasuredHeight = Math.min(view.getMeasuredHeight(), maxSize.y);
+            final int newContentHeight = mContentHeight + clampedMeasuredHeight;
             if (newContentHeight != mContentHeight) {
                 mContentHeight = newContentHeight;
                 changed = true;
@@ -250,6 +291,17 @@ final class FillUi {
         if (mDestroyed) {
             throw new IllegalStateException("cannot interact with a destroyed instance");
         }
+    }
+
+    private static void resolveMaxWindowSize(Context context, Point outPoint) {
+        context.getDisplay().getSize(outPoint);
+        TypedValue typedValue = sTempTypedValue;
+        context.getTheme().resolveAttribute(R.attr.autofillDatasetPickerMaxWidth,
+                typedValue, true);
+        outPoint.x = (int) typedValue.getFraction(outPoint.x, outPoint.x);
+        context.getTheme().resolveAttribute(R.attr.autofillDatasetPickerMaxHeight,
+                typedValue, true);
+        outPoint.y = (int) typedValue.getFraction(outPoint.y, outPoint.y);
     }
 
     private static class ViewItem {
@@ -312,7 +364,8 @@ final class FillUi {
         public void show(WindowManager.LayoutParams params) {
             try {
                 if (!mShowing) {
-                    params.accessibilityTitle = mAccessibilityTitle;
+                    params.accessibilityTitle = mContentView.getContext()
+                            .getString(R.string.autofill_picker_accessibility_title);
                     mWm.addView(mContentView, params);
                     mContentView.setOnTouchListener(this);
                     mShowing = true;
@@ -320,7 +373,7 @@ final class FillUi {
                     mWm.updateViewLayout(mContentView, params);
                 }
             } catch (WindowManager.BadTokenException e) {
-                Slog.i(TAG, "Filed with with token " + params.token + " gone.");
+                if (sDebug) Slog.d(TAG, "Filed with with token " + params.token + " gone.");
                 mCallback.onDestroy();
             }
         }
@@ -352,7 +405,6 @@ final class FillUi {
         pw.print(prefix); pw.print("mListView: "); pw.println(mListView);
         pw.print(prefix); pw.print("mAdapter: "); pw.println(mAdapter != null);
         pw.print(prefix); pw.print("mFilterText: "); pw.println(mFilterText);
-        pw.print(prefix); pw.print("mAccessibilityTitle: "); pw.println(mAccessibilityTitle);
         pw.print(prefix); pw.print("mContentWidth: "); pw.println(mContentWidth);
         pw.print(prefix); pw.print("mContentHeight: "); pw.println(mContentHeight);
         pw.print(prefix); pw.print("mDestroyed: "); pw.println(mDestroyed);

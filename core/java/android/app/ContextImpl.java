@@ -1357,34 +1357,34 @@ class ContextImpl extends Context {
 
     @Override
     public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
-            boolean visibleToInstantApps) {
-        return registerReceiver(receiver, filter, null, null, visibleToInstantApps);
+            int flags) {
+        return registerReceiver(receiver, filter, null, null, flags);
     }
 
     @Override
     public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
             String broadcastPermission, Handler scheduler) {
         return registerReceiverInternal(receiver, getUserId(),
-                filter, broadcastPermission, scheduler, getOuterContext(), false);
+                filter, broadcastPermission, scheduler, getOuterContext(), 0);
     }
 
     @Override
     public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
-            String broadcastPermission, Handler scheduler, boolean visibleToInstantApps) {
+            String broadcastPermission, Handler scheduler, int flags) {
         return registerReceiverInternal(receiver, getUserId(),
-                filter, broadcastPermission, scheduler, getOuterContext(), visibleToInstantApps);
+                filter, broadcastPermission, scheduler, getOuterContext(), flags);
     }
 
     @Override
     public Intent registerReceiverAsUser(BroadcastReceiver receiver, UserHandle user,
             IntentFilter filter, String broadcastPermission, Handler scheduler) {
         return registerReceiverInternal(receiver, user.getIdentifier(),
-                filter, broadcastPermission, scheduler, getOuterContext(), false);
+                filter, broadcastPermission, scheduler, getOuterContext(), 0);
     }
 
     private Intent registerReceiverInternal(BroadcastReceiver receiver, int userId,
             IntentFilter filter, String broadcastPermission,
-            Handler scheduler, Context context, boolean visibleToInstantApps) {
+            Handler scheduler, Context context, int flags) {
         IIntentReceiver rd = null;
         if (receiver != null) {
             if (mPackageInfo != null && context != null) {
@@ -1405,7 +1405,7 @@ class ContextImpl extends Context {
         try {
             final Intent intent = ActivityManager.getService().registerReceiver(
                     mMainThread.getApplicationThread(), mBasePackageName, rd, filter,
-                    broadcastPermission, userId, visibleToInstantApps);
+                    broadcastPermission, userId, flags);
             if (intent != null) {
                 intent.setExtrasClassLoader(getClassLoader());
                 intent.prepareToEnterProcess();
@@ -1447,21 +1447,13 @@ class ContextImpl extends Context {
     @Override
     public ComponentName startService(Intent service) {
         warnIfCallingFromSystemProcess();
-        return startServiceCommon(service, -1, null, false, mUser);
+        return startServiceCommon(service, false, mUser);
     }
 
     @Override
     public ComponentName startForegroundService(Intent service) {
         warnIfCallingFromSystemProcess();
-        return startServiceCommon(service, -1, null, true, mUser);
-    }
-
-    // STOPSHIP: remove when NotificationManager.startServiceInForeground() is retired
-    @Override
-    public ComponentName startServiceInForeground(Intent service,
-            int id, Notification notification) {
-        warnIfCallingFromSystemProcess();
-        return startServiceCommon(service, id, notification, false, mUser);
+        return startServiceCommon(service, true, mUser);
     }
 
     @Override
@@ -1472,29 +1464,22 @@ class ContextImpl extends Context {
 
     @Override
     public ComponentName startServiceAsUser(Intent service, UserHandle user) {
-        return startServiceCommon(service, -1, null, false, user);
+        return startServiceCommon(service, false, user);
     }
 
     @Override
     public ComponentName startForegroundServiceAsUser(Intent service, UserHandle user) {
-        return startServiceCommon(service, -1, null, true, user);
+        return startServiceCommon(service, true, user);
     }
 
-    // STOPSHIP: remove when NotificationManager.startServiceInForeground() is retired
-    @Override
-    public ComponentName startServiceInForegroundAsUser(Intent service,
-            int id, Notification notification, UserHandle user) {
-        return startServiceCommon(service, id, notification, false, user);
-    }
-
-    private ComponentName startServiceCommon(Intent service, int id, Notification notification,
-            boolean requireForeground, UserHandle user) {
+    private ComponentName startServiceCommon(Intent service, boolean requireForeground,
+            UserHandle user) {
         try {
             validateServiceIntent(service);
             service.prepareToLeaveProcess(this);
             ComponentName cn = ActivityManager.getService().startService(
                 mMainThread.getApplicationThread(), service, service.resolveTypeIfNeeded(
-                            getContentResolver()), id, notification, requireForeground,
+                            getContentResolver()), requireForeground,
                             getOpPackageName(), user.getIdentifier());
             if (cn != null) {
                 if (cn.getPackageName().equals("!")) {

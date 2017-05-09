@@ -301,7 +301,7 @@ public final class VolumeShaper implements AutoCloseable {
                 .setInterpolatorType(INTERPOLATOR_TYPE_LINEAR)
                 .setCurve(new float[] {0.f, 1.f} /* times */,
                         new float[] {0.f, 1.f} /* volumes */)
-                .setDurationMs(1000.)
+                .setDuration(1000)
                 .build();
 
         /**
@@ -314,7 +314,7 @@ public final class VolumeShaper implements AutoCloseable {
                 .setInterpolatorType(INTERPOLATOR_TYPE_CUBIC)
                 .setCurve(new float[] {0.f, 1.f} /* times */,
                         new float[] {0.f, 1.f}  /* volumes */)
-                .setDurationMs(1000.)
+                .setDuration(1000)
                 .build();
 
         /**
@@ -348,12 +348,12 @@ public final class VolumeShaper implements AutoCloseable {
             SINE_RAMP = new VolumeShaper.Configuration.Builder()
                 .setInterpolatorType(INTERPOLATOR_TYPE_CUBIC)
                 .setCurve(times, sines)
-                .setDurationMs(1000.)
+                .setDuration(1000)
                 .build();
             SCURVE_RAMP = new VolumeShaper.Configuration.Builder()
                 .setInterpolatorType(INTERPOLATOR_TYPE_CUBIC)
                 .setCurve(times, scurve)
-                .setDurationMs(1000.)
+                .setDuration(1000)
                 .build();
         }
 
@@ -569,8 +569,9 @@ public final class VolumeShaper implements AutoCloseable {
         /**
          * Returns the duration of the volume shape in milliseconds.
          */
-        public double getDurationMs() {
-            return mDurationMs;
+        public long getDuration() {
+            // casting is safe here as the duration was set as a long in the Builder
+            return (long) mDurationMs;
         }
 
         /**
@@ -700,7 +701,7 @@ public final class VolumeShaper implements AutoCloseable {
          *             .setInterpolatorType(VolumeShaper.Configuration.INTERPOLATOR_TYPE_LINEAR)
          *             .setCurve(new float[] { 0.f, 1.f }, // times
          *                       new float[] { 0.f, 1.f }) // volumes
-         *             .setDurationMs(1000.)
+         *             .setDuration(1000)
          *             .build();
          * </pre>
          * <p>
@@ -731,7 +732,7 @@ public final class VolumeShaper implements AutoCloseable {
                 mId = configuration.getId();
                 mOptionFlags = configuration.getAllOptionFlags();
                 mInterpolatorType = configuration.getInterpolatorType();
-                mDurationMs = configuration.getDurationMs();
+                mDurationMs = configuration.getDuration();
                 mTimes = configuration.getTimes().clone();
                 mVolumes = configuration.getVolumes().clone();
             }
@@ -805,17 +806,17 @@ public final class VolumeShaper implements AutoCloseable {
              *
              * If omitted, the default duration is 1 second.
              *
-             * @param durationMs
+             * @param durationMillis
              * @return the same {@code Builder} instance.
-             * @throws IllegalArgumentException if {@code durationMs}
+             * @throws IllegalArgumentException if {@code durationMillis}
              *         is not strictly positive.
              */
-            public @NonNull Builder setDurationMs(double durationMs) {
-                if (durationMs <= 0.) {
+            public @NonNull Builder setDuration(long durationMillis) {
+                if (durationMillis <= 0) {
                     throw new IllegalArgumentException(
-                            "duration: " + durationMs + " not positive");
+                            "duration: " + durationMillis + " not positive");
                 }
-                mDurationMs = durationMs;
+                mDurationMs = (double) durationMillis;
                 return this;
             }
 
@@ -833,7 +834,7 @@ public final class VolumeShaper implements AutoCloseable {
              * time (x) coordinates should be monotonically increasing, from 0.f to 1.f;
              * volume (y) coordinates must be within 0.f to 1.f.
              * <p>
-             * The time scale is set by {@link #setDurationMs}.
+             * The time scale is set by {@link #setDuration}.
              * <p>
              * @param times an array of float values representing
              *        the time line of the volume curve.

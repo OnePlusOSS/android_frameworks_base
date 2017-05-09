@@ -353,7 +353,7 @@ public class AppWidgetHostView extends FrameLayout {
      *
      * @param executor the executor to use or null.
      */
-    public void setAsyncExecutor(Executor executor) {
+    public void setExecutor(Executor executor) {
         if (mLastExecutionSignal != null) {
             mLastExecutionSignal.cancel();
             mLastExecutionSignal = null;
@@ -498,8 +498,13 @@ public class AppWidgetHostView extends FrameLayout {
     private void updateContentDescription(AppWidgetProviderInfo info) {
         if (info != null) {
             LauncherApps launcherApps = getContext().getSystemService(LauncherApps.class);
-            ApplicationInfo appInfo = launcherApps.getApplicationInfo(
-                    info.provider.getPackageName(), 0, info.getProfile());
+            ApplicationInfo appInfo = null;
+            try {
+                appInfo = launcherApps.getApplicationInfo(
+                        info.provider.getPackageName(), 0, info.getProfile());
+            } catch (NameNotFoundException e) {
+                // ignore -- use null.
+            }
             if (appInfo != null &&
                     (appInfo.flags & ApplicationInfo.FLAG_SUSPENDED) != 0) {
                 setContentDescription(

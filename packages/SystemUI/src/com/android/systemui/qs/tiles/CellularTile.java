@@ -35,8 +35,8 @@ import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.qs.DetailAdapter;
 import com.android.systemui.plugins.qs.QSIconView;
 import com.android.systemui.plugins.qs.QSTile.SignalState;
-import com.android.systemui.qs.CellTileView;
 import com.android.systemui.qs.QSHost;
+import com.android.systemui.qs.SignalTileView;
 import com.android.systemui.qs.tileimpl.QSTileImpl;
 import com.android.systemui.statusbar.policy.NetworkController;
 import com.android.systemui.statusbar.policy.NetworkController.IconState;
@@ -83,7 +83,7 @@ public class CellularTile extends QSTileImpl<SignalState> {
 
     @Override
     public QSIconView createTileView(Context context) {
-        return new CellTileView(context);
+        return new SignalTileView(context);
     }
 
     @Override
@@ -118,15 +118,6 @@ public class CellularTile extends QSTileImpl<SignalState> {
         }
 
         final Resources r = mContext.getResources();
-        final int iconId = cb.noSim ? R.drawable.ic_qs_no_sim
-                : !cb.enabled || cb.airplaneModeEnabled ? R.drawable.ic_qs_signal_disabled
-                : cb.mobileSignalIconId > 0 ? cb.mobileSignalIconId
-                : R.drawable.ic_qs_signal_no_signal;
-        if (cb.dataTypeIconId != 0) {
-            state.icon = ResourceIcon.get(cb.dataTypeIconId);
-        } else {
-            state.icon = ResourceIcon.get(iconId);
-        }
         state.activityIn = cb.enabled && cb.activityIn;
         state.activityOut = cb.enabled && cb.activityOut;
 
@@ -136,8 +127,16 @@ public class CellularTile extends QSTileImpl<SignalState> {
         state.expandedAccessibilityClassName = Switch.class.getName();
         state.value = mDataController.isMobileDataSupported()
                 && mDataController.isMobileDataEnabled();
-        state.state = cb.airplaneModeEnabled ? Tile.STATE_UNAVAILABLE
+        state.icon = ResourceIcon.get(R.drawable.ic_data_unavailable);
+        state.state = cb.airplaneModeEnabled || !cb.enabled ? Tile.STATE_UNAVAILABLE
                 : state.value ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE;
+        if (state.state == Tile.STATE_ACTIVE) {
+            state.icon = ResourceIcon.get(R.drawable.ic_data_on);
+        } else if (state.state == Tile.STATE_INACTIVE) {
+            state.icon = ResourceIcon.get(R.drawable.ic_data_off);
+        } else {
+            state.icon = ResourceIcon.get(R.drawable.ic_data_unavailable);
+        }
     }
 
     @Override
@@ -164,7 +163,6 @@ public class CellularTile extends QSTileImpl<SignalState> {
         boolean enabled;
         boolean wifiEnabled;
         boolean airplaneModeEnabled;
-        int mobileSignalIconId;
         String signalContentDescription;
         int dataTypeIconId;
         String dataContentDescription;
@@ -188,15 +186,13 @@ public class CellularTile extends QSTileImpl<SignalState> {
         @Override
         public void setMobileDataIndicators(IconState statusIcon, IconState qsIcon, int statusType,
                 int qsType, boolean activityIn, boolean activityOut, int dataActivityId,
-                int stackedDataIcon, int stackedVoiceIcon,
-                String typeContentDescription, String description, boolean isWide,
-                int subId, boolean roaming) {
+                int stackedDataIcon, int stackedVoiceIcon, String typeContentDescription,
+                String description, boolean isWide, int subId, boolean roaming) {
             if (qsIcon == null) {
                 // Not data sim, don't display.
                 return;
             }
             mInfo.enabled = qsIcon.visible;
-            mInfo.mobileSignalIconId = qsIcon.icon;
             mInfo.signalContentDescription = qsIcon.contentDescription;
             mInfo.dataTypeIconId = qsType;
             mInfo.dataContentDescription = typeContentDescription;
@@ -213,7 +209,6 @@ public class CellularTile extends QSTileImpl<SignalState> {
             mInfo.noSim = show;
             if (mInfo.noSim) {
                 // Make sure signal gets cleared out when no sims.
-                mInfo.mobileSignalIconId = 0;
                 mInfo.dataTypeIconId = 0;
                 // Show a No SIMs description to avoid emergency calls message.
                 mInfo.enabled = true;

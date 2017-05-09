@@ -22,7 +22,7 @@ import static android.app.StatusBarManager.WINDOW_STATE_HIDDEN;
 import static android.app.StatusBarManager.WINDOW_STATE_SHOWING;
 import static android.app.StatusBarManager.windowStateToString;
 
-import static com.android.systemui.statusbar.notification.NotificationInflater.InflationExceptionHandler;
+import static com.android.systemui.statusbar.notification.NotificationInflater.InflationCallback;
 import static com.android.systemui.statusbar.phone.BarTransitions.MODE_LIGHTS_OUT;
 import static com.android.systemui.statusbar.phone.BarTransitions.MODE_LIGHTS_OUT_TRANSPARENT;
 import static com.android.systemui.statusbar.phone.BarTransitions.MODE_OPAQUE;
@@ -31,6 +31,7 @@ import static com.android.systemui.statusbar.phone.BarTransitions.MODE_TRANSLUCE
 import static com.android.systemui.statusbar.phone.BarTransitions.MODE_TRANSPARENT;
 import static com.android.systemui.statusbar.phone.BarTransitions.MODE_WARNING;
 
+import android.R.style;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.NonNull;
@@ -48,10 +49,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.IntentSender;
-import android.content.pm.ActivityInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.ContentObserver;
@@ -95,6 +94,7 @@ import android.util.ArraySet;
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.Log;
+import android.view.ContextThemeWrapper;
 import android.view.Display;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -139,7 +139,6 @@ import com.android.systemui.doze.DozeLog;
 import com.android.systemui.fragments.FragmentHostManager;
 import com.android.systemui.fragments.PluginFragmentListener;
 import com.android.systemui.keyguard.KeyguardViewMediator;
-import com.android.systemui.pip.phone.PipManager;
 import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.statusbar.NotificationSwipeActionHelper.SnoozeOption;
@@ -258,7 +257,7 @@ public class StatusBar extends SystemUI implements DemoMode,
         OnHeadsUpChangedListener, VisualStabilityManager.Callback, CommandQueue.Callbacks,
         ActivatableNotificationView.OnActivatedListener,
         ExpandableNotificationRow.ExpansionLogger, NotificationData.Environment,
-        ExpandableNotificationRow.OnExpandClickListener {
+        ExpandableNotificationRow.OnExpandClickListener, InflationCallback {
     public static final boolean MULTIUSER_DEBUG = false;
 
     public static final boolean ENABLE_REMOTE_INPUT =
@@ -714,8 +713,8 @@ public class StatusBar extends SystemUI implements DemoMode,
     private LockscreenGestureLogger mLockscreenGestureLogger = new LockscreenGestureLogger();
     private NotificationIconAreaController mNotificationIconAreaController;
     private ConfigurationListener mConfigurationListener;
-    private InflationExceptionHandler mInflationExceptionHandler = this::handleInflationException;
     private boolean mReinflateNotificationsOnUserSwitched;
+    private HashMap<String, Entry> mPendingNotifications = new HashMap<>();
 
     private void recycleAllVisibilityObjects(ArraySet<NotificationVisibility> array) {
         final int N = array.size();
@@ -1114,13 +1113,10 @@ public class StatusBar extends SystemUI implements DemoMode,
         }
         mHeadsUpManager.addListener(mScrimController);
         mStackScroller.setScrimController(mScrimController);
-        mDozeScrimController = new DozeScrimController(mScrimController, context, mStackScroller,
-                mNotificationPanel);
+        mDozeScrimController = new DozeScrimController(mScrimController, context);
 
         // Other icons
         mVolumeComponent = getComponent(VolumeComponent.class);
-
-        initEmergencyCryptkeeperText();
 
         mKeyguardBottomArea.setStatusBar(this);
         mKeyguardBottomArea.setUserSetupComplete(mUserSetup);
@@ -1229,24 +1225,6 @@ public class StatusBar extends SystemUI implements DemoMode,
             }
             mNavigationBar.setCurrentSysuiVisibility(mSystemUiVisibility);
         });
-    }
-
-    private void initEmergencyCryptkeeperText() {
-        View emergencyViewStub = mStatusBarWindow.findViewById(R.id.emergency_cryptkeeper_text);
-        if (mNetworkController.hasEmergencyCryptKeeperText()) {
-            if (emergencyViewStub != null) {
-                ((ViewStub) emergencyViewStub).inflate();
-            }
-            mNetworkController.addCallback(new NetworkController.SignalCallback() {
-                @Override
-                public void setIsAirplaneMode(NetworkController.IconState icon) {
-                    recomputeDisableFlags(true /* animate */);
-                }
-            });
-        } else if (emergencyViewStub != null) {
-            ViewGroup parent = (ViewGroup) emergencyViewStub.getParent();
-            parent.removeView(emergencyViewStub);
-        }
     }
 
     /**
@@ -1358,7 +1336,10 @@ public class StatusBar extends SystemUI implements DemoMode,
     }
 
     private void inflateDismissView() {
-        mDismissView = (DismissView) LayoutInflater.from(mContext).inflate(
+        // Always inflate with a dark theme, since this sits on the scrim.
+        ContextThemeWrapper themedContext = new ContextThemeWrapper(mContext,
+                style.Theme_DeviceDefault);
+        mDismissView = (DismissView) LayoutInflater.from(themedContext).inflate(
                 R.layout.status_bar_notification_dismiss_all, mStackScroller, false);
         mDismissView.setOnButtonClickListener(new View.OnClickListener() {
             @Override
@@ -1563,29 +1544,24 @@ public class StatusBar extends SystemUI implements DemoMode,
         return new UserHandle(mCurrentUserId);
     }
 
-    public void addNotification(StatusBarNotification notification, RankingMap ranking,
-            Entry oldEntry) throws InflationException {
-        if (DEBUG) Log.d(TAG, "addNotification key=" + notification.getKey());
+    public void addNotification(StatusBarNotification notification, RankingMap ranking)
+            throws InflationException {
+        String key = notification.getKey();
+        if (DEBUG) Log.d(TAG, "addNotification key=" + key);
 
         mNotificationData.updateRanking(ranking);
         Entry shadeEntry = createNotificationViews(notification);
         boolean isHeadsUped = shouldPeek(shadeEntry);
-        if (isHeadsUped) {
-            mHeadsUpManager.showNotification(shadeEntry);
-            // Mark as seen immediately
-            setNotificationShown(notification);
-        }
-
         if (!isHeadsUped && notification.getNotification().fullScreenIntent != null) {
-            if (shouldSuppressFullScreenIntent(notification.getKey())) {
+            if (shouldSuppressFullScreenIntent(key)) {
                 if (DEBUG) {
-                    Log.d(TAG, "No Fullscreen intent: suppressed by DND: " + notification.getKey());
+                    Log.d(TAG, "No Fullscreen intent: suppressed by DND: " + key);
                 }
-            } else if (mNotificationData.getImportance(notification.getKey())
+            } else if (mNotificationData.getImportance(key)
                     < NotificationManager.IMPORTANCE_HIGH) {
                 if (DEBUG) {
                     Log.d(TAG, "No Fullscreen intent: not important enough: "
-                            + notification.getKey());
+                            + key);
                 }
             } else {
                 // Stop screensaver if the notification has a full-screen intent.
@@ -1597,7 +1573,7 @@ public class StatusBar extends SystemUI implements DemoMode,
                     Log.d(TAG, "Notification has fullScreenIntent; sending fullScreenIntent");
                 try {
                     EventLog.writeEvent(EventLogTags.SYSUI_FULLSCREEN_NOTIFICATION,
-                            notification.getKey());
+                            key);
                     notification.getNotification().fullScreenIntent.send();
                     shadeEntry.notifyFullScreenIntentLaunched();
                     mMetricsLogger.count("note_fullscreen", 1);
@@ -1605,13 +1581,45 @@ public class StatusBar extends SystemUI implements DemoMode,
                 }
             }
         }
-        addNotificationViews(shadeEntry, ranking);
+        abortExistingInflation(key);
+        mPendingNotifications.put(key, shadeEntry);
+    }
+
+    private void abortExistingInflation(String key) {
+        if (mPendingNotifications.containsKey(key)) {
+            Entry entry = mPendingNotifications.get(key);
+            entry.abortInflation();
+            mPendingNotifications.remove(key);
+        }
+        Entry addedEntry = mNotificationData.get(key);
+        if (addedEntry != null) {
+            addedEntry.abortInflation();
+        }
+    }
+
+    private void addEntry(Entry shadeEntry) {
+        boolean isHeadsUped = shouldPeek(shadeEntry);
+        if (isHeadsUped) {
+            mHeadsUpManager.showNotification(shadeEntry);
+            // Mark as seen immediately
+            setNotificationShown(shadeEntry.notification);
+        }
+        addNotificationViews(shadeEntry);
         // Recalculate the position of the sliding windows and the titles.
         setAreThereNotifications();
     }
 
+    @Override
     public void handleInflationException(StatusBarNotification notification, InflationException e) {
         handleNotificationError(notification, e.getMessage());
+    }
+
+    @Override
+    public void onAsyncInflationFinished(Entry entry) {
+        mPendingNotifications.remove(entry.key);
+        if (mNotificationData.get(entry.key) == null) {
+            addEntry(entry);
+        }
     }
 
     private boolean shouldSuppressFullScreenIntent(String key) {
@@ -1633,6 +1641,7 @@ public class StatusBar extends SystemUI implements DemoMode,
 
     public void removeNotification(String key, RankingMap ranking) {
         boolean deferRemoval = false;
+        abortExistingInflation(key);
         if (mHeadsUpManager.isHeadsUp(key)) {
             // A cancel() in repsonse to a remote input shouldn't be delayed, as it makes the
             // sending look longer than it takes.
@@ -1830,6 +1839,7 @@ public class StatusBar extends SystemUI implements DemoMode,
                 updatePublicContentView(ent, ent.notification);
             }
             ent.row.setSensitive(sensitive, deviceSensitive);
+            ent.row.setNeedsRedaction(needsRedaction(ent));
             if (mGroupManager.isChildInGroupWithSummary(ent.row.getStatusBarNotification())) {
                 ExpandableNotificationRow summary = mGroupManager.getGroupSummary(
                         ent.row.getStatusBarNotification());
@@ -1918,6 +1928,21 @@ public class StatusBar extends SystemUI implements DemoMode,
         mNotificationIconAreaController.updateNotificationIcons(mNotificationData);
     }
 
+    /** @return true if the entry needs redaction when on the lockscreen. */
+    private boolean needsRedaction(Entry ent) {
+        int userId = ent.notification.getUserId();
+
+        boolean currentUserWantsRedaction = !userAllowsPrivateNotificationsInPublic(mCurrentUserId);
+        boolean notiUserWantsRedaction = !userAllowsPrivateNotificationsInPublic(userId);
+        boolean redactedLockscreen = currentUserWantsRedaction || notiUserWantsRedaction;
+
+        boolean notificationRequestsRedaction =
+                ent.notification.getNotification().visibility == Notification.VISIBILITY_PRIVATE;
+        boolean userForcesRedaction = packageHasVisibilityOverride(ent.notification.getKey());
+
+        return userForcesRedaction || notificationRequestsRedaction && redactedLockscreen;
+    }
+
     /**
      * Disable QS if device not provisioned.
      * If the user switcher is simple then disable QS during setup because
@@ -1928,6 +1953,7 @@ public class StatusBar extends SystemUI implements DemoMode,
                 && (mUserSetup || mUserSwitcherController == null
                         || !mUserSwitcherController.isSimpleUserSwitcher())
                 && ((mDisabled2 & StatusBarManager.DISABLE2_QUICK_SETTINGS) == 0)
+                && !mDozing
                 && !ONLY_CORE_APPS);
     }
 
@@ -3297,6 +3323,14 @@ public class StatusBar extends SystemUI implements DemoMode,
                     + " scroll " + mStackScroller.getScrollX()
                     + "," + mStackScroller.getScrollY());
         }
+        pw.print("  mPendingNotifications=");
+        if (mPendingNotifications.size() == 0) {
+            pw.println("null");
+        } else {
+            for (Entry entry : mPendingNotifications.values()) {
+                pw.println(entry.notification);
+            }
+        }
 
         pw.print("  mInteractingWindows="); pw.println(mInteractingWindows);
         pw.print("  mStatusBarWindowState=");
@@ -4332,6 +4366,8 @@ public class StatusBar extends SystemUI implements DemoMode,
         mStackScroller.setDark(mDozing, animate, mWakeUpTouchLocation);
         mScrimController.setDozing(mDozing);
         mKeyguardIndicationController.setDozing(mDozing);
+        mNotificationPanel.setDark(mDozing);
+        updateQsExpansionEnabled();
 
         // Immediately abort the dozing from the doze scrim controller in case of wake-and-unlock
         // for pulsing so the Keyguard fade-out animation scrim can take over.
@@ -4958,6 +4994,7 @@ public class StatusBar extends SystemUI implements DemoMode,
         mDozing = mDozingRequested && mState == StatusBarState.KEYGUARD
                 || mFingerprintUnlockController.getMode()
                         == FingerprintUnlockController.MODE_WAKE_AND_UNLOCK_PULSING;
+        mStatusBarWindowManager.setDozing(mDozing);
         updateDozingState();
         Trace.endSection();
     }
@@ -5063,6 +5100,16 @@ public class StatusBar extends SystemUI implements DemoMode,
         @Override
         public void startPendingIntentDismissingKeyguard(PendingIntent intent) {
             StatusBar.this.startPendingIntentDismissingKeyguard(intent);
+        }
+
+        @Override
+        public void abortPulsing() {
+            mDozeScrimController.abortPulsing();
+        }
+
+        @Override
+        public void extendPulse() {
+            mDozeScrimController.extendPulse();
         }
 
     }
@@ -5520,7 +5567,7 @@ public class StatusBar extends SystemUI implements DemoMode,
                 public void run() {
                     for (StatusBarNotification sbn : notifications) {
                         try {
-                            addNotification(sbn, currentRanking, null /* oldEntry */);
+                            addNotification(sbn, currentRanking);
                         } catch (InflationException e) {
                             handleInflationException(sbn, e);
                         }
@@ -5563,7 +5610,7 @@ public class StatusBar extends SystemUI implements DemoMode,
                             if (isUpdate) {
                                 updateNotification(sbn, rankingMap);
                             } else {
-                                addNotification(sbn, rankingMap, null /* oldEntry */);
+                                addNotification(sbn, rankingMap);
                             }
                         } catch (InflationException e) {
                             handleInflationException(sbn, e);
@@ -5763,6 +5810,9 @@ public class StatusBar extends SystemUI implements DemoMode,
             snoozeGuts.setSnoozeListener(mStackScroller.getSwipeActionHelper());
             snoozeGuts.setStatusBarNotification(sbn);
             snoozeGuts.setSnoozeOptions(row.getEntry().snoozeCriteria);
+            guts.setHeightChangedListener((NotificationGuts g) -> {
+                mStackScroller.onHeightChanged(row, row.isShown() /* needsAnimation */);
+            });
         }
 
         if (gutsView instanceof NotificationInfo) {
@@ -5864,6 +5914,9 @@ public class StatusBar extends SystemUI implements DemoMode,
                 }
 
                 final ExpandableNotificationRow row = (ExpandableNotificationRow) v;
+                if (row.isDark()) {
+                    return false;
+                }
                 bindGuts(row, item);
                 NotificationGuts guts = row.getGuts();
 
@@ -5911,8 +5964,10 @@ public class StatusBar extends SystemUI implements DemoMode,
                             }
                         });
                         a.start();
-                        guts.setExposed(true /* exposed */,
-                                mState == StatusBarState.KEYGUARD /* needsFalsingProtection */);
+                        final boolean needsFalsingProtection =
+                                (mState == StatusBarState.KEYGUARD &&
+                                !mAccessibilityManager.isTouchExplorationEnabled());
+                        guts.setExposed(true /* exposed */, needsFalsingProtection);
                         row.closeRemoteInput();
                         mStackScroller.onHeightChanged(row, true /* needsAnimation */);
                         mNotificationGutsExposed = guts;
@@ -6113,8 +6168,7 @@ public class StatusBar extends SystemUI implements DemoMode,
         }
     }
 
-    protected void inflateViews(Entry entry, ViewGroup parent) throws
-            InflationException {
+    protected void inflateViews(Entry entry, ViewGroup parent) {
         PackageManager pmUser = getPackageManagerForUser(mContext,
                 entry.notification.getUser().getIdentifier());
 
@@ -6135,7 +6189,7 @@ public class StatusBar extends SystemUI implements DemoMode,
             row.setRemoteInputController(mRemoteInputController);
             row.setOnExpandClickListener(this);
             row.setRemoteViewClickHandler(mOnClickHandler);
-            row.setInflateExceptionHandler(mInflationExceptionHandler);
+            row.setInflationCallback(this);
 
             // Get the app name.
             // Note that Notification.Builder#bindHeaderAppName has similar logic
@@ -6163,6 +6217,7 @@ public class StatusBar extends SystemUI implements DemoMode,
             }
         }
 
+        row.setNeedsRedaction(needsRedaction(entry));
         boolean isLowPriority = mNotificationData.isAmbient(sbn.getKey());
         row.setIsLowPriority(isLowPriority);
         // bind the click event to the content area
@@ -6369,17 +6424,10 @@ public class StatusBar extends SystemUI implements DemoMode,
                                             .getIdentifier();
                                     if (mLockPatternUtils.isSeparateProfileChallengeEnabled(userId)
                                             && mKeyguardManager.isDeviceLocked(userId)) {
-                                        boolean canBypass = false;
-                                        try {
-                                            canBypass = ActivityManager.getService()
-                                                    .canBypassWorkChallenge(intent);
-                                        } catch (RemoteException e) {
-                                        }
-                                        // For direct-boot aware activities, they can be shown when
-                                        // the device is still locked without triggering the work
-                                        // challenge.
-                                        if ((!canBypass) && startWorkChallengeIfNecessary(userId,
-                                                    intent.getIntentSender(), notificationKey)) {
+                                        // TODO(b/28935539): should allow certain activities to
+                                        // bypass work challenge
+                                        if (startWorkChallengeIfNecessary(userId,
+                                                intent.getIntentSender(), notificationKey)) {
                                             // Show work challenge, do not run PendingIntent and
                                             // remove notification
                                             return;
@@ -6534,18 +6582,17 @@ public class StatusBar extends SystemUI implements DemoMode,
         NotificationData.Entry entry = new NotificationData.Entry(sbn);
         Dependency.get(LeakDetector.class).trackInstance(entry);
         entry.createIcons(mContext, sbn);
-
         // Construct the expanded view.
         inflateViews(entry, mStackScroller);
         return entry;
     }
 
-    protected void addNotificationViews(Entry entry, RankingMap ranking) {
+    protected void addNotificationViews(Entry entry) {
         if (entry == null) {
             return;
         }
         // Add the expanded view and icon.
-        mNotificationData.add(entry, ranking);
+        mNotificationData.add(entry);
         updateNotifications();
     }
 
@@ -6663,6 +6710,7 @@ public class StatusBar extends SystemUI implements DemoMode,
         if (DEBUG) Log.d(TAG, "updateNotification(" + notification + ")");
 
         final String key = notification.getKey();
+        abortExistingInflation(key);
         Entry entry = mNotificationData.get(key);
         if (entry == null) {
             return;

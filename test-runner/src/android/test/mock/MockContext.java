@@ -492,7 +492,7 @@ public class MockContext extends Context {
 
     @Override
     public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
-            boolean visibleToInstantApps) {
+            int flags) {
         throw new UnsupportedOperationException();
     }
 
@@ -504,7 +504,7 @@ public class MockContext extends Context {
 
     @Override
     public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
-            String broadcastPermission, Handler scheduler, boolean visibleToInstantApps) {
+            String broadcastPermission, Handler scheduler, int flags) {
         throw new UnsupportedOperationException();
     }
 
@@ -530,13 +530,6 @@ public class MockContext extends Context {
         throw new UnsupportedOperationException();
     }
 
-    /** STOPSHIP remove when trial API is turned down */
-    @Override
-    public ComponentName startServiceInForeground(Intent service,
-            int id, Notification notification) {
-        throw new UnsupportedOperationException();
-    }
-
     @Override
     public boolean stopService(Intent service) {
         throw new UnsupportedOperationException();
@@ -551,13 +544,6 @@ public class MockContext extends Context {
     /** @hide */
     @Override
     public ComponentName startForegroundServiceAsUser(Intent service, UserHandle user) {
-        throw new UnsupportedOperationException();
-    }
-
-    /** @hide STOPSHIP removed when trial API is turned down */
-    @Override
-    public ComponentName startServiceInForegroundAsUser(Intent service,
-            int id, Notification notification, UserHandle user) {
         throw new UnsupportedOperationException();
     }
 

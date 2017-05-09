@@ -2778,26 +2778,26 @@
         <public name="paddingVertical" />
         <public name="fontStyle" />
         <public name="keyboardNavigationCluster" />
-        <public name="targetProcess" />
+        <public name="targetProcesses" />
         <public name="nextClusterForward" />
         <public name="__removed1" />
         <public name="colorError" />
         <public name="focusedByDefault" />
         <public name="appCategory" />
         <public name="autoSizeMaxTextSize" />
-        <public name="supportsDismissingWindow" />
-        <public name="restartOnConfigChanges" />
+        <public name="__removed2" />
+        <public name="recreateOnConfigChanges" />
         <public name="certDigest" />
         <public name="splitName" />
         <public name="colorMode" />
         <public name="isolatedSplits" />
         <public name="targetSandboxVersion" />
-        <public name="canCaptureFingerprintGestures" />
+        <public name="canRequestFingerprintGestures" />
         <public name="alphabeticModifiers" />
         <public name="numericModifiers" />
         <public name="fontProviderAuthority" />
         <public name="fontProviderQuery" />
-        <public name="autofillMode" />
+        <public name="__removed3" />
         <public name="primaryContentAlpha" />
         <public name="secondaryContentAlpha" />
         <public name="requiredFeature" />
@@ -2814,6 +2814,15 @@
         <public name="iconTintMode" />
         <public name="maxAspectRatio"/>
         <public name="iconSpaceReserved"/>
+        <public name="defaultFocusHighlightEnabled" />
+        <public name="persistentWhenFeatureAvailable"/>
+        <public name="windowSplashscreenContent" />
+        <!-- @hide @SystemApi -->
+        <public name="requiredSystemPropertyName" />
+        <!-- @hide @SystemApi -->
+        <public name="requiredSystemPropertyValue" />
+        <public name="justificationMode" />
+        <public name="autofilledHighlight" />
     </public-group>
 
     <public-group type="style" first-id="0x010302e0">
@@ -2825,10 +2834,9 @@
         <public name="autofill" />
     </public-group>
 
-    <public-group type="drawable" first-id="0x010800b4">
-        <public name="autofilled_highlight" />
+    <public-group type="string" first-id="0x01040019">
+        <public name="paste_as_plain_text" />
     </public-group>
-
 
   <!-- ===============================================================
        DO NOT ADD UN-GROUPED ITEMS HERE

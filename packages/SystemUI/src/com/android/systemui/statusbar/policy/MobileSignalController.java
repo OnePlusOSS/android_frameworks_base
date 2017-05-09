@@ -37,6 +37,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.telephony.TelephonyIntents;
 import com.android.internal.telephony.cdma.EriInfo;
 import com.android.systemui.R;
+import com.android.systemui.statusbar.phone.SignalDrawable;
 import com.android.systemui.statusbar.policy.NetworkController.IconState;
 import com.android.systemui.statusbar.policy.NetworkController.SignalCallback;
 import com.android.systemui.statusbar.policy.NetworkControllerImpl.Config;
@@ -250,6 +251,46 @@ public class MobileSignalController extends SignalController<
         mNetworkToIconLookup.put(TelephonyManager.NETWORK_TYPE_IWLAN, TelephonyIcons.WFC);
     }
 
+    private int getNumLevels() {
+        return SignalStrength.NUM_SIGNAL_STRENGTH_BINS;
+    }
+
+    @Override
+    public int getCurrentIconId() {
+        if (mCurrentState.iconGroup == TelephonyIcons.CARRIER_NETWORK_CHANGE) {
+            return SignalDrawable.getCarrierChangeState(getNumLevels());
+        } else if (mCurrentState.connected) {
+            if (mConfig.readIconsFromXml) {
+                return getIcons().mSingleSignalIcon;
+            } else {
+                return SignalDrawable.getState(mCurrentState.level, getNumLevels(),
+                    mCurrentState.inetCondition == 0);
+            }
+        } else if (mCurrentState.enabled) {
+            if (mConfig.readIconsFromXml) {
+                return getIcons().mSbDiscState;
+            } else {
+                return SignalDrawable.getEmptyState(getNumLevels());
+            }
+        } else {
+            return 0;
+        }
+    }
+
+    @Override
+    public int getQsCurrentIconId() {
+        if (mCurrentState.iconGroup == TelephonyIcons.CARRIER_NETWORK_CHANGE) {
+            return SignalDrawable.getCarrierChangeState(getNumLevels());
+        } else if (mCurrentState.connected) {
+            return SignalDrawable.getState(mCurrentState.level, getNumLevels(),
+                    mCurrentState.inetCondition == 0);
+        } else if (mCurrentState.enabled) {
+            return SignalDrawable.getEmptyState(getNumLevels());
+        } else {
+            return 0;
+        }
+    }
+
     @Override
     public void notifyListeners(SignalCallback callback) {
         if (mConfig.readIconsFromXml) {
@@ -286,6 +327,7 @@ public class MobileSignalController extends SignalController<
         showDataIcon &= mCurrentState.isDefault || dataDisabled;
         showDataIcon &= mStyle == STATUS_BAR_STYLE_ANDROID_DEFAULT;
         int typeIcon = showDataIcon ? icons.mDataType : 0;
+
         int dataActivityId = showMobileActivity() ? 0 : icons.mActivityId;
         callback.setMobileDataIndicators(statusIcon, qsIcon, typeIcon, qsTypeIcon,
                 activityIn, activityOut, dataActivityId,
@@ -297,15 +339,6 @@ public class MobileSignalController extends SignalController<
     @Override
     protected MobileState cleanState() {
         return new MobileState();
-    }
-
-    @Override
-    public int getCurrentIconId() {
-        if (mConfig.readIconsFromXml && mCurrentState.connected) {
-            return getIcons().mSingleSignalIcon;
-        } else {
-            return super.getCurrentIconId();
-        }
     }
 
     private boolean hasService() {
@@ -493,11 +526,7 @@ public class MobileSignalController extends SignalController<
         final int voiceType = getVoiceNetworkType();
         final int dataType =  getDataNetworkType();
 
-        int[][] sbIcons = TelephonyIcons.TELEPHONY_SIGNAL_STRENGTH;
-        int[][] qsIcons = TelephonyIcons.QS_TELEPHONY_SIGNAL_STRENGTH;
         int[] contentDesc = AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH;
-        int sbDiscState = TelephonyIcons.TELEPHONY_NO_NETWORK;
-        int qsDiscState = TelephonyIcons.QS_TELEPHONY_NO_NETWORK;
         int discContentDesc = AccessibilityContentDescriptions.PHONE_SIGNAL_STRENGTH[0];
         int dataContentDesc, dataTypeIcon, qsDataTypeIcon, dataActivityId;
         int singleSignalIcon, stackedDataIcon = 0, stackedVoiceIcon = 0;
@@ -556,7 +585,7 @@ public class MobileSignalController extends SignalController<
         if (stackedVoiceIcon == 0) stackedDataIcon = 0;
 
         contentDesc = TelephonyIcons.getSignalStrengthDes(slotId);
-        sbDiscState = TelephonyIcons.getSignalNullIcon(slotId);
+        int sbDiscState = TelephonyIcons.getSignalNullIcon(slotId);
         if (DEBUG) {
             Log.d(mTag, "singleSignalIcon=" + getResourceName(singleSignalIcon)
                     + " dataActivityId=" + getResourceName(dataActivityId)
@@ -583,7 +612,7 @@ public class MobileSignalController extends SignalController<
         }
         mCurrentState.iconGroup = new MobileIconGroup(
                 TelephonyManager.getNetworkTypeName(dataType),
-                sbIcons, qsIcons, contentDesc, 0, 0, sbDiscState, qsDiscState, discContentDesc,
+                null, null, contentDesc, 0, 0, sbDiscState, 0, discContentDesc,
                 dataContentDesc, dataTypeIcon, false, qsDataTypeIcon,
                 singleSignalIcon, stackedDataIcon, stackedVoiceIcon, dataActivityId);
     }

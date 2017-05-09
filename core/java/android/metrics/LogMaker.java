@@ -54,7 +54,11 @@ public class LogMaker {
 
     /* Deserialize from the eventlog */
     public LogMaker(Object[] items) {
-      deserialize(items);
+        if (items != null) {
+            deserialize(items);
+        } else {
+            setCategory(MetricsEvent.VIEW_UNKNOWN);
+        }
     }
 
     /** @param category to replace the existing setting. */
@@ -90,6 +94,16 @@ public class LogMaker {
     /** Set the subtype to 0. */
     public LogMaker clearSubtype() {
         entries.remove(MetricsEvent.RESERVED_FOR_LOGBUILDER_SUBTYPE);
+        return this;
+    }
+
+    /**
+     * Set event latency.
+     *
+     * @hide // TODO Expose in the future?  Too late for O.
+     */
+    public LogMaker setLatency(long milliseconds) {
+        entries.put(MetricsEvent.NOTIFICATION_SINCE_CREATE_MILLIS, milliseconds);
         return this;
     }
 
@@ -152,6 +166,27 @@ public class LogMaker {
      */
     public LogMaker clearProcessId() {
         entries.remove(MetricsEvent.RESERVED_FOR_LOGBUILDER_PID);
+        return this;
+    }
+
+    /**
+     * This will be set by the system when the log is persisted.
+     * Client-supplied values will be ignored.
+     *
+     * @param uid to replace the existing setting.
+     * @hide
+     */
+    public LogMaker setUid(int uid) {
+        entries.put(MetricsEvent.RESERVED_FOR_LOGBUILDER_UID, uid);
+        return this;
+    }
+
+    /**
+     * Remove the UID property.
+     * @hide
+     */
+    public LogMaker clearUid() {
+        entries.remove(MetricsEvent.RESERVED_FOR_LOGBUILDER_UID);
         return this;
     }
 
@@ -305,6 +340,16 @@ public class LogMaker {
         }
     }
 
+    /** @return the UID of the log, or -1. */
+    public int getUid() {
+        Object obj = entries.get(MetricsEvent.RESERVED_FOR_LOGBUILDER_UID);
+        if (obj instanceof Integer) {
+            return (Integer) obj;
+        } else {
+            return -1;
+        }
+    }
+
     /** @return the name of the counter, or null. */
     public String getCounterName() {
         Object obj = entries.get(MetricsEvent.RESERVED_FOR_LOGBUILDER_NAME);
@@ -363,13 +408,13 @@ public class LogMaker {
      */
     public void deserialize(Object[] items) {
         int i = 0;
-        while (i < items.length) {
+        while (items != null && i < items.length) {
             Object key = items[i++];
             Object value = i < items.length ? items[i++] : null;
             if (key instanceof Integer) {
                 entries.put((Integer) key, value);
             } else {
-                Log.i(TAG, "Invalid key " + key.toString());
+                Log.i(TAG, "Invalid key " + (key == null ? "null" : key.toString()));
             }
         }
     }

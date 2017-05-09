@@ -126,6 +126,7 @@
     <protected-broadcast android:name="android.bluetooth.adapter.action.DISCOVERY_STARTED" />
     <protected-broadcast android:name="android.bluetooth.adapter.action.DISCOVERY_FINISHED" />
     <protected-broadcast android:name="android.bluetooth.adapter.action.LOCAL_NAME_CHANGED" />
+    <protected-broadcast android:name="android.bluetooth.adapter.action.BLUETOOTH_ADDRESS_CHANGED" />
     <protected-broadcast android:name="android.bluetooth.adapter.action.CONNECTION_STATE_CHANGED" />
     <protected-broadcast android:name="android.bluetooth.device.action.UUID" />
     <protected-broadcast android:name="android.bluetooth.device.action.MAS_INSTANCE" />
@@ -375,8 +376,6 @@
     <protected-broadcast android:name="android.nfc.handover.intent.action.TRANSFER_PROGRESS" />
     <protected-broadcast android:name="android.nfc.handover.intent.action.TRANSFER_DONE" />
 
-    <protected-broadcast android:name="android.intent.action.ACTION_DEFAULT_SUBSCRIPTION_CHANGED" />
-    <protected-broadcast android:name="android.intent.action.ACTION_DEFAULT_SMS_SUBSCRIPTION_CHANGED" />
     <protected-broadcast android:name="android.intent.action.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED" />
     <protected-broadcast android:name="android.intent.action.ACTION_DEFAULT_VOICE_SUBSCRIPTION_CHANGED" />
     <protected-broadcast android:name="android.intent.action.ACTION_SUBINFO_CONTENT_CHANGE" />
@@ -444,6 +443,8 @@
     <protected-broadcast android:name="android.telecom.action.PHONE_ACCOUNT_UNREGISTERED" />
     <protected-broadcast android:name="android.telecom.action.SHOW_MISSED_CALLS_NOTIFICATION" />
     <protected-broadcast android:name="android.telephony.action.CARRIER_CONFIG_CHANGED" />
+    <protected-broadcast android:name="android.telephony.action.DEFAULT_SUBSCRIPTION_CHANGED" />
+    <protected-broadcast android:name="android.telephony.action.DEFAULT_SMS_SUBSCRIPTION_CHANGED" />
     <protected-broadcast android:name="android.telephony.action.SHOW_VOICEMAIL_NOTIFICATION" />
 
     <protected-broadcast android:name="com.android.bluetooth.btservice.action.ALARM_WAKEUP" />
@@ -491,7 +492,9 @@
     <protected-broadcast android:name="android.intent.action.ACTION_RADIO_OFF" />
 
     <protected-broadcast android:name="android.accounts.LOGIN_ACCOUNTS_CHANGED" />
+    <protected-broadcast android:name="android.accounts.action.ACCOUNT_REMOVED" />
     <protected-broadcast android:name="android.accounts.action.VISIBLE_ACCOUNTS_CHANGED" />
+
     <protected-broadcast android:name="com.android.sync.SYNC_CONN_STATUS_CHANGED" />
 
     <protected-broadcast android:name="com.android.phone.SIP_INCOMING_CALL" />
@@ -535,6 +538,7 @@
     <protected-broadcast android:name="android.media.tv.action.PREVIEW_PROGRAM_ADDED_TO_WATCH_NEXT" />
     <protected-broadcast android:name="android.media.tv.action.PREVIEW_PROGRAM_BROWSABLE_DISABLED" />
     <protected-broadcast android:name="android.media.tv.action.WATCH_NEXT_PROGRAM_BROWSABLE_DISABLED" />
+    <protected-broadcast android:name="android.media.tv.action.CHANNEL_BROWSABLE_REQUESTED" />
 
     <!-- ====================================================================== -->
     <!--                          RUNTIME PERMISSIONS                           -->
@@ -822,16 +826,6 @@
         android:description="@string/permdesc_callPhone"
         android:protectionLevel="dangerous" />
 
-    <!-- Allows an application to manage its own calls, but rely on the system to route focus to the
-         currently active call.
-        <p>Protection level: dangerous
-    -->
-    <permission android:name="android.permission.MANAGE_OWN_CALLS"
-        android:permissionGroup="android.permission-group.PHONE"
-        android:label="@string/permlab_manageOwnCalls"
-        android:description="@string/permdesc_manageOwnCalls"
-        android:protectionLevel="dangerous" />
-
     <!-- Allows an application to access the IMS call service: making and
          modifying a call
         <p>Protection level: signature|privileged
@@ -919,6 +913,16 @@
         android:description="@string/permdesc_answerPhoneCalls"
         android:protectionLevel="dangerous|runtime" />
 
+    <!-- Allows a calling application which manages it own calls through the self-managed
+         {@link android.telecom.ConnectionService} APIs.  See
+         {@link android.telecom.PhoneAccount#CAPABILITY_SELF_MANAGED for more information on the
+         self-managed ConnectionService APIs.
+         <p>Protection level: normal
+    -->
+    <permission android:name="android.permission.MANAGE_OWN_CALLS"
+                android:label="@string/permlab_manageOwnCalls"
+                android:description="@string/permdesc_manageOwnCalls"
+                android:protectionLevel="normal" />
 
     <!-- ====================================================================== -->
     <!-- Permissions for accessing the device microphone                        -->
@@ -1151,6 +1155,11 @@
          <p>Not for use by third-party applications. -->
     <permission android:name="android.permission.MODIFY_CELL_BROADCASTS"
                 android:protectionLevel="signature|privileged" />
+
+    <!-- Allows an application to authorize outgoing SMS messages.
+         @hide -->
+    <permission android:name="com.qti.permission.AUTHORIZE_OUTGOING_SMS"
+                android:protectionLevel="signature" />
 
     <!-- =============================================================== -->
     <!-- Permissions for setting the device alarm                        -->
@@ -1522,6 +1531,16 @@
     <permission android:name="android.permission.DVB_DEVICE"
         android:protectionLevel="signature|privileged" />
 
+    <!-- @SystemApi Allows reading and enabling/disabling the OEM unlock allowed by carrier state
+         @hide <p>Not for use by third-party applications. -->
+    <permission android:name="android.permission.MANAGE_CARRIER_OEM_UNLOCK_STATE"
+        android:protectionLevel="signature|privileged" />
+
+    <!-- @SystemApi Allows reading and enabling/disabling the OEM unlock allowed by user state
+         @hide <p>Not for use by third-party applications. -->
+    <permission android:name="android.permission.MANAGE_USER_OEM_UNLOCK_STATE"
+        android:protectionLevel="signature|privileged" />
+
     <!-- @SystemApi Allows reading the OEM unlock state
          @hide <p>Not for use by third-party applications. -->
     <permission android:name="android.permission.READ_OEM_UNLOCK_STATE"
@@ -1683,7 +1702,8 @@
     <permission android:name="android.permission.CACHE_CONTENT"
         android:protectionLevel="signature" />
 
-    <!-- Allows an application to aggressively allocate disk space.
+    <!-- @SystemApi @hide
+         Allows an application to aggressively allocate disk space.
          <p>Not for use by third-party applications.
     -->
     <permission android:name="android.permission.ALLOCATE_AGGRESSIVE"
@@ -1846,21 +1866,39 @@
         android:description="@string/permdesc_systemAlertWindow"
         android:protectionLevel="signature|preinstalled|appop|pre23|development" />
 
-    <!-- Allows an app to run in the background.
-         <p>Protection level: signature
+    <!-- @deprecated Use {@link android.Manifest.permission#REQUEST_COMPANION_RUN_IN_BACKGROUND}
+         @hide
     -->
     <permission android:name="android.permission.RUN_IN_BACKGROUND"
         android:label="@string/permlab_runInBackground"
         android:description="@string/permdesc_runInBackground"
         android:protectionLevel="signature" />
 
-    <!-- Allows an app to use data in the background.
-         <p>Protection level: signature
+    <!-- @deprecated Use
+        {@link android.Manifest.permission#REQUEST_COMPANION_USE_DATA_IN_BACKGROUND}
+         @hide
     -->
     <permission android:name="android.permission.USE_DATA_IN_BACKGROUND"
         android:label="@string/permlab_useDataInBackground"
         android:description="@string/permdesc_useDataInBackground"
         android:protectionLevel="signature" />
+
+    <!-- Allows a companion app to run in the background.
+         <p>Protection level: normal
+    -->
+    <permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND"
+                android:label="@string/permlab_runInBackground"
+                android:description="@string/permdesc_runInBackground"
+                android:protectionLevel="normal" />
+
+    <!-- Allows a companion app to use data in the background.
+         <p>Protection level: normal
+    -->
+    <permission android:name="android.permission.REQUEST_COMPANION_USE_DATA_IN_BACKGROUND"
+                android:label="@string/permlab_useDataInBackground"
+                android:description="@string/permdesc_useDataInBackground"
+                android:protectionLevel="normal" />
+
 
     <!-- ================================== -->
     <!-- Permissions affecting the system wallpaper -->
@@ -2471,13 +2509,11 @@
          to ensure that only the system can bind to it.
          <p>Protection level: signature
     -->
-    <permission android:name="android.permission.BIND_AUTOFILL"
+    <permission android:name="android.permission.BIND_AUTOFILL_SERVICE"
         android:protectionLevel="signature" />
 
-    <!--  TODO(b/35956626): temporary until clients change to BIND_AUTOFILL
-         <p>Protection level: signature
-    -->
-    <permission android:name="android.permission.BIND_AUTO_FILL"
+    <!-- @hide TODO(b/37563972): remove once clients use BIND_AUTOFILL_SERVICE -->
+    <permission android:name="android.permission.BIND_AUTOFILL"
         android:protectionLevel="signature" />
 
     <!-- Must be required by hotword enrollment application,
@@ -3147,6 +3183,14 @@
     <permission android:name="android.permission.BIND_CHOOSER_TARGET_SERVICE"
         android:protectionLevel="signature" />
 
+    <!-- @SystemApi Must be held by services that extend
+         {@link android.service.resolver.ResolverRankerService}.
+         <p>Protection level: signature|privileged
+         @hide
+    -->
+    <permission android:name="android.permission.PROVIDE_RESOLVER_RANKER_SERVICE"
+                android:protectionLevel="signature|privileged" />
+
     <!-- @SystemApi Must be required by services that extend
          {@link android.service.resolver.ResolverRankerService}, to ensure that only the system can
          bind to them.
@@ -3314,6 +3358,8 @@
         android:protectionLevel="signature" />
 
     <!-- Must be required by system apps when accessing restricted VR APIs.
+         @hide
+         @SystemApi
          <p>Protection level: signature -->
     <permission android:name="android.permission.RESTRICTED_VR_ACCESS"
         android:protectionLevel="signature|preinstalled" />
@@ -3542,6 +3588,11 @@
                 android:process=":ui">
         </activity>
 
+        <activity android:name="com.android.settings.notification.NotificationAccessConfirmationActivity"
+                  android:theme="@android:style/Theme.DeviceDefault.Light.Dialog.Alert"
+                  android:excludeFromRecents="true">
+        </activity>
+
         <receiver android:name="com.android.server.BootReceiver"
                 android:systemUserOnly="true">
             <intent-filter android:priority="1000">
@@ -3601,6 +3652,22 @@
                 android:permission="android.permission.UPDATE_CONFIG">
             <intent-filter>
                 <action android:name="android.intent.action.UPDATE_CT_LOGS" />
+                <data android:scheme="content" android:host="*" android:mimeType="*/*" />
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name="com.android.server.updates.LangIdInstallReceiver"
+                android:permission="android.permission.UPDATE_CONFIG">
+            <intent-filter>
+                <action android:name="android.intent.action.UPDATE_LANG_ID" />
+                <data android:scheme="content" android:host="*" android:mimeType="*/*" />
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name="com.android.server.updates.SmartSelectionInstallReceiver"
+                android:permission="android.permission.UPDATE_CONFIG">
+            <intent-filter>
+                <action android:name="android.intent.action.UPDATE_SMART_SELECTION" />
                 <data android:scheme="content" android:host="*" android:mimeType="*/*" />
             </intent-filter>
         </receiver>
@@ -3666,14 +3733,6 @@
 
         <service android:name="com.android.server.PreloadsFileCacheExpirationJobService"
                  android:permission="android.permission.BIND_JOB_SERVICE" >
-        </service>
-
-        <service android:name="com.android.internal.app.LRResolverRankerService"
-            android:permission="android.permission.BIND_RESOLVER_RANKER_SERVICE"
-            android:priority="-1" >
-            <intent-filter>
-                <action android:name="android.service.resolver.ResolverRankerService" />
-            </intent-filter>
         </service>
     </application>
 

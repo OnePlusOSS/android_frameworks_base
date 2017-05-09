@@ -32,6 +32,7 @@ LOCAL_CFLAGS += -DGL_GLEXT_PROTOTYPES -DEGL_EGLEXT_PROTOTYPES
 LOCAL_CFLAGS += -DU_USING_ICU_NAMESPACE=0
 
 LOCAL_SRC_FILES:= \
+    android_util_SeempLog.cpp \
     AndroidRuntime.cpp \
     com_android_internal_content_NativeLibraryHelper.cpp \
     com_google_android_gles_jni_EGLImpl.cpp \
@@ -96,6 +97,8 @@ LOCAL_SRC_FILES:= \
     android_os_SystemProperties.cpp \
     android_os_Trace.cpp \
     android_os_UEventObserver.cpp \
+    android_os_VintfObject.cpp \
+    android_os_VintfRuntimeInfo.cpp \
     android_net_LocalSocketImpl.cpp \
     android_net_NetUtils.cpp \
     android_net_TrafficStats.cpp \
@@ -197,6 +200,7 @@ LOCAL_C_INCLUDES += \
     $(JNI_H_INCLUDE) \
     $(LOCAL_PATH)/android/graphics \
     $(LOCAL_PATH)/../../libs/hwui \
+    $(LOCAL_PATH)/../../libs/regionalization \
     $(LOCAL_PATH)/../../../native/vulkan/include \
     $(call include-path-for, bluedroid) \
     $(call include-path-for, libhardware)/hardware \
@@ -233,6 +237,7 @@ LOCAL_STATIC_LIBRARIES := \
     libseccomp_policy \
     libselinux \
     libcrypto \
+    libgrallocusage \
 
 LOCAL_SHARED_LIBRARIES := \
     libmemtrack \
@@ -289,6 +294,7 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_SHARED_LIBRARIES += \
     libhwui \
     libdl \
+    libregionalization
 
 # our headers include libnativewindow's public headers
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := \

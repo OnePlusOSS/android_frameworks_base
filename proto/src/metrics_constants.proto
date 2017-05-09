@@ -3636,7 +3636,7 @@ message MetricsEvent {
     // OS: N
     ACTION_GET_CONTACT = 864;
 
-    // This values should never appear in log outputs - it is reserved for
+    // This value should never appear in log outputs - it is reserved for
     // internal platform metrics use.
     RESERVED_FOR_LOGBUILDER_PID = 865;
 
@@ -3905,6 +3905,57 @@ message MetricsEvent {
     // CATEGORY: SETTINGS
     // OS: O
     FINGERPRINT_REMOVE_SIDECAR = 934;
+
+    // OPEN: Settings > Storage > Movies & TV
+    // CATEGORY: SETTINGS
+    // OS: O
+    APPLICATIONS_STORAGE_MOVIES = 935;
+
+    // OPEN: Text selection "assist" menu item shown.
+    //  SUBTYPE: 1 is for EMAIL, 2 is for PHONE, 3 is for ADDRESS, 4 is for URL, 0 is for OTHER.
+    // CATEGORY: TEXT_CONTROLS
+    // OS: O
+    TEXT_SELECTION_MENU_ITEM_ASSIST = 936;
+
+    // ACTION: Text selection "assist" menu item clicked.
+    //  SUBTYPE: 1 is for EMAIL, 2 is for PHONE, 3 is for ADDRESS, 4 is for URL, 0 is for OTHER.
+    // CATEGORY: TEXT_CONTROLS
+    // OS: O
+    ACTION_TEXT_SELECTION_MENU_ITEM_ASSIST = 937;
+
+    // OPEN: Settings > Security > Managed Device Info > Apps installed
+    // CATEGORY: SETTINGS
+    // OS: O
+    ENTERPRISE_PRIVACY_INSTALLED_APPS = 938;
+
+    // OPEN: Settings > Security > Managed Device Info > nnn permissions
+    // CATEGORY: SETTINGS
+    // OS: O
+    ENTERPRISE_PRIVACY_PERMISSIONS = 939;
+
+    // OPEN: Settings > Security > Managed Device Info > Default apps
+    // CATEGORY: SETTINGS
+    // OS: O
+    ENTERPRISE_PRIVACY_DEFAULT_APPS = 940;
+
+    // OPEN: Settings > Notifications > An app > A channel > Importance
+    // CATEGORY: SETTINGS
+    // OS: O
+    NOTIFICATION_CHANNEL_IMPORTANCE = 941;
+
+    // OPEN: Settings > Notifications > An app > A channel > On the lock screen
+    // CATEGORY: SETTINGS
+    // OS: O
+    NOTIFICATION_CHANNEL_LOCK_SCREEN_VIS = 942;
+
+    // This value should never appear in log outputs - it is reserved for
+    // internal platform metrics use.
+    RESERVED_FOR_LOGBUILDER_UID = 943;
+
+    // OPEN: Running background apps notification > List of background apps
+    // CATEGORY: GLOBAL_SYSTEM_UI
+    // OS: O
+    RUNNING_BACKGROUND_APPS_DIALOG = 944;
 
     // ---- End O Constants, all O constants go above this line ----
 

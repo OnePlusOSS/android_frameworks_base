@@ -35,6 +35,7 @@ import android.view.View;
 import com.android.settingslib.applications.InterestingConfigChanges;
 import com.android.systemui.Dependency;
 import com.android.systemui.plugins.Plugin;
+import com.android.systemui.util.leak.LeakDetector;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -76,6 +77,11 @@ public class FragmentHostManager {
             @Override
             public void onFragmentViewDestroyed(FragmentManager fm, Fragment f) {
                 FragmentHostManager.this.onFragmentViewDestroyed(f);
+            }
+
+            @Override
+            public void onFragmentDestroyed(FragmentManager fm, Fragment f) {
+                Dependency.get(LeakDetector.class).trackGarbage(f);
             }
         };
         mFragments.getFragmentManager().registerFragmentLifecycleCallbacks(mLifecycleCallbacks,
@@ -157,7 +163,7 @@ public class FragmentHostManager {
         // TODO: Do something?
     }
 
-    private View findViewById(int id) {
+    private <T extends View> T findViewById(int id) {
         return mRootView.findViewById(id);
     }
 
@@ -245,7 +251,7 @@ public class FragmentHostManager {
 
         @Override
         @Nullable
-        public View onFindViewById(int id) {
+        public <T extends View> T onFindViewById(int id) {
             return FragmentHostManager.this.findViewById(id);
         }
 

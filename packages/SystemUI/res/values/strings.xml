@@ -376,19 +376,22 @@
     <string name="accessibility_no_sim">No SIM.</string>
 
     <!-- Content description of the cell data. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_cell_data">Cellular Data</string>
+    <string name="accessibility_cell_data">Mobile Data</string>
 
     <!-- Content description of the cell data being enabled. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_cell_data_on">Cellular Data On</string>
+    <string name="accessibility_cell_data_on">Mobile Data On</string>
 
     <!-- Content description of the cell data being disabled. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_cell_data_off">Cellular Data Off</string>
+    <string name="accessibility_cell_data_off">Mobile Data Off</string>
 
     <!-- Content description of the bluetooth tethering icon for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_bluetooth_tether">Bluetooth tethering.</string>
 
     <!-- Content description of the airplane mode icon for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_airplane_mode">Airplane mode.</string>
+
+    <!-- Content description of the VPN icon for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
+    <string name="accessibility_vpn_on">VPN on.</string>
 
     <!-- Content description of the no sim icon for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_no_sims">No SIM card.</string>
@@ -574,11 +577,11 @@
     <!-- Title of dialog shown when 4G data usage has exceeded limit and has been disabled. [CHAR LIMIT=48] -->
     <string name="data_usage_disabled_dialog_4g_title">4G data is paused</string>
     <!-- Title of dialog shown when mobile data usage has exceeded limit and has been disabled. [CHAR LIMIT=48] -->
-    <string name="data_usage_disabled_dialog_mobile_title">Cellular data is paused</string>
+    <string name="data_usage_disabled_dialog_mobile_title">Mobile data is paused</string>
     <!-- Title of dialog shown when data usage has exceeded limit and has been disabled. [CHAR LIMIT=48] -->
     <string name="data_usage_disabled_dialog_title">Data is paused</string>
     <!-- Body of dialog shown when data usage has exceeded limit and has been disabled. [CHAR LIMIT=NONE] -->
-    <string name="data_usage_disabled_dialog">The data limit you set has been reached. You are no longer using cellular data.\n\nIf you resume, charges may apply for data usage.</string>
+    <string name="data_usage_disabled_dialog">The data limit you set has been reached. You are no longer using mobile data.\n\nIf you resume, charges may apply for data usage.</string>
     <!-- Dialog button indicating that data connection should be re-enabled. [CHAR LIMIT=28] -->
     <string name="data_usage_disabled_dialog_enable">Resume</string>
 
@@ -749,7 +752,7 @@
     <!-- QuickSettings: Flashlight [CHAR LIMIT=NONE] -->
     <string name="quick_settings_flashlight_label">Flashlight</string>
     <!-- QuickSettings: Cellular detail panel title [CHAR LIMIT=NONE] -->
-    <string name="quick_settings_cellular_detail_title">Cellular data</string>
+    <string name="quick_settings_cellular_detail_title">Mobile data</string>
     <!-- QuickSettings: Cellular detail panel, data usage title [CHAR LIMIT=NONE] -->
     <string name="quick_settings_cellular_detail_data_usage">Data usage</string>
     <!-- QuickSettings: Cellular detail panel, remaining data title [CHAR LIMIT=NONE] -->
@@ -1065,7 +1068,7 @@
     <string name="quick_settings_disclosure_named_vpn">Device connected to <xliff:g id="vpn_app" example="Foo VPN App">%1$s</xliff:g></string>
 
     <!-- Monitoring dialog title for device owned devices [CHAR LIMIT=35] -->
-    <string name="monitoring_title_device_owned">Device monitoring</string>
+    <string name="monitoring_title_device_owned">Device management</string>
 
     <!-- Monitoring dialog title for profile owned devices [CHAR LIMIT=35] -->
     <string name="monitoring_title_profile_owned">Profile monitoring</string>
@@ -1093,10 +1096,10 @@
     <string name="monitoring_button_view_policies">View Policies</string>
 
     <!-- Monitoring dialog: Description of the device owner by name. [CHAR LIMIT=NONE]-->
-    <string name="monitoring_description_named_management">Your device is managed by <xliff:g id="organization_name" example="Foo, Inc.">%1$s</xliff:g>.\n\nYour admin can monitor and manage settings, corporate access, apps, data associated with your device, and your device's location information.\n\nFor more information, contact your admin." </string>
+    <string name="monitoring_description_named_management">Your device is managed by <xliff:g id="organization_name" example="Foo, Inc.">%1$s</xliff:g>.\n\nYour admin can monitor and manage settings, corporate access, apps, data associated with your device, and your device\'s location information.\n\nFor more information, contact your admin.</string>
 
     <!-- Monitoring dialog: Description of a device owner. [CHAR LIMIT=NONE]-->
-    <string name="monitoring_description_management">Your device is managed by your organization.\n\nYour admin can monitor and manage settings, corporate access, apps, data associated with your device, and your device's location information.\n\nFor more information, contact your admin." </string>
+    <string name="monitoring_description_management">Your device is managed by your organization.\n\nYour admin can monitor and manage settings, corporate access, apps, data associated with your device, and your device\'s location information.\n\nFor more information, contact your admin.</string>
 
     <!-- Monitoring dialog: Description of a CA Certificate. [CHAR LIMIT=NONE]-->
     <string name="monitoring_description_management_ca_certificate">Your organization installed a certificate authority on this device. Your secure network traffic may be monitored or modified.</string>
@@ -1111,10 +1114,10 @@
     <string name="monitoring_description_management_network_logging">Your admin has turned on network logging, which monitors traffic on your device.</string>
 
     <!-- Monitoring dialog: Description of an active VPN. [CHAR LIMIT=NONE]-->
-    <string name="monitoring_description_named_vpn">You're connected to <xliff:g id="vpn_app" example="Foo VPN App">%1$s</xliff:g>, which can monitor your network activity, including emails, apps, and websites.</string>
+    <string name="monitoring_description_named_vpn">You\'re connected to <xliff:g id="vpn_app" example="Foo VPN App">%1$s</xliff:g>, which can monitor your network activity, including emails, apps, and websites.</string>
 
     <!-- Monitoring dialog: Description of two active VPNs. [CHAR LIMIT=NONE]-->
-    <string name="monitoring_description_two_named_vpns">You're connected to <xliff:g id="vpn_app" example="Foo VPN App">%1$s</xliff:g> and <xliff:g id="vpn_app" example="Bar VPN App">%2$s</xliff:g>, which can monitor your network activity, including emails, apps, and websites.</string>
+    <string name="monitoring_description_two_named_vpns">You\'re connected to <xliff:g id="vpn_app" example="Foo VPN App">%1$s</xliff:g> and <xliff:g id="vpn_app" example="Bar VPN App">%2$s</xliff:g>, which can monitor your network activity, including emails, apps, and websites.</string>
 
     <!-- Monitoring dialog: Description of an active VPN in the work profile. [CHAR LIMIT=NONE]-->
     <string name="monitoring_description_managed_profile_named_vpn">Your work profile is connected to <xliff:g id="vpn_app" example="Foo VPN App">%1$s</xliff:g>, which can monitor your network activity, including emails, apps, and websites.</string>
@@ -1466,6 +1469,15 @@
         <item quantity="other"><xliff:g id="channel_name_1">%1$s</xliff:g>, <xliff:g id="channel_name_2">%2$s</xliff:g>, and <xliff:g id="number">%3$d</xliff:g> others</item>
     </plurals>
 
+    <!-- Notification: Control panel: Accessibility description for expanded inline controls view, used
+        to control settings about notifications related to the current notification.  -->
+    <string name="notification_channel_controls_opened_accessibility">Notification controls for <xliff:g id="app_name" example="YouTube">%1$s</xliff:g> opened</string>
+    <!-- Notification: Control panel: Accessibility description for announcing the closing of the
+        inline controls view.  -->
+    <string name="notification_channel_controls_closed_accessibility">Notification controls for <xliff:g id="app_name" example="YouTube">%1$s</xliff:g> closed</string>
+    <!-- Notification: Control panel: Accessibility description for switch that is used to enable
+        or disable notifications from this channel -->
+    <string name="notification_channel_switch_accessibility">Allow notifications from this channel</string>
     <!-- Notification: Control panel: Label for button that launches notification settings. Used
         when this app has defined more than a single channel for notifications. -->
     <string name="notification_all_categories">All Categories</string>
@@ -1493,8 +1505,6 @@
     <string name="snooze_option_30_min">30 minutes</string>
     <!-- Notification: Menu row: Snooze options: 1 hour option. [CHAR LIMIT=50]-->
     <string name="snooze_option_1_hour">1 hour</string>
-    <!-- Notification: Menu row: Snooze options: cancel snoozing option. [CHAR LIMIT=50] -->
-    <string name="snooze_option_dont_snooze">Cancel</string>
     <!-- Notification: Menu row: Snooze undo button label. [CHAR LIMIT=50]-->
     <string name="snooze_undo">UNDO</string>
 
@@ -1804,10 +1814,14 @@
     <string name="report_rejected_touch" translatable="false">Report rejected touch</string>
 
     <!-- Multi-Window strings -->
-    <!-- Text that gets shown on top of current activity to inform the user that the system force-resized the current activity and that things might crash/not work properly [CHAR LIMIT=NONE] -->
+    <!-- Text that gets shown on top of current activity to inform the user that the system force-resized the current activity to be displayed in split-screen and that things might crash/not work properly [CHAR LIMIT=NONE] -->
     <string name="dock_forced_resizable">App may not work with split-screen.</string>
-    <!-- Warning message when we try to dock a non-resizeble tasks and launch it in fullscreen instead. -->
+    <!-- Warning message when we try to dock a non-resizeable task and launch it in fullscreen instead. -->
     <string name="dock_non_resizeble_failed_to_dock_text">App does not support split-screen.</string>
+    <!-- Text that gets shown on top of current activity to inform the user that the system force-resized the current activity to be displayed on a secondary display and that things might crash/not work properly [CHAR LIMIT=NONE] -->
+    <string name="forced_resizable_secondary_display">App may not work on a secondary display.</string>
+    <!-- Warning message when we try to launch a non-resizeable activity on a secondary display and launch it on the primary instead. -->
+    <string name="activity_launch_on_secondary_display_failed_text">App does not support launch on secondary displays.</string>
 
     <!-- accessibility label for button to open settings [CHAR LIMIT=NONE] -->
     <string name="accessibility_quick_settings_settings">Open settings.</string>
@@ -1847,10 +1861,6 @@
         not appear on production builds ever. -->
     <string name="tuner_doze" translatable="false">Ambient Display</string>
 
-    <!-- Ambient display, Sensors wake up device of the tuner. Non-translatable since it should
-        not appear on production builds ever. -->
-    <string name="tuner_doze_sensors_wake_up_fully" translatable="false">Wake up device on double tap or lift</string>
-
     <!-- Ambient display always-on of the tuner. Non-translatable since it should
         not appear on production builds ever. -->
     <string name="tuner_doze_always_on" translatable="false">Always on</string>
@@ -1888,12 +1898,37 @@
     <!-- PiP minimize description. [CHAR LIMIT=NONE] -->
     <string name="pip_minimize_description" translatable="false">Drag or fling the PIP to the edges of the screen to minimize it.</string>
 
+    <!-- PiP fling to dismiss title. [CHAR LIMIT=NONE]-->
+    <string name="pip_fling_dismiss_title" translatable="false">Fling to dismiss</string>
+
+    <!-- PiP fling to dismiss description. [CHAR LIMIT=NONE] -->
+    <string name="pip_fling_dismiss_description" translatable="false">Fling from anywhere on the screen to the bottom of the screen to dismiss the PIP.</string>
+
+    <!-- Button to play the current media on picture-in-picture (PIP) [CHAR LIMIT=30] -->
+    <string name="pip_play">Play</string>
+
+    <!-- Button to pause the current media on picture-in-picture (PIP) [CHAR LIMIT=30] -->
+    <string name="pip_pause">Pause</string>
+
+    <!-- Button to skip to the next media on picture-in-picture (PIP) [CHAR LIMIT=30] -->
+    <string name="pip_skip_to_next">Skip to next</string>
+
+    <!-- Button to skip to the prev media on picture-in-picture (PIP) [CHAR LIMIT=30] -->
+    <string name="pip_skip_to_prev">Skip to previous</string>
+
     <!-- Tuner string -->
     <string name="change_theme_reboot" translatable="false">Changing the theme requires a restart.</string>
     <!-- Tuner string -->
     <string name="theme" translatable="false">Theme</string>
     <!-- Tuner string -->
     <string name="default_theme" translatable="false">Default</string>
+
+    <!-- Title for notification & dialog that the user's phone last shut down because it got too hot. [CHAR LIMIT=40] -->
+    <string name="thermal_shutdown_title">Phone turned off due to heat</string>
+    <!-- Message body for notification that user's phone last shut down because it got too hot. [CHAR LIMIT=100] -->
+    <string name="thermal_shutdown_message">Your phone is now running normally</string>
+    <!-- Text body for dialog alerting user that their phone last shut down because it got too hot. [CHAR LIMIT=450] -->
+    <string name="thermal_shutdown_dialog_message">Your phone was too hot, so it turned off to cool down. Your phone is now running normally.\n\nYour phone may get too hot if you:\n\t&#8226; Use resource-intensive apps (such as gaming, video, or navigation apps)\n\t&#8226; Download or upload large files\n\t&#8226; Use your phone in high temperatures</string>
 
     <!-- Title for notification (and dialog) that user's phone has reached a certain temperature and may start to slow down in order to cool down. [CHAR LIMIT=30] -->
     <string name="high_temp_title">Phone is getting warm</string>
@@ -1962,6 +1997,9 @@
     <!-- Action label for launching app info on the specified app [CHAR LIMIT=20] -->
     <string name="app_info">App info</string>
 
+    <!-- Action label for switching to web for an instant app [CHAR LIMIT=20] -->
+    <string name="go_to_web">Go to web</string>
+
     <!-- Quick settings tile for toggling mobile data [CHAR LIMIT=20] -->
     <string name="mobile_data">Mobile data</string>
 
@@ -1975,13 +2013,13 @@
     <string name="dnd_is_off">Do Not Disturb is off</string>
 
     <!-- Prompt for when Do not disturb is on from automatic rule in QS [CHAR LIMIT=NONE] -->
-    <string name="qs_dnd_prompt_auto_rule">Do Not Disturb was turned on by an automatic rule (<xliff:g name="rule">%s</xliff:g>). Keep current settings?</string>
+    <string name="qs_dnd_prompt_auto_rule">Do Not Disturb was turned on by an automatic rule (<xliff:g name="rule">%s</xliff:g>).</string>
 
     <!-- Prompt for when Do not disturb is on from app in QS [CHAR LIMIT=NONE] -->
-    <string name="qs_dnd_prompt_app">Do Not Disturb was turned on by an app (<xliff:g name="app">%s</xliff:g>). Keep current settings?</string>
+    <string name="qs_dnd_prompt_app">Do Not Disturb was turned on by an app (<xliff:g name="app">%s</xliff:g>).</string>
 
     <!-- Prompt for when Do not disturb is on from automatic rule or app in QS [CHAR LIMIT=NONE] -->
-    <string name="qs_dnd_prompt_auto_rule_app">Do Not Disturb was turned on by an automatic rule or app. Keep current settings?</string>
+    <string name="qs_dnd_prompt_auto_rule_app">Do Not Disturb was turned on by an automatic rule or app.</string>
 
     <!-- Description of Do Not Disturb option in QS that ends at the specified time[CHAR LIMIT=20] -->
     <string name="qs_dnd_until">Until <xliff:g name="time">%s</xliff:g></string>
@@ -1997,4 +2035,10 @@
     <string name="China_Unicom">China Unicom</string>
     <string name="China_Telecom">China Telecom</string>
     <string name="China_Mobile_HD">China Mobile (HD)</string>
+
+    <!-- Title of the "running foreground services" dialog. [CHAR LIMIT=NONE] -->
+    <string name="running_foreground_services_title">Apps running in background</string>
+
+    <!-- Title of the "running foreground services" dialog. [CHAR LIMIT=NONE] -->
+    <string name="running_foreground_services_msg">Tap for details on battery and data usage</string>
 </resources>

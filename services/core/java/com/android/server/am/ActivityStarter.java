@@ -245,6 +245,9 @@ class ActivityStarter {
             ActivityRecord[] outActivity, ActivityStackSupervisor.ActivityContainer container,
             TaskRecord inTask) {
         int err = ActivityManager.START_SUCCESS;
+        // Pull the optional Ephemeral Installer-only bundle out of the options early.
+        final Bundle verificationBundle
+                = options != null ? options.popAppVerificationBundle() : null;
 
         ProcessRecord callerApp = null;
         if (caller != null) {
@@ -466,7 +469,7 @@ class ActivityStarter {
         // app [on install success].
         if (rInfo != null && rInfo.auxiliaryInfo != null) {
             intent = createLaunchIntent(rInfo.auxiliaryInfo, ephemeralIntent,
-                    callingPackage, resolvedType, userId);
+                    callingPackage, verificationBundle, resolvedType, userId);
             resolvedType = null;
             callingUid = realCallingUid;
             callingPid = realCallingPid;
@@ -522,14 +525,16 @@ class ActivityStarter {
      * Creates a launch intent for the given auxiliary resolution data.
      */
     private @NonNull Intent createLaunchIntent(@NonNull AuxiliaryResolveInfo auxiliaryResponse,
-            Intent originalIntent, String callingPackage, String resolvedType, int userId) {
+            Intent originalIntent, String callingPackage, Bundle verificationBundle,
+            String resolvedType, int userId) {
         if (auxiliaryResponse.needsPhaseTwo) {
             // request phase two resolution
             mService.getPackageManagerInternalLocked().requestInstantAppResolutionPhaseTwo(
-                    auxiliaryResponse, originalIntent, resolvedType, callingPackage, userId);
+                    auxiliaryResponse, originalIntent, resolvedType, callingPackage,
+                    verificationBundle, userId);
         }
         return InstantAppResolver.buildEphemeralInstallerIntent(originalIntent,
-            callingPackage, resolvedType, userId, auxiliaryResponse.packageName,
+            callingPackage, verificationBundle, resolvedType, userId, auxiliaryResponse.packageName,
             auxiliaryResponse.splitName, auxiliaryResponse.versionCode,
             auxiliaryResponse.token, auxiliaryResponse.needsPhaseTwo);
     }
@@ -979,6 +984,8 @@ class ActivityStarter {
 
         final int preferredLaunchStackId =
                 (mOptions != null) ? mOptions.getLaunchStackId() : INVALID_STACK_ID;
+        final int preferredLaunchDisplayId =
+                (mOptions != null) ? mOptions.getLaunchDisplayId() : DEFAULT_DISPLAY;
 
         if (reusedActivity != null) {
             // When the flags NEW_TASK and CLEAR_TASK are set, then the task gets reused but
@@ -1100,8 +1107,8 @@ class ActivityStarter {
 
             // Don't use mStartActivity.task to show the toast. We're not starting a new activity
             // but reusing 'top'. Fields in mStartActivity may not be fully initialized.
-            mSupervisor.handleNonResizableTaskIfNeeded(
-                    top.getTask(), preferredLaunchStackId, topStack.mStackId);
+            mSupervisor.handleNonResizableTaskIfNeeded(top.getTask(), preferredLaunchStackId,
+                    preferredLaunchDisplayId, topStack.mStackId);
 
             return START_DELIVERED_TO_TOP;
         }
@@ -1183,8 +1190,8 @@ class ActivityStarter {
         }
         mSupervisor.updateUserStackLocked(mStartActivity.userId, mTargetStack);
 
-        mSupervisor.handleNonResizableTaskIfNeeded(
-                mStartActivity.getTask(), preferredLaunchStackId, mTargetStack.mStackId);
+        mSupervisor.handleNonResizableTaskIfNeeded(mStartActivity.getTask(), preferredLaunchStackId,
+                preferredLaunchDisplayId, mTargetStack.mStackId);
 
         return START_SUCCESS;
     }
@@ -1580,7 +1587,7 @@ class ActivityStarter {
         }
 
         mSupervisor.handleNonResizableTaskIfNeeded(intentActivity.getTask(), INVALID_STACK_ID,
-                mTargetStack.mStackId);
+                DEFAULT_DISPLAY, mTargetStack.mStackId);
 
         // If the caller has requested that the target task be reset, then do so.
         if ((mLaunchFlags & FLAG_ACTIVITY_RESET_TASK_IF_NEEDED) != 0) {
@@ -2033,16 +2040,19 @@ class ActivityStarter {
                 canUseFocusedStack = r.isAssistantActivity();
                 break;
             case DOCKED_STACK_ID:
-                // Any activty which supports split screen can go in the docked stack.
+                // Any activity which supports split screen can go in the docked stack.
                 canUseFocusedStack = r.supportsSplitScreen();
                 break;
             case FREEFORM_WORKSPACE_STACK_ID:
-                // Any activty which supports freeform can go in the freeform stack.
+                // Any activity which supports freeform can go in the freeform stack.
                 canUseFocusedStack = r.supportsFreeform();
                 break;
             default:
-                // Dynamic stacks behave similarly to the fullscreen stack and can contain any task.
-                canUseFocusedStack = isDynamicStack(focusedStackId);
+                // Dynamic stacks behave similarly to the fullscreen stack and can contain any
+                // resizeable task.
+                // TODO: Check ActivityView after fixing b/35349678.
+                canUseFocusedStack = isDynamicStack(focusedStackId)
+                        && r.canBeLaunchedOnDisplay(focusedStack.mDisplayId);
         }
 
         return canUseFocusedStack
@@ -2082,7 +2092,7 @@ class ActivityStarter {
                     "Stack and display id can't be set at the same time.");
         }
 
-        if (isValidLaunchStackId(launchStackId, r)) {
+        if (isValidLaunchStackId(launchStackId, launchDisplayId, r)) {
             return mSupervisor.getStack(launchStackId, CREATE_IF_NEEDED, ON_TOP);
         }
         if (launchStackId == DOCKED_STACK_ID) {
@@ -2148,7 +2158,7 @@ class ActivityStarter {
         }
     }
 
-    boolean isValidLaunchStackId(int stackId, ActivityRecord r) {
+    boolean isValidLaunchStackId(int stackId, int displayId, ActivityRecord r) {
         switch (stackId) {
             case INVALID_STACK_ID:
             case HOME_STACK_ID:
@@ -2167,8 +2177,8 @@ class ActivityStarter {
                 return r.isAssistantActivity();
             default:
                 // TODO: Check ActivityView after fixing b/35349678.
-                if (StackId.isDynamicStack(stackId) && mService.mSupportsMultiDisplay) {
-                    return true;
+                if (StackId.isDynamicStack(stackId)) {
+                    return r.canBeLaunchedOnDisplay(displayId);
                 }
                 Slog.e(TAG, "isValidLaunchStackId: Unexpected stackId=" + stackId);
                 return false;

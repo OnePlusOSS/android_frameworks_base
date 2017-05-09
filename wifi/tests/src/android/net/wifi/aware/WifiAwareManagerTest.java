@@ -34,11 +34,9 @@ import android.os.IBinder;
 import android.os.Parcel;
 import android.os.test.TestLooper;
 import android.test.suitebuilder.annotation.SmallTest;
-import android.util.Base64;
 
 import libcore.util.HexEncoding;
 
-import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -152,7 +150,7 @@ public class WifiAwareManagerTest {
         inOrder.verify(mockAwareService).publish(eq(clientId), eq(publishConfig), any());
 
         // (3) disconnect
-        session.destroy();
+        session.close();
         inOrder.verify(mockAwareService).disconnect(eq(clientId), eq(binder.getValue()));
 
         // (4) try publishing again - fails silently
@@ -331,7 +329,7 @@ public class WifiAwareManagerTest {
         inOrder.verify(mockSessionCallback).onSessionConfigFailed();
 
         // (5) terminate
-        publishSession.getValue().destroy();
+        publishSession.getValue().close();
         mMockLooper.dispatchAll();
         inOrder.verify(mockAwareService).terminateSession(clientId, sessionId);
 
@@ -468,7 +466,7 @@ public class WifiAwareManagerTest {
         inOrder.verify(mockSessionCallback).onSessionConfigFailed();
 
         // (5) terminate
-        subscribeSession.getValue().destroy();
+        subscribeSession.getValue().close();
         mMockLooper.dispatchAll();
         inOrder.verify(mockAwareService).terminateSession(clientId, sessionId);
 
@@ -689,8 +687,6 @@ public class WifiAwareManagerTest {
         collector.checkThat("mSubscribeType", subscribeConfig.mSubscribeType,
                 equalTo(SubscribeConfig.SUBSCRIBE_TYPE_PASSIVE));
         collector.checkThat("mTtlSec", subscribeConfig.mTtlSec, equalTo(0));
-        collector.checkThat("mMatchStyle", subscribeConfig.mMatchStyle,
-                equalTo(SubscribeConfig.MATCH_STYLE_ALL));
         collector.checkThat("mEnableTerminateNotification",
                 subscribeConfig.mEnableTerminateNotification, equalTo(true));
     }
@@ -703,14 +699,13 @@ public class WifiAwareManagerTest {
         final int subscribeType = SubscribeConfig.SUBSCRIBE_TYPE_PASSIVE;
         final int subscribeCount = 10;
         final int subscribeTtl = 15;
-        final int matchStyle = SubscribeConfig.MATCH_STYLE_FIRST_ONLY;
         final boolean enableTerminateNotification = false;
 
         SubscribeConfig subscribeConfig = new SubscribeConfig.Builder().setServiceName(serviceName)
                 .setServiceSpecificInfo(serviceSpecificInfo.getBytes()).setMatchFilter(
                         new TlvBufferUtils.TlvIterable(0, 1, matchFilter).toList())
                 .setSubscribeType(subscribeType)
-                .setTtlSec(subscribeTtl).setMatchStyle(matchStyle)
+                .setTtlSec(subscribeTtl)
                 .setTerminateNotificationEnabled(enableTerminateNotification).build();
 
         collector.checkThat("mServiceName", serviceName.getBytes(),
@@ -721,7 +716,6 @@ public class WifiAwareManagerTest {
         collector.checkThat("mSubscribeType", subscribeType,
                 equalTo(subscribeConfig.mSubscribeType));
         collector.checkThat("mTtlSec", subscribeTtl, equalTo(subscribeConfig.mTtlSec));
-        collector.checkThat("mMatchStyle", matchStyle, equalTo(subscribeConfig.mMatchStyle));
         collector.checkThat("mEnableTerminateNotification", enableTerminateNotification,
                 equalTo(subscribeConfig.mEnableTerminateNotification));
     }
@@ -732,16 +726,14 @@ public class WifiAwareManagerTest {
         final String serviceSpecificInfo = "long arbitrary string with some info";
         final byte[] matchFilter = { 1, 16, 1, 22 };
         final int subscribeType = SubscribeConfig.SUBSCRIBE_TYPE_PASSIVE;
-        final int subscribeCount = 10;
         final int subscribeTtl = 15;
-        final int matchStyle = SubscribeConfig.MATCH_STYLE_FIRST_ONLY;
         final boolean enableTerminateNotification = true;
 
         SubscribeConfig subscribeConfig = new SubscribeConfig.Builder().setServiceName(serviceName)
                 .setServiceSpecificInfo(serviceSpecificInfo.getBytes()).setMatchFilter(
                         new TlvBufferUtils.TlvIterable(0, 1, matchFilter).toList())
                 .setSubscribeType(subscribeType)
-                .setTtlSec(subscribeTtl).setMatchStyle(matchStyle)
+                .setTtlSec(subscribeTtl)
                 .setTerminateNotificationEnabled(enableTerminateNotification).build();
 
         Parcel parcelW = Parcel.obtain();
@@ -765,14 +757,6 @@ public class WifiAwareManagerTest {
     @Test(expected = IllegalArgumentException.class)
     public void testSubscribeConfigBuilderNegativeTtl() {
         new SubscribeConfig.Builder().setTtlSec(-100);
-    }
-
-    /**
-     * Validate that a bad match style configuration throws an exception.
-     */
-    @Test(expected = IllegalArgumentException.class)
-    public void testSubscribeConfigBuilderBadMatchStyle() {
-        new SubscribeConfig.Builder().setMatchStyle(10);
     }
 
     /*
@@ -959,8 +943,6 @@ public class WifiAwareManagerTest {
         final ConfigRequest configRequest = new ConfigRequest.Builder().build();
         final PublishConfig publishConfig = new PublishConfig.Builder().build();
 
-        String pmkB64 = Base64.encodeToString(pmk, Base64.DEFAULT);
-
         ArgumentCaptor<WifiAwareSession> sessionCaptor = ArgumentCaptor.forClass(
                 WifiAwareSession.class);
         ArgumentCaptor<IWifiAwareEventCallback> clientProxyCallback = ArgumentCaptor
@@ -991,51 +973,37 @@ public class WifiAwareManagerTest {
         inOrder.verify(mockSessionCallback).onPublishStarted(publishSession.capture());
 
         // (3) request an open (unencrypted) network specifier from the session
-        String networkSpecifier = publishSession.getValue().createNetworkSpecifierOpen(peerHandle);
+        WifiAwareNetworkSpecifier ns =
+                (WifiAwareNetworkSpecifier) publishSession.getValue().createNetworkSpecifierOpen(
+                        peerHandle);
 
         // validate format
-        JSONObject jsonObject = new JSONObject(networkSpecifier);
-        collector.checkThat("role", role,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_ROLE)));
-        collector.checkThat("client_id", clientId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_CLIENT_ID)));
-        collector.checkThat("session_id", sessionId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_SESSION_ID)));
-        collector.checkThat("peer_id", peerHandle.peerId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_PEER_ID)));
+        collector.checkThat("role", role, equalTo(ns.role));
+        collector.checkThat("client_id", clientId, equalTo(ns.clientId));
+        collector.checkThat("session_id", sessionId, equalTo(ns.sessionId));
+        collector.checkThat("peer_id", peerHandle.peerId, equalTo(ns.peerId));
 
         // (4) request an encrypted (PMK) network specifier from the session
-        networkSpecifier = publishSession.getValue().createNetworkSpecifierPmk(peerHandle, pmk);
+        ns = (WifiAwareNetworkSpecifier) publishSession.getValue().createNetworkSpecifierPmk(
+                peerHandle, pmk);
 
         // validate format
-        jsonObject = new JSONObject(networkSpecifier);
-        collector.checkThat("role", role,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_ROLE)));
-        collector.checkThat("client_id", clientId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_CLIENT_ID)));
-        collector.checkThat("session_id", sessionId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_SESSION_ID)));
-        collector.checkThat("peer_id", peerHandle.peerId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_PEER_ID)));
-        collector.checkThat("pmk", pmkB64 ,
-                equalTo(jsonObject.getString(WifiAwareManager.NETWORK_SPECIFIER_KEY_PMK)));
+        collector.checkThat("role", role, equalTo(ns.role));
+        collector.checkThat("client_id", clientId, equalTo(ns.clientId));
+        collector.checkThat("session_id", sessionId, equalTo(ns.sessionId));
+        collector.checkThat("peer_id", peerHandle.peerId, equalTo(ns.peerId));
+        collector.checkThat("pmk", pmk , equalTo(ns.pmk));
 
         // (5) request an encrypted (Passphrase) network specifier from the session
-        networkSpecifier = publishSession.getValue().createNetworkSpecifierPassphrase(peerHandle,
-                passphrase);
+        ns = (WifiAwareNetworkSpecifier) publishSession.getValue().createNetworkSpecifierPassphrase(
+                peerHandle, passphrase);
 
         // validate format
-        jsonObject = new JSONObject(networkSpecifier);
-        collector.checkThat("role", role,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_ROLE)));
-        collector.checkThat("client_id", clientId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_CLIENT_ID)));
-        collector.checkThat("session_id", sessionId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_SESSION_ID)));
-        collector.checkThat("peer_id", peerHandle.peerId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_PEER_ID)));
-        collector.checkThat("passphrase", passphrase,
-                equalTo(jsonObject.getString(WifiAwareManager.NETWORK_SPECIFIER_KEY_PASSPHRASE)));
+        collector.checkThat("role", role, equalTo(ns.role));
+        collector.checkThat("client_id", clientId, equalTo(ns.clientId));
+        collector.checkThat("session_id", sessionId, equalTo(ns.sessionId));
+        collector.checkThat("peer_id", peerHandle.peerId, equalTo(ns.peerId));
+        collector.checkThat("passphrase", passphrase, equalTo(ns.passphrase));
 
         verifyNoMoreInteractions(mockCallback, mockSessionCallback, mockAwareService,
                 mockPublishSession, mockRttListener);
@@ -1053,8 +1021,6 @@ public class WifiAwareManagerTest {
         final int role = WifiAwareManager.WIFI_AWARE_DATA_PATH_ROLE_INITIATOR;
         final byte[] pmk = "Some arbitrary pmk data".getBytes();
         final String passphrase = "A really bad password";
-
-        String pmkB64 = Base64.encodeToString(pmk, Base64.DEFAULT);
 
         ArgumentCaptor<WifiAwareSession> sessionCaptor = ArgumentCaptor.forClass(
                 WifiAwareSession.class);
@@ -1074,47 +1040,32 @@ public class WifiAwareManagerTest {
         WifiAwareSession session = sessionCaptor.getValue();
 
         // (2) request an open (unencrypted) direct network specifier
-        String networkSpecifier = session.createNetworkSpecifierOpen(role, someMac);
+        WifiAwareNetworkSpecifier ns =
+                (WifiAwareNetworkSpecifier) session.createNetworkSpecifierOpen(role, someMac);
 
         // validate format
-        JSONObject jsonObject = new JSONObject(networkSpecifier);
-        collector.checkThat("role", role,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_ROLE)));
-        collector.checkThat("client_id", clientId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_CLIENT_ID)));
-        collector.checkThat("peer_mac", someMac, equalTo(HexEncoding.decode(
-                jsonObject.getString(WifiAwareManager.NETWORK_SPECIFIER_KEY_PEER_MAC).toCharArray(),
-                false)));
+        collector.checkThat("role", role, equalTo(ns.role));
+        collector.checkThat("client_id", clientId, equalTo(ns.clientId));
+        collector.checkThat("peer_mac", someMac, equalTo(ns.peerMac));
 
         // (3) request an encrypted (PMK) direct network specifier
-        networkSpecifier = session.createNetworkSpecifierPmk(role, someMac, pmk);
+        ns = (WifiAwareNetworkSpecifier) session.createNetworkSpecifierPmk(role, someMac, pmk);
 
         // validate format
-        jsonObject = new JSONObject(networkSpecifier);
-        collector.checkThat("role", role,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_ROLE)));
-        collector.checkThat("client_id", clientId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_CLIENT_ID)));
-        collector.checkThat("peer_mac", someMac, equalTo(HexEncoding.decode(
-                jsonObject.getString(WifiAwareManager.NETWORK_SPECIFIER_KEY_PEER_MAC).toCharArray(),
-                false)));
-        collector.checkThat("pmk", pmkB64,
-                equalTo(jsonObject.getString(WifiAwareManager.NETWORK_SPECIFIER_KEY_PMK)));
+        collector.checkThat("role", role, equalTo(ns.role));
+        collector.checkThat("client_id", clientId, equalTo(ns.clientId));
+        collector.checkThat("peer_mac", someMac, equalTo(ns.peerMac));
+        collector.checkThat("pmk", pmk, equalTo(ns.pmk));
 
         // (4) request an encrypted (Passphrase) direct network specifier
-        networkSpecifier = session.createNetworkSpecifierPassphrase(role, someMac, passphrase);
+        ns = (WifiAwareNetworkSpecifier) session.createNetworkSpecifierPassphrase(role, someMac,
+                passphrase);
 
         // validate format
-        jsonObject = new JSONObject(networkSpecifier);
-        collector.checkThat("role", role,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_ROLE)));
-        collector.checkThat("client_id", clientId,
-                equalTo(jsonObject.getInt(WifiAwareManager.NETWORK_SPECIFIER_KEY_CLIENT_ID)));
-        collector.checkThat("peer_mac", someMac, equalTo(HexEncoding.decode(
-                jsonObject.getString(WifiAwareManager.NETWORK_SPECIFIER_KEY_PEER_MAC).toCharArray(),
-                false)));
-        collector.checkThat("passphrase", passphrase,
-                equalTo(jsonObject.getString(WifiAwareManager.NETWORK_SPECIFIER_KEY_PASSPHRASE)));
+        collector.checkThat("role", role, equalTo(ns.role));
+        collector.checkThat("client_id", clientId, equalTo(ns.clientId));
+        collector.checkThat("peer_mac", someMac, equalTo(ns.peerMac));
+        collector.checkThat("passphrase", passphrase, equalTo(ns.passphrase));
 
         verifyNoMoreInteractions(mockCallback, mockSessionCallback, mockAwareService,
                 mockPublishSession, mockRttListener);

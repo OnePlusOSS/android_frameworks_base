@@ -27,6 +27,7 @@ import android.content.Intent;
 import android.content.pm.ParceledListSlice;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.UserHandle;
 import android.service.notification.Adjustment;
 import android.service.notification.Condition;
 import android.service.notification.IConditionListener;
@@ -45,7 +46,7 @@ interface INotificationManager
     void enqueueToast(String pkg, ITransientNotification callback, int duration);
     void cancelToast(String pkg, ITransientNotification callback);
     void enqueueNotificationWithTag(String pkg, String opPkg, String tag, int id,
-            in Notification notification, inout int[] idReceived, int userId);
+            in Notification notification, int userId);
     void cancelNotificationWithTag(String pkg, String tag, int id, int userId);
 
     void setShowBadge(String pkg, int uid, boolean showBadge);
@@ -101,9 +102,9 @@ interface INotificationManager
     void setOnNotificationPostedTrimFromListener(in INotificationListener token, int trim);
     void setInterruptionFilter(String pkg, int interruptionFilter);
 
-    void updateNotificationChannelFromPrivilegedListener(in INotificationListener token, String pkg, in NotificationChannel channel);
-    ParceledListSlice getNotificationChannelsFromPrivilegedListener(in INotificationListener token, String pkg);
-    ParceledListSlice getNotificationChannelGroupsFromPrivilegedListener(in INotificationListener token, String pkg);
+    void updateNotificationChannelFromPrivilegedListener(in INotificationListener token, String pkg, in UserHandle user, in NotificationChannel channel);
+    ParceledListSlice getNotificationChannelsFromPrivilegedListener(in INotificationListener token, String pkg, in UserHandle user);
+    ParceledListSlice getNotificationChannelGroupsFromPrivilegedListener(in INotificationListener token, String pkg, in UserHandle user);
 
     void applyEnqueuedAdjustmentFromAssistant(in INotificationListener token, in Adjustment adjustment);
     void applyAdjustmentFromAssistant(in INotificationListener token, in Adjustment adjustment);

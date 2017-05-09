@@ -44,7 +44,7 @@ public class PipMenuActivity extends Activity implements PipManager.Listener {
         mPipManager.addListener(this);
 
         mRestorePipSizeWhenClose = true;
-        mPipControlsView = (PipControlsView) findViewById(R.id.pip_controls);
+        mPipControlsView = findViewById(R.id.pip_controls);
         mFadeInAnimation = AnimatorInflater.loadAnimator(
                 this, R.anim.tv_pip_menu_fade_in_animation);
         mFadeInAnimation.setTarget(mPipControlsView);
@@ -56,7 +56,7 @@ public class PipMenuActivity extends Activity implements PipManager.Listener {
     private void restorePipAndFinish() {
         if (mRestorePipSizeWhenClose) {
             // When PIP menu activity is closed, restore to the default position.
-            mPipManager.resizePinnedStack(PipManager.STATE_PIP_OVERLAY);
+            mPipManager.resizePinnedStack(PipManager.STATE_PIP);
         }
         finish();
     }

@@ -17,6 +17,7 @@ package android.content.pm;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.TestApi;
 import android.content.Intent;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -26,6 +27,7 @@ import java.util.List;
 /**
  * Packages that have been changed since the last time they
  * were requested.
+ * @see PackageManager#getChangedPackages(int)
  */
 public final class ChangedPackages implements Parcelable {
     /** The last known sequence number for these changes */

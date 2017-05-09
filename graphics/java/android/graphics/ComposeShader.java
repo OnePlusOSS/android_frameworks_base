@@ -59,43 +59,10 @@ public class ComposeShader extends Shader {
     }
 
     private ComposeShader(Shader shaderA, Shader shaderB, int nativeMode) {
-        setInternal(shaderA, shaderB, nativeMode);
-    }
-
-    /**
-     * Reinitialize the ComposeShader's component Shaders and blend mode.
-     *
-     * @param shaderA  The colors from this shader are seen as the "dst" by the mode
-     * @param shaderB  The colors from this shader are seen as the "src" by the mode
-     * @param mode     The PorterDuff mode that combines the colors from the two shaders.
-     */
-    public void set(@NonNull Shader shaderA, @NonNull Shader shaderB, @NonNull Xfermode mode) {
-        setInternal(shaderA, shaderB, mode.porterDuffMode);
-    }
-
-    /**
-     * Reinitialize the ComposeShader's component Shaders and blend mode.
-     *
-     * @param shaderA  The colors from this shader are seen as the "dst" by the mode
-     * @param shaderB  The colors from this shader are seen as the "src" by the mode
-     * @param mode     The PorterDuff mode that combines the colors from the two shaders.
-     */
-    public void set(@NonNull Shader shaderA, @NonNull Shader shaderB,
-            @NonNull PorterDuff.Mode mode) {
-        setInternal(shaderA, shaderB, mode.nativeInt);
-    }
-
-    private void setInternal(Shader shaderA, Shader shaderB, int nativeMode) {
         if (shaderA == null || shaderB == null) {
             throw new IllegalArgumentException("Shader parameters must not be null");
         }
 
-        if (shaderA == mShaderA && shaderB == mShaderB && mPorterDuffMode == nativeMode) {
-            // no work to do...
-            return;
-        }
-
-        discardNativeInstance();
         mShaderA = shaderA;
         mShaderB = shaderB;
         mPorterDuffMode = nativeMode;

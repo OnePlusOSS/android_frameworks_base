@@ -34,6 +34,7 @@ import android.os.Bundle;
 import android.os.Looper;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.UserHandle;
 import android.transition.Transition;
 import android.transition.TransitionInflater;
 import android.transition.TransitionSet;
@@ -57,6 +58,7 @@ import android.widget.AdapterView;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
+import java.lang.reflect.InvocationTargetException;
 
 final class FragmentState implements Parcelable {
     final String mClassName;
@@ -508,6 +510,10 @@ public class Fragment implements ComponentCallbacks2, OnCreateContextMenuListene
     // True if mHidden has been changed and the animation should be scheduled.
     boolean mHiddenChanged;
 
+    // The cached value from onGetLayoutInflater(Bundle) that will be returned from
+    // getLayoutInflater()
+    LayoutInflater mLayoutInflater;
+
     /**
      * State information that has been retrieved from a fragment instance
      * through {@link FragmentManager#saveFragmentInstanceState(Fragment)
@@ -615,7 +621,7 @@ public class Fragment implements ComponentCallbacks2, OnCreateContextMenuListene
                 }
                 sClassMap.put(fname, clazz);
             }
-            Fragment f = (Fragment)clazz.newInstance();
+            Fragment f = (Fragment) clazz.getConstructor().newInstance();
             if (args != null) {
                 args.setClassLoader(f.getClass().getClassLoader());
                 f.setArguments(args);
@@ -633,6 +639,12 @@ public class Fragment implements ComponentCallbacks2, OnCreateContextMenuListene
             throw new InstantiationException("Unable to instantiate fragment " + fname
                     + ": make sure class name exists, is public, and has an"
                     + " empty constructor that is public", e);
+        } catch (NoSuchMethodException e) {
+            throw new InstantiationException("Unable to instantiate fragment " + fname
+                    + ": could not find Fragment constructor", e);
+        } catch (InvocationTargetException e) {
+            throw new InstantiationException("Unable to instantiate fragment " + fname
+                    + ": calling Fragment constructor caused an exception", e);
         }
     }
 
@@ -1188,6 +1200,19 @@ public class Fragment implements ComponentCallbacks2, OnCreateContextMenuListene
     }
 
     /**
+     * @hide
+     * Call {@link Activity#startActivityForResultAsUser(Intent, int, UserHandle)} from the
+     * fragment's containing Activity.
+     */
+    public void startActivityForResultAsUser(
+            Intent intent, int requestCode, Bundle options, UserHandle user) {
+        if (mHost == null) {
+            throw new IllegalStateException("Fragment " + this + " not attached to Activity");
+        }
+        mHost.onStartActivityAsUserFromFragment(this, intent, requestCode, options, user);
+    }
+
+    /**
      * Call {@link Activity#startIntentSenderForResult(IntentSender, int, Intent, int, int, int,
      * Bundle)} from the fragment's containing Activity.
      */
@@ -1372,6 +1397,38 @@ public class Fragment implements ComponentCallbacks2, OnCreateContextMenuListene
             result.setPrivateFactory(mChildFragmentManager.getLayoutInflaterFactory());
         }
         return result;
+    }
+
+    /**
+     * Returns the cached LayoutInflater used to inflate Views of this Fragment. If
+     * {@link #onGetLayoutInflater(Bundle)} has not been called {@link #onGetLayoutInflater(Bundle)}
+     * will be called with a {@code null} argument and that value will be cached.
+     * <p>
+     * The cached LayoutInflater will be replaced immediately prior to
+     * {@link #onCreateView(LayoutInflater, ViewGroup, Bundle)} and cleared immediately after
+     * {@link #onDetach()}.
+     *
+     * @return The LayoutInflater used to inflate Views of this Fragment.
+     */
+    public final LayoutInflater getLayoutInflater() {
+        if (mLayoutInflater == null) {
+            return performGetLayoutInflater(null);
+        }
+        return mLayoutInflater;
+    }
+
+    /**
+     * Calls {@link #onGetLayoutInflater(Bundle)} and caches the result for use by
+     * {@link #getLayoutInflater()}.
+     *
+     * @param savedInstanceState If the fragment is being re-created from
+     * a previous saved state, this is the state.
+     * @return The LayoutInflater used to inflate Views of this Fragment.
+     */
+    LayoutInflater performGetLayoutInflater(Bundle savedInstanceState) {
+        LayoutInflater layoutInflater = onGetLayoutInflater(savedInstanceState);
+        mLayoutInflater = layoutInflater;
+        return mLayoutInflater;
     }
 
     /**
@@ -2360,7 +2417,7 @@ public class Fragment implements ComponentCallbacks2, OnCreateContextMenuListene
      * enabled.
      *
      * @see Activity#postponeEnterTransition()
-     * @see FragmentTransaction#setAllowOptimization(boolean)
+     * @see FragmentTransaction#setReorderingAllowed(boolean)
      */
     public void postponeEnterTransition() {
         ensureAnimationInfo().mEnterTransitionPostponed = true;
@@ -2513,7 +2570,7 @@ public class Fragment implements ComponentCallbacks2, OnCreateContextMenuListene
         mChildFragmentManager.attachController(mHost, new FragmentContainer() {
             @Override
             @Nullable
-            public View onFindViewById(int id) {
+            public <T extends View> T onFindViewById(int id) {
                 if (mView == null) {
                     throw new IllegalStateException("Fragment does not have a view");
                 }
@@ -2821,6 +2878,7 @@ public class Fragment implements ComponentCallbacks2, OnCreateContextMenuListene
     void performDetach() {
         mCalled = false;
         onDetach();
+        mLayoutInflater = null;
         if (!mCalled) {
             throw new SuperNotCalledException("Fragment " + this
                     + " did not call through to super.onDetach()");

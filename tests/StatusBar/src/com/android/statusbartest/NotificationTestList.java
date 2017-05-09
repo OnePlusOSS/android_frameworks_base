@@ -124,7 +124,6 @@ public class NotificationTestList extends TestActivity
                     Notification n = new Notification.Builder(NotificationTestList.this,
                             "phone call")
                             .setSmallIcon(R.drawable.icon2)
-                            .setChannel(phoneCall.getId())
                             .setFullScreenIntent(makeIntent2(), true)
                             .build();
                     mNM.notify(7001, n);
@@ -366,7 +365,7 @@ public class NotificationTestList extends TestActivity
                     Notification n = new Notification.Builder(NotificationTestList.this, "default")
                             .setSmallIcon(R.drawable.icon2)
                             .setContentTitle("timeout in a minute")
-                            .setTimeout(System.currentTimeMillis() + (1000 * 60))
+                            .setTimeoutAfter(System.currentTimeMillis() + (1000 * 60))
                             .build();
                     mNM.notify("timeout_min", 7013, n);
                 }
@@ -378,12 +377,29 @@ public class NotificationTestList extends TestActivity
                             .setSmallIcon(R.drawable.icon2)
                             .setContentTitle("RED IS BEST")
                             .setContentText("or is blue?")
-                            .setTimeout(System.currentTimeMillis() + (1000 * 60))
+                            .setTimeoutAfter(System.currentTimeMillis() + (1000 * 60))
                             .setColor(Color.RED)
                             .setFlag(Notification.FLAG_ONGOING_EVENT, true)
                             .setColorized(true)
                             .build();
                     mNM.notify("timeout_min", 7013, n);
+                }
+            },
+            new Test("Too many cancels") {
+                public void run()
+                {
+                    mNM.cancelAll();
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    Notification n = new Notification.Builder(NotificationTestList.this, "default")
+                            .setSmallIcon(R.drawable.icon2)
+                            .setContentTitle("Cancel then post")
+                            .setContentText("instead of just updating the existing notification")
+                            .build();
+                    mNM.notify("cancel_madness", 7014, n);
                 }
             },
         new Test("Off") {

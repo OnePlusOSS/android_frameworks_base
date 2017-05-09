@@ -57,11 +57,9 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.animation.LayoutAnimationController;
 import android.view.animation.Transformation;
-
 import com.android.internal.R;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -808,33 +806,27 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
         return mDefaultFocus != null || super.hasDefaultFocus();
     }
 
-    void setFocusInCluster(View child) {
-        // Stop at the root of the cluster
-        if (child.isKeyboardNavigationCluster()) {
-            return;
-        }
-
+    void setFocusedInCluster(View child) {
         mFocusedInCluster = child;
-
-        if (mParent instanceof ViewGroup) {
-            ((ViewGroup) mParent).setFocusInCluster(this);
-        }
     }
 
-    void clearFocusInCluster(View child) {
+    /**
+     * Removes {@code child} (and associated focusedInCluster chain) from the cluster containing
+     * it.
+     * <br>
+     * This is intended to be run on {@code child}'s immediate parent. This is necessary because
+     * the chain is sometimes cleared after {@code child} has been detached.
+     */
+    void clearFocusedInCluster(View child) {
         if (mFocusedInCluster != child) {
             return;
         }
-
-        if (child.isKeyboardNavigationCluster()) {
-            return;
-        }
-
-        mFocusedInCluster = null;
-
-        if (mParent instanceof ViewGroup) {
-            ((ViewGroup) mParent).clearFocusInCluster(this);
-        }
+        View top = findKeyboardNavigationCluster();
+        ViewParent parent = this;
+        do {
+            ((ViewGroup) parent).mFocusedInCluster = null;
+            parent = parent.getParent();
+        } while (parent != top && parent instanceof ViewGroup);
     }
 
     @Override
@@ -1216,7 +1208,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
                 children[count++] = child;
             }
         }
-        Arrays.sort(children, 0, count, FocusFinder.getFocusComparator(this, false));
+        FocusFinder.sort(children, 0, count, this, isLayoutRtl());
         for (int i = 0; i < count; ++i) {
             children[i].addFocusables(views, direction, focusableMode);
         }
@@ -1266,7 +1258,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
                 visibleChildren[count++] = child;
             }
         }
-        Arrays.sort(visibleChildren, 0, count, FocusFinder.getFocusComparator(this, false));
+        FocusFinder.sort(visibleChildren, 0, count, this, isLayoutRtl());
         for (int i = 0; i < count; ++i) {
             visibleChildren[i].addKeyboardNavigationClusters(views, direction);
         }
@@ -1282,7 +1274,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     public void setTouchscreenBlocksFocus(boolean touchscreenBlocksFocus) {
         if (touchscreenBlocksFocus) {
             mGroupFlags |= FLAG_TOUCHSCREEN_BLOCKS_FOCUS;
-            if (hasFocus()) {
+            if (hasFocus() && !isKeyboardNavigationCluster()) {
                 final View focusedChild = getDeepestFocusedChild();
                 if (!focusedChild.isFocusableInTouchMode()) {
                     final View newFocus = focusSearch(FOCUS_FORWARD);
@@ -1307,6 +1299,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     /**
      * Check whether this ViewGroup should ignore focus requests for itself and its children.
      */
+    @ViewDebug.ExportedProperty(category = "focus")
     public boolean getTouchscreenBlocksFocus() {
         return (mGroupFlags & FLAG_TOUCHSCREEN_BLOCKS_FOCUS) != 0;
     }
@@ -1317,7 +1310,8 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
         // cluster, focus is free to move around within it.
         return getTouchscreenBlocksFocus() &&
                 mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
-                && (!hasFocus() || !isKeyboardNavigationCluster());
+                && !(isKeyboardNavigationCluster()
+                        && (hasFocus() || (findKeyboardNavigationCluster() != this)));
     }
 
     @Override
@@ -3218,8 +3212,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
     }
 
     private boolean restoreFocusInClusterInternal(@FocusRealDirection int direction) {
-        if (mFocusedInCluster != null && !mFocusedInCluster.isKeyboardNavigationCluster()
-                && getDescendantFocusability() != FOCUS_BLOCK_DESCENDANTS
+        if (mFocusedInCluster != null && getDescendantFocusability() != FOCUS_BLOCK_DESCENDANTS
                 && (mFocusedInCluster.mViewFlags & VISIBILITY_MASK) == VISIBLE
                 && mFocusedInCluster.restoreFocusInCluster(direction)) {
             return true;
@@ -3448,12 +3441,13 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
      * default {@link View} implementation.
      */
     @Override
-    public void dispatchProvideAutofillStructure(ViewStructure structure, int flags) {
+    public void dispatchProvideAutofillStructure(ViewStructure structure,
+            @AutofillFlags int flags) {
         super.dispatchProvideAutofillStructure(structure, flags);
-        if (isAutofillBlocked() || structure.getChildCount() != 0) {
+        if (structure.getChildCount() != 0) {
             return;
         }
-        final ChildListForAutoFill children = getChildrenForAutofill();
+        final ChildListForAutoFill children = getChildrenForAutofill(flags);
         final int childrenCount = children.size();
         structure.setChildCount(childrenCount);
         for (int i = 0; i < childrenCount; i++) {
@@ -3469,14 +3463,14 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
      * level descendants that are important for autofill. The returned
      * child list object is pooled and the caller must recycle it once done.
      * @hide */
-    private @NonNull ChildListForAutoFill getChildrenForAutofill() {
+    private @NonNull ChildListForAutoFill getChildrenForAutofill(@AutofillFlags int flags) {
         final ChildListForAutoFill children = ChildListForAutoFill.obtain();
-        populateChildrenForAutofill(children);
+        populateChildrenForAutofill(children, flags);
         return children;
     }
 
     /** @hide */
-    private void populateChildrenForAutofill(ArrayList<View> list) {
+    private void populateChildrenForAutofill(ArrayList<View> list, @AutofillFlags int flags) {
         final int childrenCount = mChildrenCount;
         if (childrenCount <= 0) {
             return;
@@ -3488,10 +3482,11 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             final int childIndex = getAndVerifyPreorderedIndex(childrenCount, i, customOrder);
             final View child = (preorderedList == null)
                     ? mChildren[childIndex] : preorderedList.get(childIndex);
-            if (child.isImportantForAutofill()) {
+            if ((flags & AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS) != 0
+                    || child.isImportantForAutofill()) {
                 list.add(child);
             } else if (child instanceof ViewGroup) {
-                ((ViewGroup) child).populateChildrenForAutofill(list);
+                ((ViewGroup) child).populateChildrenForAutofill(list, flags);
             }
         }
     }
@@ -5183,7 +5178,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             clearChildFocus = true;
         }
         if (view == mFocusedInCluster) {
-            clearFocusInCluster(view);
+            clearFocusedInCluster(view);
         }
 
         view.clearAccessibilityFocus();
@@ -5303,7 +5298,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
                 clearDefaultFocus = view;
             }
             if (view == mFocusedInCluster) {
-                clearFocusInCluster(view);
+                clearFocusedInCluster(view);
             }
 
             view.clearAccessibilityFocus();
@@ -5419,6 +5414,9 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
         if (mDefaultFocus != null) {
             clearDefaultFocus(mDefaultFocus);
         }
+        if (mFocusedInCluster != null) {
+            clearFocusedInCluster(mFocusedInCluster);
+        }
         if (clearChildFocus) {
             clearChildFocus(focused);
             if (!rootViewRequestFocus()) {
@@ -5459,7 +5457,7 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             clearDefaultFocus(child);
         }
         if (child == mFocusedInCluster) {
-            clearFocusInCluster(child);
+            clearFocusedInCluster(child);
         }
 
         child.clearAccessibilityFocus();
@@ -5823,34 +5821,6 @@ public abstract class ViewGroup extends View implements ViewParent, ViewManager 
             }
 
             return mParent;
-        }
-
-        return null;
-    }
-
-    /**
-     * Quick invalidation method that simply transforms the dirty rect into the parent's
-     * coordinate system, pruning the invalidation if the parent has already been invalidated.
-     *
-     * @hide
-     */
-    protected ViewParent damageChildInParent(int left, int top, final Rect dirty) {
-        if ((mPrivateFlags & PFLAG_DRAWN) != 0
-                || (mPrivateFlags & PFLAG_DRAWING_CACHE_VALID) != 0) {
-            dirty.offset(left - mScrollX, top - mScrollY);
-            if ((mGroupFlags & FLAG_CLIP_CHILDREN) == 0) {
-                dirty.union(0, 0, mRight - mLeft, mBottom - mTop);
-            }
-
-            if ((mGroupFlags & FLAG_CLIP_CHILDREN) == 0 ||
-                    dirty.intersect(0, 0, mRight - mLeft, mBottom - mTop)) {
-
-                if (!getMatrix().isIdentity()) {
-                    transformRect(dirty);
-                }
-
-                return mParent;
-            }
         }
 
         return null;

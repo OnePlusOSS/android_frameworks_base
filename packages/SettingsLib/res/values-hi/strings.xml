@@ -56,6 +56,8 @@
     <string name="bluetooth_profile_pan_nap" msgid="8429049285027482959">"इंटरनेट कनेक्शन साझाकरण"</string>
     <string name="bluetooth_profile_map" msgid="5465271250454324383">"संदेश एक्सेस"</string>
     <string name="bluetooth_profile_sap" msgid="5764222021851283125">"सिम ऐक्सेस"</string>
+    <string name="bluetooth_profile_a2dp_high_quality" msgid="2221025895896419505">"अच्छी गुणवत्ता वाले ऑडियो का उपयोग करें: <xliff:g id="CODEC_NAME">%1$s</xliff:g>"</string>
+    <string name="bluetooth_profile_a2dp_high_quality_unknown_codec" msgid="5860996587596508755">"अच्छी गुणवत्ता वाले ऑडियो का उपयोग करें"</string>
     <string name="bluetooth_a2dp_profile_summary_connected" msgid="963376081347721598">"मीडिया ऑडियो से कनेक्‍ट किया गया"</string>
     <string name="bluetooth_headset_profile_summary_connected" msgid="7661070206715520671">"फ़ोन ऑडियो से कनेक्‍ट किया गया"</string>
     <string name="bluetooth_opp_profile_summary_connected" msgid="2611913495968309066">"फ़ाइल स्‍थानांतरण सर्वर से कनेक्‍ट किया गया"</string>
@@ -172,6 +174,7 @@
     <string name="wifi_allow_scan_with_traffic" msgid="3601853081178265786">"हमेशा वाई-फ़ाई रोम स्कैन करने दें"</string>
     <string name="mobile_data_always_on" msgid="8774857027458200434">"मोबाइल डेटा हमेशा सक्रिय"</string>
     <string name="bluetooth_disable_absolute_volume" msgid="2660673801947898809">"पूर्ण वॉल्यूम अक्षम करें"</string>
+    <string name="bluetooth_enable_inband_ringing" msgid="3291686366721786740">"इन-बैंड रिंग करना सक्षम करें"</string>
     <string name="bluetooth_select_avrcp_version_string" msgid="3750059931120293633">"ब्लूटूथ AVRCP वर्शन"</string>
     <string name="bluetooth_select_avrcp_version_dialog_title" msgid="7277329668298705702">"ब्लूटूथ AVRCP वर्शन चुनें"</string>
     <string name="bluetooth_select_a2dp_codec_type" msgid="90597356942154882">"ब्लूटूथ ऑडियो कोडेक"</string>
@@ -209,6 +212,7 @@
     <string name="verify_apps_over_usb_title" msgid="4177086489869041953">"USB पर ऐप्स  सत्यापित करें"</string>
     <string name="verify_apps_over_usb_summary" msgid="9164096969924529200">"नुकसानदेह व्यवहार के लिए ADB/ADT के द्वारा इंस्टॉल किए गए ऐप्स  जांचें."</string>
     <string name="bluetooth_disable_absolute_volume_summary" msgid="6031284410786545957">"दूरस्थ डिवाइस के साथ वॉल्यूम की समस्याओं जैसे अस्वीकार्य तेज़ वॉल्यूम या नियंत्रण की कमी की स्थिति में ब्लूटूथ पूर्ण वॉल्यूम सुविधा को अक्षम करता है."</string>
+    <string name="bluetooth_enable_inband_ringing_summary" msgid="2787866074741784975">"फ़ोन की रिंगटोन को ब्लूटूथ हैडसेट पर बजने दें"</string>
     <string name="enable_terminal_title" msgid="95572094356054120">"स्थानीय टर्मिनल"</string>
     <string name="enable_terminal_summary" msgid="67667852659359206">"स्थानीय शेल एक्सेस ऑफ़र करने वाला टर्मिनल ऐप्स  सक्षम करें"</string>
     <string name="hdcp_checking_title" msgid="8605478913544273282">"HDCP जांच"</string>
@@ -295,8 +299,6 @@
     <string name="inactive_app_active_summary" msgid="4174921824958516106">"सक्रिय. टॉगल करने पर टैप करें."</string>
     <string name="runningservices_settings_title" msgid="8097287939865165213">"चल रही सेवाएं"</string>
     <string name="runningservices_settings_summary" msgid="854608995821032748">"वर्तमान में चल रही सेवाओं को देखें और नियंत्रित करें"</string>
-    <string name="enable_webview_multiprocess" msgid="3352660896640797330">"मल्टीप्रोसेस WebView"</string>
-    <string name="enable_webview_multiprocess_desc" msgid="2485604010404197724">"WebView रेंडरर अलग-अलग चलाएं"</string>
     <string name="select_webview_provider_title" msgid="4628592979751918907">"WebView कार्यान्वयन"</string>
     <string name="select_webview_provider_dialog_title" msgid="4370551378720004872">"WebView कार्यान्वयन सेट करें"</string>
     <string name="select_webview_provider_toast_text" msgid="5466970498308266359">"यह चयन अब मान्य नहीं है. पुनः प्रयास करें."</string>

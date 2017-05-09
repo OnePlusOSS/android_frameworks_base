@@ -128,6 +128,9 @@ public abstract class UtteranceProgressListener {
      * <p>This method is called when the audio is expected to start playing on the speaker. Note
      * that this is different from {@link #onAudioAvailable} which is called as soon as the audio is
      * generated.
+
+     * <p>This information can be used, for example, to highlight ranges of the text while it is
+     * spoken.
      *
      * <p>Only called if the engine supplies timing information by calling {@link
      * SynthesisCallback#rangeStart(int, int, int)}.
@@ -141,9 +144,8 @@ public abstract class UtteranceProgressListener {
         onUtteranceRangeStart(utteranceId, start, end);
     }
 
-    /**
-     * @deprecated Due to internal API changes. Remove when apps catch up.
-     */
+    /** @removed */
+    @Deprecated
     public void onUtteranceRangeStart(String utteranceId, int start, int end) {
     }
 

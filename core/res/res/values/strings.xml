@@ -212,6 +212,21 @@
     <!-- Displayed to tell the user that they should switch their network preference. -->
     <string name="NetworkPreferenceSwitchSummary">To improve reception, try changing the type selected at System &gt; Network &amp; Internet &gt; Mobile networks &gt; Preferred network type."</string>
 
+    <!-- Telephony notification channel name for a channel containing network alert notifications. -->
+    <string name="notification_channel_network_alert">Alerts</string>
+    <!-- Telephony notification channel name for a channel containing call forwarding notifications. -->
+    <string name="notification_channel_call_forward">Call forwarding</string>
+    <!-- Telephony notification channel name for a channel containing emergency callback mode notifications. -->
+    <string name="notification_channel_emergency_callback">Emergency callback mode</string>
+    <!-- Telephony notification channel name for a channel containing mobile data alert notifications. -->
+    <string name="notification_channel_mobile_data_alert">Mobile data alerts</string>
+    <!-- Telephony notification channel name for a channel containing sms notifications. -->
+    <string name="notification_channel_sms">SMS messages</string>
+    <!-- Telephony notification channel name for a channel containing voice mail notifications. -->
+    <string name="notification_channel_voice_mail">Voicemail messages</string>
+    <!-- Telephony notification channel name for a channel containing wifi calling status notifications. -->
+    <string name="notification_channel_wfc">Wi-Fi calling</string>
+
     <!-- Displayed to tell the user that peer changed TTY mode -->
     <string name="peerTtyModeFull">Peer requested TTY Mode FULL</string>
     <string name="peerTtyModeHco">Peer requested TTY Mode HCO</string>
@@ -629,6 +644,29 @@
     <!-- Text shown when viewing channel settings for notifications related to a usb connection -->
     <string name="notification_channel_usb">USB connection</string>
 
+    <!-- Text shown when viewing channel settings for notifications related to running foreground
+        services [CHAR LIMIT=NONE] -->
+    <string name="notification_channel_foreground_service">Apps running in background</string>
+
+    <!-- Label for foreground service notification when one app is running. [CHAR LIMIT=NONE] -->
+    <string name="foreground_service_app_in_background"><xliff:g id="app_name">%1$s</xliff:g> is
+        running in the background</string>
+
+    <!-- Label for foreground service notification when multiple apps are running.
+        [CHAR LIMIT=NONE] -->
+    <string name="foreground_service_apps_in_background"><xliff:g id="number">%1$d</xliff:g> apps
+        are running in the background</string>
+
+    <!-- Content for foreground service notification when one app is running.
+        [CHAR LIMIT=NONE] -->
+    <string name="foreground_service_tap_for_details">Tap for details on battery and
+        data usage</string>
+
+    <!-- Separator for foreground service notification content listing all apps when there
+        are multiple apps running [CHAR LIMIT=NONE] -->
+    <string name="foreground_service_multiple_separator"><xliff:g id="left_side">%1$s</xliff:g>,
+        <xliff:g id="right_side">%2$s</xliff:g></string>
+
     <!-- Displayed to the user to tell them that they have started up the phone in "safe mode" -->
     <string name="safeMode">Safe mode</string>
 
@@ -697,13 +735,6 @@
     <!-- Description for the capability of an accessibility service to request touch exploration. -->
     <string name="capability_desc_canRequestTouchExploration">Tapped items will be spoken aloud
         and the screen can be explored using gestures.</string>
-
-    <!-- Title for the capability of an accessibility service to request enhanced web accessibility. -->
-    <string name="capability_title_canRequestEnhancedWebAccessibility">Turn on enhanced web
-        accessibility</string>
-    <!-- Description for the capability of an accessibility service to request enhanced web accessibility. -->
-    <string name="capability_desc_canRequestEnhancedWebAccessibility">Scripts may be installed to
-        make app content more accessible.</string>
 
     <!-- Title for the capability of an accessibility service to request to filter key events. -->
     <string name="capability_title_canRequestFilterKeyEvents">Observe text you type</string>
@@ -3000,6 +3031,8 @@
 
     <!-- Do not translate. Default access point SSID used for tethering -->
     <string name="wifi_tether_configure_ssid_default" translatable="false">AndroidAP</string>
+    <!-- Do not translate. Default access point SSID used for local only hotspot -->
+    <string name="wifi_localhotspot_configure_ssid_default" translatable="false">AndroidShare</string>
 
     <!-- A notification is shown the first time a connection is attempted on an app owned AP -->
     <!-- title for this message -->
@@ -4585,23 +4618,26 @@
     <!-- Accessibility title for the autofill dialog used to select a list of options to autofill an activity. [CHAR LIMIT=NONE] -->
     <string name="autofill_picker_accessibility_title">Autofill options</string>
 
+    <!-- Accessibility title for the autofill dialog used to ask user to save the information on the screen by sending it to an Autofill Service. [CHAR LIMIT=NONE] -->
+    <string name="autofill_save_accessibility_title">Save for Autofill</string>
+
     <!-- Toast message shown when user manually request autofill but service could not figure out the data that would autofill the screen contents. [CHAR LIMIT=NONE] -->
     <string name="autofill_error_cannot_autofill">Contents can\u2019t be autofilled</string>
 
     <!-- Title for the autofill save dialog shown when the the contents of the activity can be saved
          by an autofill service, but the service does not know what the activity represents [CHAR LIMIT=NONE] -->
-    <string name="autofill_save_title">Save to <xliff:g id="label" example="MyPass">%1$s</xliff:g>?</string>
+    <string name="autofill_save_title">Save to &lt;b><xliff:g id="label" example="MyPass">%1$s</xliff:g>&lt;/b>?</string>
     <!-- Title for the autofill save dialog shown when the the contents of the activity can be saved
          by an autofill service, and the service does knows what the activity represents (for example, credit card info) [CHAR LIMIT=NONE] -->
-    <string name="autofill_save_title_with_type">Save <xliff:g id="type" example="Credit Card">%1$s</xliff:g> to <xliff:g id="label" example="MyPass">%2$s</xliff:g>?</string>
+    <string name="autofill_save_title_with_type">Save <xliff:g id="type" example="Credit Card">%1$s</xliff:g> to &lt;b><xliff:g id="label" example="MyPass">%2$s</xliff:g>&lt;/b>?</string>
     <!-- Title for the autofill save dialog shown when the the contents of the activity can be saved
          by an autofill service, and the service does knows what the activity represents, and it represents 2 types of
          data (for example, password and credit card info) [CHAR LIMIT=NONE] -->
-    <string name="autofill_save_title_with_2types">Save <xliff:g id="type" example="Password">%1$s</xliff:g>, <xliff:g id="type" example="Credit Card">%2$s</xliff:g> to <xliff:g id="label" example="MyPass">%3$s</xliff:g>?</string>
+    <string name="autofill_save_title_with_2types">Save <xliff:g id="type" example="Password">%1$s</xliff:g> and <xliff:g id="type" example="Credit Card">%2$s</xliff:g> to &lt;b><xliff:g id="label" example="MyPass">%3$s</xliff:g>&lt;/b>?</string>
     <!-- Title for the autofill save dialog shown when the the contents of the activity can be saved
          by an autofill service, and the service does knows what the activity represents, and it represents 3 types of
          data (for example, username, password and credit card info) [CHAR LIMIT=NONE] -->
-    <string name="autofill_save_title_with_3types">Save <xliff:g id="type" example="Username">%1$s</xliff:g>, <xliff:g id="type" example="Password">%2$s</xliff:g>, <xliff:g id="type" example="Credit Card">%3$s</xliff:g> to <xliff:g id="label" example="MyPass">%4$s</xliff:g>?</string>
+    <string name="autofill_save_title_with_3types">Save <xliff:g id="type" example="Username">%1$s</xliff:g>, <xliff:g id="type" example="Password">%2$s</xliff:g>, and <xliff:g id="type" example="Credit Card">%3$s</xliff:g> to &lt;b><xliff:g id="label" example="MyPass">%4$s</xliff:g>&lt;/b>?</string>
     <!-- Label for the autofill save button [CHAR LIMIT=NONE] -->
     <string name="autofill_save_yes">Save</string>
     <!-- Label for the autofill cancel button [CHAR LIMIT=NONE] -->
