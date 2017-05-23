@@ -352,7 +352,8 @@
     <string name="description_target_search" msgid="3091587249776033139">"搜索"</string>
     <string name="description_direction_up" msgid="7169032478259485180">"向上滑动以<xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>。"</string>
     <string name="description_direction_left" msgid="7207478719805562165">"向左滑动以<xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>。"</string>
-    <string name="zen_priority_introduction" msgid="3070506961866919502">"您将不会受声音和振动的打扰，但闹钟、提醒、活动和您指定的来电者除外。"</string>
+    <string name="zen_priority_introduction" msgid="7577965386868311310">"您将不会受到声音和振动的打扰（闹钟、提醒、活动和所指定来电者的相关提示音除外）。您依然可以听到您选择播放的任何内容（包括音乐、视频和游戏）的相关音效。"</string>
+    <string name="zen_alarms_introduction" msgid="7034415210361973827">"您将不会受到声音和振动的打扰（闹钟提示音除外）。您依然可以听到您选择播放的任何内容（包括音乐、视频和游戏）的相关音效。"</string>
     <string name="zen_priority_customize_button" msgid="7948043278226955063">"自定义"</string>
     <string name="zen_silence_introduction_voice" msgid="2284540992298200729">"这会阻止所有声音和振动（包括闹钟、音乐、视频和游戏）打扰您。您仍然可以拨打电话。"</string>
     <string name="zen_silence_introduction" msgid="3137882381093271568">"这会阻止所有声音和振动（包括闹钟、音乐、视频和游戏）打扰您。"</string>
@@ -472,7 +473,7 @@
     <string name="hidden_notifications_cancel" msgid="3690709735122344913">"不用了"</string>
     <string name="hidden_notifications_setup" msgid="41079514801976810">"设置"</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>（<xliff:g id="EXIT_CONDITION">%2$s</xliff:g>）"</string>
-    <string name="volume_zen_end_now" msgid="3179845345429841822">"立即结束"</string>
+    <string name="volume_zen_end_now" msgid="6930243045593601084">"立即关闭"</string>
     <string name="accessibility_volume_expand" msgid="5946812790999244205">"展开"</string>
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"收起"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"已固定屏幕"</string>
@@ -699,8 +700,8 @@
     <string name="accessibility_desc_notification_icon" msgid="8352414185263916335">"<xliff:g id="ID_1">%1$s</xliff:g>通知：<xliff:g id="ID_2">%2$s</xliff:g>"</string>
     <string name="dock_forced_resizable" msgid="5914261505436217520">"应用可能无法在分屏模式下正常运行。"</string>
     <string name="dock_non_resizeble_failed_to_dock_text" msgid="3871617304250207291">"应用不支持分屏。"</string>
-    <string name="forced_resizable_secondary_display" msgid="4230857851756391925">"应用可能无法在辅助显示屏上正常运行。"</string>
-    <string name="activity_launch_on_secondary_display_failed_text" msgid="7793821742158306742">"应用不支持在辅助显示屏上启动。"</string>
+    <string name="forced_resizable_secondary_display" msgid="4230857851756391925">"应用可能无法在辅显示屏上正常运行。"</string>
+    <string name="activity_launch_on_secondary_display_failed_text" msgid="7793821742158306742">"应用不支持在辅显示屏上启动。"</string>
     <string name="accessibility_quick_settings_settings" msgid="6132460890024942157">"打开设置。"</string>
     <string name="accessibility_quick_settings_expand" msgid="2375165227880477530">"开启快捷设置。"</string>
     <string name="accessibility_quick_settings_collapse" msgid="1792625797142648105">"关闭快捷设置。"</string>
@@ -767,4 +768,7 @@
     <string name="China_Unicom">中国联通</string>
     <string name="China_Telecom">中国电信</string>
     <string name="China_Mobile_HD">中国移动 (HD)</string>
+
+    <string name="running_foreground_services_title" msgid="381024150898615683">"在后台运行的应用"</string>
+    <string name="running_foreground_services_msg" msgid="6326247670075574355">"点按即可详细了解电量和流量消耗情况"</string>
 </resources>

@@ -354,7 +354,8 @@
     <string name="description_target_search" msgid="3091587249776033139">"Претрага"</string>
     <string name="description_direction_up" msgid="7169032478259485180">"Превуците нагоре за <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>."</string>
     <string name="description_direction_left" msgid="7207478719805562165">"Превуците улево за <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>."</string>
-    <string name="zen_priority_introduction" msgid="3070506961866919502">"Неће вас узнемиравати звукови и вибрације, осим за аларме, подсетнике, догађаје и позиваоце које изаберете."</string>
+    <string name="zen_priority_introduction" msgid="7577965386868311310">"Неће вас узнемиравати звукови и вибрације осим за аларме, подсетнике, догађаје и позиваоце које наведете. И даље ћете чути све што одаберете да пустите, укључујући музику, видео снимке и игре."</string>
+    <string name="zen_alarms_introduction" msgid="7034415210361973827">"Неће вас узнемиравати звукови и вибрације осим за аларме. И даље ћете чути све што одаберете да пустите, укључујући музику, видео снимке и игре."</string>
     <string name="zen_priority_customize_button" msgid="7948043278226955063">"Прилагоди"</string>
     <string name="zen_silence_introduction_voice" msgid="2284540992298200729">"Ово блокира СВЕ звукове и вибрације укључујући аларме, музику, видео снимке и игре. И даље ћете моћи да упућујете позиве."</string>
     <string name="zen_silence_introduction" msgid="3137882381093271568">"Ово блокира СВЕ звукове и вибрације укључујући аларме, музику, видео снимке и игре."</string>
@@ -400,7 +401,7 @@
     <string name="user_logout_notification_text" msgid="3350262809611876284">"Одјавите актуелног корисника"</string>
     <string name="user_logout_notification_action" msgid="1195428991423425062">"ОДЈАВИ КОРИСНИКА"</string>
     <string name="user_add_user_title" msgid="4553596395824132638">"Додајете новог корисника?"</string>
-    <string name="user_add_user_message_short" msgid="2161624834066214559">"Када додате новог корисника, та особа треба да подеси сопствени простор.\n\nСваки корисник може да ажурира апликације за све остале кориснике."</string>
+    <string name="user_add_user_message_short" msgid="2161624834066214559">"Када додате новог корисника, та особа треба да подеси свој простор.\n\nСваки корисник може да ажурира апликације за све остале кориснике."</string>
     <string name="user_remove_user_title" msgid="4681256956076895559">"Желите ли да уклоните корисника?"</string>
     <string name="user_remove_user_message" msgid="1453218013959498039">"Све апликације и подаци овог корисника ће бити избрисани."</string>
     <string name="user_remove_user_remove" msgid="7479275741742178297">"Уклони"</string>
@@ -474,7 +475,7 @@
     <string name="hidden_notifications_cancel" msgid="3690709735122344913">"Не, хвала"</string>
     <string name="hidden_notifications_setup" msgid="41079514801976810">"Подеси"</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
-    <string name="volume_zen_end_now" msgid="3179845345429841822">"Прекини одмах"</string>
+    <string name="volume_zen_end_now" msgid="6930243045593601084">"Искључи одмах"</string>
     <string name="accessibility_volume_expand" msgid="5946812790999244205">"Прошири"</string>
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"Скупи"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"Екран је закачен"</string>
@@ -590,8 +591,8 @@
     <string name="keyboard_key_dpad_left" msgid="1346446024676962251">"Тастер са стрелицом налево"</string>
     <string name="keyboard_key_dpad_right" msgid="3317323247127515341">"Тастер са стрелицом надесно"</string>
     <string name="keyboard_key_dpad_center" msgid="2566737770049304658">"Тастер са централном стрелицом"</string>
-    <string name="keyboard_key_tab" msgid="3871485650463164476">"Табулатор"</string>
-    <string name="keyboard_key_space" msgid="2499861316311153293">"Тастер за размак"</string>
+    <string name="keyboard_key_tab" msgid="3871485650463164476">"Tab"</string>
+    <string name="keyboard_key_space" msgid="2499861316311153293">"Размак"</string>
     <string name="keyboard_key_enter" msgid="5739632123216118137">"Enter"</string>
     <string name="keyboard_key_backspace" msgid="1559580097512385854">"Тастер за брисање уназад"</string>
     <string name="keyboard_key_media_play_pause" msgid="3861975717393887428">"Тастер за репродукцију/паузирање"</string>
@@ -657,7 +658,7 @@
   </string-array>
     <string name="menu_ime" msgid="4998010205321292416">"Пребацивач за тастатуру"</string>
     <string name="save" msgid="2311877285724540644">"Сачувај"</string>
-    <string name="reset" msgid="2448168080964209908">"Поново постави"</string>
+    <string name="reset" msgid="2448168080964209908">"Ресетуј"</string>
     <string name="adjust_button_width" msgid="6138616087197632947">"Прилагоди ширину дугмета"</string>
     <string name="clipboard" msgid="1313879395099896312">"Привремена меморија"</string>
     <string name="accessibility_key" msgid="5701989859305675896">"Прилагођено дугме за навигацију"</string>
@@ -765,4 +766,6 @@
     <string name="qs_dnd_until" msgid="3469471136280079874">"До <xliff:g id="ID_1">%s</xliff:g>"</string>
     <string name="qs_dnd_keep" msgid="1825009164681928736">"Задржи"</string>
     <string name="qs_dnd_replace" msgid="8019520786644276623">"Замени"</string>
+    <string name="running_foreground_services_title" msgid="381024150898615683">"Апликације покренуте у позадини"</string>
+    <string name="running_foreground_services_msg" msgid="6326247670075574355">"Додирните за детаље о батерији и потрошњи података"</string>
 </resources>

@@ -356,7 +356,8 @@
     <string name="description_target_search" msgid="3091587249776033139">"Căutați"</string>
     <string name="description_direction_up" msgid="7169032478259485180">"Glisați în sus pentru <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>."</string>
     <string name="description_direction_left" msgid="7207478719805562165">"Glisați spre stânga pentru <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>."</string>
-    <string name="zen_priority_introduction" msgid="3070506961866919502">"Nu veți fi deranjat(ă) de sunete și vibrații, exceptând alarmele, mementourile, evenimentele și apelanții pe care îi menționați."</string>
+    <string name="zen_priority_introduction" msgid="7577965386868311310">"Se vor anunța prin sunete și vibrații numai alarmele, mementourile, evenimentele și apelanții specificați de dvs. Totuși, veți auzi tot ce alegeți să redați, inclusiv muzică, videoclipuri și jocuri."</string>
+    <string name="zen_alarms_introduction" msgid="7034415210361973827">"Se vor anunța prin sunete și vibrații numai alarmele. Totuși, veți auzi tot ce alegeți să redați, inclusiv muzică, videoclipuri și jocuri."</string>
     <string name="zen_priority_customize_button" msgid="7948043278226955063">"Personalizați"</string>
     <string name="zen_silence_introduction_voice" msgid="2284540992298200729">"Această opțiune blochează TOATE sunetele și vibrațiile, inclusiv cele ale alarmelor, muzicii, videoclipurilor și jocurilor. Totuși, veți putea iniția apeluri."</string>
     <string name="zen_silence_introduction" msgid="3137882381093271568">"Această opțiune blochează TOATE sunetele și vibrațiile, inclusiv cele ale alarmelor, muzicii, videoclipurilor și jocurilor."</string>
@@ -476,7 +477,7 @@
     <string name="hidden_notifications_cancel" msgid="3690709735122344913">"Nu, mulț."</string>
     <string name="hidden_notifications_setup" msgid="41079514801976810">"Config."</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
-    <string name="volume_zen_end_now" msgid="3179845345429841822">"Opriți acum"</string>
+    <string name="volume_zen_end_now" msgid="6930243045593601084">"Dezactivați acum"</string>
     <string name="accessibility_volume_expand" msgid="5946812790999244205">"Extindeți"</string>
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"Restrângeți"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"Ecranul este fixat"</string>
@@ -638,7 +639,7 @@
     <string name="data_saver" msgid="5037565123367048522">"Economizor de date"</string>
     <string name="accessibility_data_saver_on" msgid="8454111686783887148">"Economizorul de date este activat"</string>
     <string name="accessibility_data_saver_off" msgid="8841582529453005337">"Economizorul de date este dezactivat"</string>
-    <string name="switch_bar_on" msgid="1142437840752794229">"Activați"</string>
+    <string name="switch_bar_on" msgid="1142437840752794229">"Activat"</string>
     <string name="switch_bar_off" msgid="8803270596930432874">"Dezactivați"</string>
     <string name="nav_bar" msgid="1993221402773877607">"Bară de navigare"</string>
     <string name="nav_bar_layout" msgid="3664072994198772020">"Aspect"</string>
@@ -705,8 +706,8 @@
     <string name="accessibility_desc_notification_icon" msgid="8352414185263916335">"Notificare <xliff:g id="ID_1">%1$s</xliff:g>: <xliff:g id="ID_2">%2$s</xliff:g>"</string>
     <string name="dock_forced_resizable" msgid="5914261505436217520">"Este posibil ca aplicația să nu funcționeze cu ecranul împărțit."</string>
     <string name="dock_non_resizeble_failed_to_dock_text" msgid="3871617304250207291">"Aplicația nu acceptă ecranul împărțit."</string>
-    <string name="forced_resizable_secondary_display" msgid="4230857851756391925">"Este posibil ca aplicația să nu funcționeze pe un afișaj secundar."</string>
-    <string name="activity_launch_on_secondary_display_failed_text" msgid="7793821742158306742">"Aplicația nu acceptă lansare pe afișaje secundare."</string>
+    <string name="forced_resizable_secondary_display" msgid="4230857851756391925">"Este posibil ca aplicația să nu funcționeze pe un ecran secundar."</string>
+    <string name="activity_launch_on_secondary_display_failed_text" msgid="7793821742158306742">"Aplicația nu acceptă lansare pe ecrane secundare."</string>
     <string name="accessibility_quick_settings_settings" msgid="6132460890024942157">"Deschideți setările."</string>
     <string name="accessibility_quick_settings_expand" msgid="2375165227880477530">"Deschideți setările rapide."</string>
     <string name="accessibility_quick_settings_collapse" msgid="1792625797142648105">"Închideți setările rapide."</string>
@@ -767,4 +768,6 @@
     <string name="qs_dnd_until" msgid="3469471136280079874">"Până la <xliff:g id="ID_1">%s</xliff:g>"</string>
     <string name="qs_dnd_keep" msgid="1825009164681928736">"Păstrați"</string>
     <string name="qs_dnd_replace" msgid="8019520786644276623">"Înlocuiți"</string>
+    <string name="running_foreground_services_title" msgid="381024150898615683">"Aplicațiile rulează în fundal"</string>
+    <string name="running_foreground_services_msg" msgid="6326247670075574355">"Atingeți pentru mai multe detalii privind bateria și utilizarea datelor"</string>
 </resources>

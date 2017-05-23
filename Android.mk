@@ -146,6 +146,7 @@ LOCAL_SRC_FILES += \
 	core/java/android/bluetooth/le/IAdvertisingSetCallback.aidl \
 	core/java/android/bluetooth/le/IPeriodicAdvertisingCallback.aidl \
 	core/java/android/bluetooth/le/IScannerCallback.aidl \
+	core/java/android/bluetooth/IBluetoothDun.aidl \
 	core/java/android/content/IClipboard.aidl \
 	core/java/android/content/IContentService.aidl \
 	core/java/android/content/IIntentReceiver.aidl \
@@ -322,7 +323,6 @@ LOCAL_SRC_FILES += \
 	core/java/android/service/chooser/IChooserTargetResult.aidl \
 	core/java/android/service/resolver/IResolverRankerService.aidl \
 	core/java/android/service/resolver/IResolverRankerResult.aidl \
-	core/java/android/text/ITextClassificationService.aidl \
 	core/java/android/view/accessibility/IAccessibilityInteractionConnection.aidl\
 	core/java/android/view/accessibility/IAccessibilityInteractionConnectionCallback.aidl\
 	core/java/android/view/accessibility/IAccessibilityManager.aidl \
@@ -1065,6 +1065,7 @@ LOCAL_DROIDDOC_OPTIONS:=\
 		-showAnnotation android.annotation.SystemApi \
 		-api $(INTERNAL_PLATFORM_SYSTEM_API_FILE) \
 		-removedApi $(INTERNAL_PLATFORM_SYSTEM_REMOVED_API_FILE) \
+		-exactApi $(INTERNAL_PLATFORM_SYSTEM_EXACT_API_FILE) \
 		-nodocs
 
 LOCAL_DROIDDOC_CUSTOM_TEMPLATE_DIR:=external/doclava/res/assets/templates-sdk
@@ -1101,6 +1102,7 @@ LOCAL_DROIDDOC_OPTIONS:=\
                -showAnnotation android.annotation.TestApi \
                -api $(INTERNAL_PLATFORM_TEST_API_FILE) \
                -removedApi $(INTERNAL_PLATFORM_TEST_REMOVED_API_FILE) \
+               -exactApi $(INTERNAL_PLATFORM_TEST_EXACT_API_FILE) \
                -nodocs
 
 LOCAL_DROIDDOC_CUSTOM_TEMPLATE_DIR:=external/doclava/res/assets/templates-sdk
@@ -1254,8 +1256,6 @@ LOCAL_DROIDDOC_CUSTOM_TEMPLATE_DIR:=external/doclava/res/assets/templates-sdk
 include $(BUILD_DROIDDOC)
 
 # ==== docs for the web (on the androiddevdocs app engine server) =======================
-# TODO: Fix the System API docs build.
-ifneq ($(filter online-system-api-sdk-docs,$(MAKECMDGOALS)),)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:=$(framework_docs_LOCAL_SRC_FILES)
@@ -1286,11 +1286,10 @@ LOCAL_DROIDDOC_OPTIONS:= \
 		-samplesdir $(samples_dir)
 
 LOCAL_DROIDDOC_CUSTOM_TEMPLATE_DIR:=external/doclava/res/assets/templates-sdk
-# Don't build by default
+
 LOCAL_UNINSTALLABLE_MODULE := true
 
 include $(BUILD_DROIDDOC)
-endif  # online-system-api-sdk-docs in make command line.
 
 # ==== docs for the web (on the devsite app engine server) =======================
 include $(CLEAR_VARS)

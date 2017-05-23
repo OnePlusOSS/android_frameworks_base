@@ -966,6 +966,14 @@ public final class BatteryStatsService extends IBatteryStats.Stub
     }
 
     @Override
+    public void noteBleScanResults(WorkSource ws, int numNewResults) {
+        enforceCallingPermission();
+        synchronized (mStats) {
+            mStats.noteBluetoothScanResultsFromSourceLocked(ws, numNewResults);
+        }
+    }
+
+    @Override
     public void noteWifiControllerActivity(WifiActivityEnergyInfo info) {
         enforceCallingPermission();
 

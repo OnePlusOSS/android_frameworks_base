@@ -119,7 +119,6 @@ public final class ServerSession extends ObexSession implements Runnable {
 
                     case ObexHelper.OBEX_OPCODE_DISCONNECT:
                         handleDisconnectRequest();
-                        done = true;
                         break;
 
                     case ObexHelper.OBEX_OPCODE_GET:

@@ -352,7 +352,8 @@
     <string name="description_target_search" msgid="3091587249776033139">"Αναζήτηση"</string>
     <string name="description_direction_up" msgid="7169032478259485180">"Κύλιση προς τα επάνω για <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>."</string>
     <string name="description_direction_left" msgid="7207478719805562165">"Κύλιση προς τα αριστερά για <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>."</string>
-    <string name="zen_priority_introduction" msgid="3070506961866919502">"Δεν θα διακόπτεστε από ήχους και δονήσεις, με εξαίρεση τα ξυπνητήρια, τις υπενθυμίσεις, τα συμβάντα και τους καλούντες που έχετε ορίσει."</string>
+    <string name="zen_priority_introduction" msgid="7577965386868311310">"Δεν θα ενοχλείστε από ήχους και δονήσεις, παρά μόνο από ξυπνητήρια, υπενθυμίσεις, συμβάντα και καλούντες που έχετε καθορίσει. Θα εξακολουθείτε να ακούτε όλο το περιεχόμενο που επιλέγετε να αναπαραγάγετε, συμπεριλαμβανομένων μουσικής, βίντεο και παιχνιδιών."</string>
+    <string name="zen_alarms_introduction" msgid="7034415210361973827">"Δεν θα ενοχλείστε από ήχους και δονήσεις, παρά μόνο από ξυπνητήρια. Θα εξακολουθείτε να ακούτε όλο το περιεχόμενο που επιλέγετε να αναπαραγάγετε, συμπεριλαμβανομένων μουσικής, βίντεο και παιχνιδιών."</string>
     <string name="zen_priority_customize_button" msgid="7948043278226955063">"Προσαρμογή"</string>
     <string name="zen_silence_introduction_voice" msgid="2284540992298200729">"Αυτή η επιλογή αποκλείει όλους τους ήχους και τις δονήσεις, μεταξύ των οποίων των ξυπνητηριών, της μουσικής, των βίντεο και των παιχνιδιών. Θα εξακολουθείτε να είστε σε θέση να πραγματοποιήσετε τηλεφωνικές κλήσεις."</string>
     <string name="zen_silence_introduction" msgid="3137882381093271568">"Αυτή η επιλογή αποκλείει όλους τους ήχους και τις δονήσεις, μεταξύ των οποίων των ξυπνητηριών, της μουσικής, των βίντεο και των παιχνιδιών."</string>
@@ -472,7 +473,7 @@
     <string name="hidden_notifications_cancel" msgid="3690709735122344913">"Όχι"</string>
     <string name="hidden_notifications_setup" msgid="41079514801976810">"Ρύθμιση"</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
-    <string name="volume_zen_end_now" msgid="3179845345429841822">"Τερματισμός τώρα"</string>
+    <string name="volume_zen_end_now" msgid="6930243045593601084">"Απενεργοποίηση τώρα"</string>
     <string name="accessibility_volume_expand" msgid="5946812790999244205">"Ανάπτυξη"</string>
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"Σύμπτυξη"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"Η οθόνη καρφιτσώθηκε"</string>
@@ -699,7 +700,7 @@
     <string name="accessibility_desc_notification_icon" msgid="8352414185263916335">"Ειδοποίηση <xliff:g id="ID_1">%1$s</xliff:g>: <xliff:g id="ID_2">%2$s</xliff:g>"</string>
     <string name="dock_forced_resizable" msgid="5914261505436217520">"Δεν είναι δυνατή η λειτουργία της εφαρμογής με διαχωρισμό οθόνης."</string>
     <string name="dock_non_resizeble_failed_to_dock_text" msgid="3871617304250207291">"Η εφαρμογή δεν υποστηρίζει διαχωρισμό οθόνης."</string>
-    <string name="forced_resizable_secondary_display" msgid="4230857851756391925">"Η εφαρμογή μπορεί να λειτουργεί σε μια δευτερεύουσα οθόνη."</string>
+    <string name="forced_resizable_secondary_display" msgid="4230857851756391925">"Η εφαρμογή ίσως να μην λειτουργήσει σε δευτερεύουσα οθόνη."</string>
     <string name="activity_launch_on_secondary_display_failed_text" msgid="7793821742158306742">"Η εφαρμογή δεν υποστηρίζει την εκκίνηση σε δευτερεύουσες οθόνες."</string>
     <string name="accessibility_quick_settings_settings" msgid="6132460890024942157">"Άνοιγμα ρυθμίσεων."</string>
     <string name="accessibility_quick_settings_expand" msgid="2375165227880477530">"Άνοιγμα γρήγορων ρυθμίσεων."</string>
@@ -761,4 +762,6 @@
     <string name="qs_dnd_until" msgid="3469471136280079874">"Έως τις <xliff:g id="ID_1">%s</xliff:g>"</string>
     <string name="qs_dnd_keep" msgid="1825009164681928736">"Διατήρηση"</string>
     <string name="qs_dnd_replace" msgid="8019520786644276623">"Αντικατάσταση"</string>
+    <string name="running_foreground_services_title" msgid="381024150898615683">"Εφαρμογές που εκτελούνται στο παρασκήνιο"</string>
+    <string name="running_foreground_services_msg" msgid="6326247670075574355">"Πατήστε για λεπτομέρειες σχετικά με τη χρήση μπαταρίας και δεδομένων"</string>
 </resources>

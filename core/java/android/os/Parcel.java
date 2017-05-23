@@ -204,6 +204,8 @@ public final class Parcel {
     private boolean mOwnsNativeParcelObject;
     private long mNativeSize;
 
+    private ArrayMap<Class, Object> mClassCookies;
+
     private RuntimeException mStack;
 
     private static final int POOL_SIZE = 6;
@@ -427,7 +429,13 @@ public final class Parcel {
      * @param size The new number of bytes in the Parcel.
      */
     public final void setDataSize(int size) {
-        updateNativeSize(nativeSetDataSize(mNativePtr, size));
+        // STOPSHIP: Try/catch for exception is for temporary debug. Remove once bug resolved
+        try {
+            updateNativeSize(nativeSetDataSize(mNativePtr, size));
+        } catch (IllegalArgumentException iae) {
+            Log.e(TAG,"Caught Exception representing a known bug in Parcel",iae);
+            Log.wtfStack(TAG, "This flow is using SetDataSize incorrectly");
+        }
     }
 
     /**
@@ -489,6 +497,24 @@ public final class Parcel {
     /** @hide */
     public final int compareData(Parcel other) {
         return nativeCompareData(mNativePtr, other.mNativePtr);
+    }
+
+    /** @hide */
+    public final void setClassCookie(Class clz, Object cookie) {
+        if (mClassCookies == null) {
+            mClassCookies = new ArrayMap<>();
+        }
+        mClassCookies.put(clz, cookie);
+    }
+
+    /** @hide */
+    public final Object getClassCookie(Class clz) {
+        return mClassCookies != null ? mClassCookies.get(clz) : null;
+    }
+
+    /** @hide */
+    public final void adoptClassCookies(Parcel from) {
+        mClassCookies = from.mClassCookies;
     }
 
     /**

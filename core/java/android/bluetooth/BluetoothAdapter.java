@@ -1030,28 +1030,6 @@ public final class BluetoothAdapter {
     }
 
     /**
-     * enable or disable Bluetooth HCI snoop log.
-     *
-     * <p>Requires the {@link android.Manifest.permission#BLUETOOTH_ADMIN}
-     * permission
-     *
-     * @return true to indicate configure HCI log successfully, or false on
-     *         immediate error
-     * @hide
-     */
-    public boolean configHciSnoopLog(boolean enable) {
-        try {
-            mServiceLock.readLock().lock();
-            if (mService != null) return mService.configHciSnoopLog(enable);
-        } catch (RemoteException e) {
-            Log.e(TAG, "", e);
-        } finally {
-            mServiceLock.readLock().unlock();
-        }
-        return false;
-    }
-
-    /**
      * Factory reset bluetooth settings.
      *
      * <p>Requires the {@link android.Manifest.permission#BLUETOOTH_PRIVILEGED}
@@ -2071,6 +2049,9 @@ public final class BluetoothAdapter {
         } else if (profile == BluetoothProfile.PAN) {
             BluetoothPan pan = new BluetoothPan(context, listener);
             return true;
+        } else if (profile == BluetoothProfile.DUN) {
+            BluetoothDun dun = new BluetoothDun(context, listener);
+            return true;
         } else if (profile == BluetoothProfile.HEALTH) {
             BluetoothHealth health = new BluetoothHealth(context, listener);
             return true;
@@ -2135,6 +2116,10 @@ public final class BluetoothAdapter {
             case BluetoothProfile.PAN:
                 BluetoothPan pan = (BluetoothPan)proxy;
                 pan.close();
+                break;
+            case BluetoothProfile.DUN:
+                BluetoothDun dun = (BluetoothDun)proxy;
+                dun.close();
                 break;
             case BluetoothProfile.HEALTH:
                 BluetoothHealth health = (BluetoothHealth)proxy;

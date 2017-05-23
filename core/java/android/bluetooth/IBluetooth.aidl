@@ -97,7 +97,6 @@ interface IBluetooth
     ParcelFileDescriptor connectSocket(in BluetoothDevice device, int type, in ParcelUuid uuid, int port, int flag);
     ParcelFileDescriptor createSocketChannel(int type, in String serviceName, in ParcelUuid uuid, int port, int flag);
 
-    boolean configHciSnoopLog(boolean enable);
     boolean factoryReset();
 
     boolean isMultiAdvertisementSupported();
@@ -122,4 +121,7 @@ interface IBluetooth
 
     void onLeServiceUp();
     void onBrEdrDown();
+
+    int setSocketOpt(int type, int port, int optionName, in byte [] optionVal, int optionLen);
+    int getSocketOpt(int type, int port, int optionName, out byte [] optionVal);
 }

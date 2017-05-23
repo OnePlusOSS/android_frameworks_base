@@ -411,5 +411,6 @@
     <string name="config_rat_4g" translatable="false">4G</string>
 
     <bool name="kg_hide_emgcy_btn_when_oos">false</bool>
+    <bool name="config_showEmergencyButton">true</bool>
 
 </resources>

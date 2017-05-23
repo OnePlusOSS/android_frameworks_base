@@ -393,6 +393,12 @@
     <!-- Activity name to enable wifi tethering after provisioning app succeeds -->
     <string translatable="false" name="config_wifi_tether_enable">com.android.settings/.TetherService</string>
 
+    <!-- Controls the WiFi wakeup feature.
+          0 = Not available.
+          1 = Available.
+     -->
+    <integer translatable="false" name="config_wifi_wakeup_available">0</integer>
+
     <!-- Array of ConnectivityManager.TYPE_xxxx values allowable for tethering -->
     <!-- Common options are [1, 4] for TYPE_WIFI and TYPE_MOBILE_DUN or
     <!== [0,1,5,7] for TYPE_MOBILE, TYPE_WIFI, TYPE_MOBILE_HIPRI and TYPE_BLUETOOTH -->
@@ -1007,6 +1013,9 @@
     <!-- Is the notification LED intrusive? Used to decide if there should be a disable option -->
     <bool name="config_intrusiveNotificationLed">false</bool>
 
+    <!-- De we do icon badges? Used to decide if there should be a disable option-->
+    <bool name="config_notificationBadging">true</bool>
+
     <!-- Default value for LED off time when the battery is low on charge in miliseconds -->
     <integer name="config_notificationsBatteryLedOff">2875</integer>
 
@@ -1299,9 +1308,9 @@
              * Include a Service for the android.net.scoring.RECOMMEND_NETWORKS action
                protected by the BIND_NETWORK_RECOMMENDATION_SERVICE permission.
 
-         This must be set to a valid network recommendation app.
+         This must be set to a valid network recommendation app or empty.
      -->
-    <string name="config_defaultNetworkRecommendationProviderPackage" translatable="false">com.android.networkrecommendation</string>
+    <string name="config_defaultNetworkRecommendationProviderPackage" translatable="false"></string>
 
     <!-- Whether to enable Hardware FLP overlay which allows Hardware FLP to be
          replaced by an app at run-time. When disabled, only the
@@ -2846,6 +2855,11 @@
     <!-- Default data warning level in mb -->
     <integer name="default_data_warning_level_mb">2048</integer>
 
+    <!-- When true, indicates that the vendor's IMS implementation requires a workaround when
+     sending a request to enable or disable the camera while the video session is also
+     paused. -->
+    <bool name="config_useVideoPauseWorkaround">false</bool>
+
     <!-- Whether to send a custom package name with the PSD.-->
     <bool name="config_sendPackageName">false</bool>
 
@@ -2884,4 +2898,14 @@
 
     <!-- Additional non-platform defined secure settings exposed to Instant Apps -->
     <string-array name="config_allowedSecureInstantAppSettings"></string-array>
+
+    <!-- Handle volume keys directly in Window Manager without passing them to the foreground app -->
+    <bool name="config_handleVolumeKeysInWindowManager">false</bool>
+
+    <!-- Volume level of in-call notification tone playback,
+         relative to the overall voice call stream volume [0..100] -->
+    <integer name="config_inCallNotificationVolumeRelative">67</integer>
+
+    <!-- Configuartion to support SIM contact batch operation.-->
+    <bool name="config_sim_phonebook_batch_operation">true</bool>
 </resources>

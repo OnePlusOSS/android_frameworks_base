@@ -365,8 +365,9 @@ import java.util.List;
  * <b>NOTIFICATION TYPES</b></br>
  * </p>
  * <p>
- * <b>Notification state changed</b> - represents the event showing
- * {@link android.app.Notification}.</br>
+ * <b>Notification state changed</b> - represents the event showing a transient piece of information
+ * to the user. This information may be a {@link android.app.Notification} or
+ * {@link android.widget.Toast}.</br>
  * <em>Type:</em> {@link #TYPE_NOTIFICATION_STATE_CHANGED}</br>
  * <em>Properties:</em></br>
  * <ul>
@@ -374,18 +375,12 @@ import java.util.List;
  *   <li>{@link #getClassName()} - The class name of the source.</li>
  *   <li>{@link #getPackageName()} - The package name of the source.</li>
  *   <li>{@link #getEventTime()}  - The event time.</li>
- *   <li>{@link #getParcelableData()} - The posted {@link android.app.Notification}.</li>
- *   <li>{@link #getText()} - Text for providing more context.</li>
+ *   <li>{@link #getParcelableData()} - The posted {@link android.app.Notification}, if
+ *   applicable.</li>
+ *   <li>{@link #getText()} - Displayed text of the {@link android.widget.Toast}, if applicable,
+ *   or may contain text from the {@link android.app.Notification}, although
+ *   {@link #getParcelableData()} is a richer set of data for {@link android.app.Notification}.</li>
  * </ul>
- * <em>Note:</em> This event type is not dispatched to descendants though
- * {@link android.view.View#dispatchPopulateAccessibilityEvent(AccessibilityEvent)
- * View.dispatchPopulateAccessibilityEvent(AccessibilityEvent)}, hence the event
- * source {@link android.view.View} and the sub-tree rooted at it will not receive
- * calls to {@link android.view.View#onPopulateAccessibilityEvent(AccessibilityEvent)
- * View.onPopulateAccessibilityEvent(AccessibilityEvent)}. The preferred way to add
- * text content to such events is by setting the
- * {@link android.R.styleable#View_contentDescription contentDescription} of the source
- * view.</br>
  * </p>
  * <p>
  * <b>EXPLORATION TYPES</b></br>
@@ -529,13 +524,6 @@ import java.util.List;
  *   <li>{@link #isEnabled()} - Whether the source is enabled.</li>
  * </ul>
  * </p>
- * <p>
- * <b>Security note</b>
- * <p>
- * Since an event contains the text of its source privacy can be compromised by leaking
- * sensitive information such as passwords. To address this issue any event fired in response
- * to manipulation of a PASSWORD field does NOT CONTAIN the text of the password.
- * </p>
  *
  * @see android.view.accessibility.AccessibilityManager
  * @see android.accessibilityservice.AccessibilityService
@@ -630,7 +618,8 @@ public final class AccessibilityEvent extends AccessibilityRecord implements Par
     public static final int TYPE_WINDOW_CONTENT_CHANGED = 0x00000800;
 
     /**
-     * Represents the event of scrolling a view.
+     * Represents the event of scrolling a view. This event type is generally not sent directly.
+     * @see View#onScrollChanged(int, int, int, int)
      */
     public static final int TYPE_VIEW_SCROLLED = 0x00001000;
 

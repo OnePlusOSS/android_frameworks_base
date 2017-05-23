@@ -352,7 +352,8 @@
     <string name="description_target_search" msgid="3091587249776033139">"Pesquisar"</string>
     <string name="description_direction_up" msgid="7169032478259485180">"Deslize para cima para <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g> ."</string>
     <string name="description_direction_left" msgid="7207478719805562165">"Deslize para a esquerda para <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g> ."</string>
-    <string name="zen_priority_introduction" msgid="3070506961866919502">"Não é incomodado por sons e vibrações, exceto de alarmes, lembretes, eventos e autores de chamadas que especificar."</string>
+    <string name="zen_priority_introduction" msgid="7577965386868311310">"Não é incomodado por sons e vibrações, exceto de alarmes, lembretes, eventos e autores de chamadas que especificar. Continua a ouvir tudo o que optar por reproduzir, incluindo música, vídeos e jogos."</string>
+    <string name="zen_alarms_introduction" msgid="7034415210361973827">"Não é incomodado por sons e vibrações, exceto de alarmes. Continua a ouvir tudo o que optar por reproduzir, incluindo música, vídeos e jogos."</string>
     <string name="zen_priority_customize_button" msgid="7948043278226955063">"Personalizar"</string>
     <string name="zen_silence_introduction_voice" msgid="2284540992298200729">"Esta ação bloqueia TODOS os sons e as vibrações, incluindo de alarmes, de músicas, de vídeos e de jogos. Continua a ser possível telefonar."</string>
     <string name="zen_silence_introduction" msgid="3137882381093271568">"Esta ação bloqueia TODOS os sons e as vibrações, incluindo de alarmes, de músicas, de vídeos e de jogos."</string>
@@ -387,7 +388,7 @@
     <string name="guest_exit_guest_dialog_title" msgid="8480693520521766688">"Pretende remover o convidado?"</string>
     <string name="guest_exit_guest_dialog_message" msgid="4155503224769676625">"Todas as aplicações e dados desta sessão serão eliminados."</string>
     <string name="guest_exit_guest_dialog_remove" msgid="7402231963862520531">"Remover"</string>
-    <string name="guest_wipe_session_title" msgid="6419439912885956132">"Bem-vindo(a) de volta, caro(a) convidado(a)!"</string>
+    <string name="guest_wipe_session_title" msgid="6419439912885956132">"Bem-vindo de volta, caro(a) convidado(a)!"</string>
     <string name="guest_wipe_session_message" msgid="8476238178270112811">"Pretende continuar a sessão?"</string>
     <string name="guest_wipe_session_wipe" msgid="5065558566939858884">"Recomeçar"</string>
     <string name="guest_wipe_session_dontwipe" msgid="1401113462524894716">"Sim, continuar"</string>
@@ -472,7 +473,7 @@
     <string name="hidden_notifications_cancel" msgid="3690709735122344913">"Não, obrigado"</string>
     <string name="hidden_notifications_setup" msgid="41079514801976810">"Configurar"</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
-    <string name="volume_zen_end_now" msgid="3179845345429841822">"Terminar agora"</string>
+    <string name="volume_zen_end_now" msgid="6930243045593601084">"Desativar agora"</string>
     <string name="accessibility_volume_expand" msgid="5946812790999244205">"Expandir"</string>
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"Reduzir"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"O ecrã está fixado"</string>
@@ -761,4 +762,6 @@
     <string name="qs_dnd_until" msgid="3469471136280079874">"Até à(s) <xliff:g id="ID_1">%s</xliff:g>"</string>
     <string name="qs_dnd_keep" msgid="1825009164681928736">"Manter"</string>
     <string name="qs_dnd_replace" msgid="8019520786644276623">"Substituir"</string>
+    <string name="running_foreground_services_title" msgid="381024150898615683">"Aplicações em execução em segundo plano"</string>
+    <string name="running_foreground_services_msg" msgid="6326247670075574355">"Toque para obter detalhes acerca da utilização da bateria e dos dados"</string>
 </resources>

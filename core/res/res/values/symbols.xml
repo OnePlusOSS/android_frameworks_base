@@ -1861,6 +1861,8 @@
   <java-symbol type="layout" name="safe_mode" />
   <java-symbol type="layout" name="simple_list_item_2_single_choice" />
   <java-symbol type="layout" name="app_error_dialog" />
+  <java-symbol type="plurals" name="wifi_available" />
+  <java-symbol type="plurals" name="wifi_available_detailed" />
   <java-symbol type="string" name="accessibility_binding_label" />
   <java-symbol type="string" name="adb_active_notification_message" />
   <java-symbol type="string" name="adb_active_notification_title" />
@@ -2087,7 +2089,9 @@
   <java-symbol type="string" name="config_mobile_hotspot_provision_response" />
   <java-symbol type="integer" name="config_mobile_hotspot_provision_check_period" />
   <java-symbol type="string" name="config_wifi_tether_enable" />
+  <java-symbol type="integer" name="config_wifi_wakeup_available" />
   <java-symbol type="bool" name="config_intrusiveNotificationLed" />
+  <java-symbol type="bool" name="config_notificationBadging" />
   <java-symbol type="dimen" name="preference_fragment_padding_bottom" />
   <java-symbol type="dimen" name="preference_fragment_padding_side" />
   <java-symbol type="drawable" name="expander_ic_maximized" />
@@ -2279,6 +2283,7 @@
   <java-symbol type="array" name="fingerprint_acquired_vendor" />
   <java-symbol type="string" name="fingerprint_error_canceled" />
   <java-symbol type="string" name="fingerprint_error_lockout" />
+  <java-symbol type="string" name="fingerprint_error_lockout_permanent" />
   <java-symbol type="string" name="fingerprint_name_template" />
 
   <!-- Fingerprint config -->
@@ -2893,6 +2898,8 @@
   <java-symbol type="id" name="autofill_save_yes" />
   <java-symbol type="id" name="autofill_save_close" />
   <java-symbol type="string" name="autofill_error_cannot_autofill" />
+  <java-symbol type="string" name="autofill_picker_no_suggestions" />
+  <java-symbol type="plurals" name="autofill_picker_some_suggestions" />
   <java-symbol type="string" name="autofill" />
   <java-symbol type="string" name="autofill_picker_accessibility_title " />
   <java-symbol type="string" name="autofill_save_accessibility_title " />
@@ -2931,9 +2938,11 @@
   <java-symbol type="id" name="label_error"/>
   <java-symbol type="layout" name="time_picker_text_input_material"/>
   <java-symbol type="drawable" name="btn_keyboard_key_material"/>
-  <java-symbol type="drawable" name="btn_event_material"/>
+  <java-symbol type="drawable" name="btn_clock_material"/>
   <java-symbol type="string" name="time_picker_text_input_mode_description"/>
   <java-symbol type="string" name="time_picker_radial_mode_description"/>
+
+  <java-symbol type="layout" name="notification_template_ambient_header" />
 
   <!-- resolver activity -->
   <java-symbol type="drawable" name="resolver_icon_placeholder" />
@@ -2966,6 +2975,7 @@
   <java-symbol type="string" name="notification_channel_updates" />
   <java-symbol type="string" name="notification_channel_network_status" />
   <java-symbol type="string" name="notification_channel_network_alerts" />
+  <java-symbol type="string" name="notification_channel_network_available" />
   <java-symbol type="string" name="notification_channel_vpn" />
   <java-symbol type="string" name="notification_channel_device_admin" />
   <java-symbol type="string" name="notification_channel_alerts" />
@@ -2997,7 +3007,7 @@
   <java-symbol type="bool" name="enable_pbap_pce_profile" />
 
   <java-symbol type="integer" name="default_data_warning_level_mb" />
-
+  <java-symbol type="bool" name="config_useVideoPauseWorkaround" />
   <java-symbol type="bool" name="config_sendPackageName" />
   <java-symbol type="string" name="config_helpPackageNameKey" />
   <java-symbol type="string" name="config_helpPackageNameValue" />
@@ -3015,4 +3025,10 @@
   <java-symbol type="array" name="config_allowedSystemInstantAppSettings" />
   <java-symbol type="array" name="config_allowedSecureInstantAppSettings" />
 
+  <java-symbol type="bool" name="config_handleVolumeKeysInWindowManager" />
+
+  <java-symbol type="integer" name="config_inCallNotificationVolumeRelative" />
+
+  <!-- SIM contact batch operation -->
+  <java-symbol type="bool" name="config_sim_phonebook_batch_operation" />
 </resources>

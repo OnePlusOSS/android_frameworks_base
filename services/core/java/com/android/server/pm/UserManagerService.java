@@ -3069,6 +3069,14 @@ public class UserManagerService extends IUserManager.Stub {
     }
 
     @Override
+    public boolean isUserNameSet(int userHandle) {
+        synchronized (mUsersLock) {
+            UserInfo userInfo = getUserInfoLU(userHandle);
+            return userInfo != null && userInfo.name != null;
+        }
+    }
+
+    @Override
     public int getUserHandle(int userSerialNumber) {
         synchronized (mUsersLock) {
             for (int userId : mUserIds) {
@@ -3673,6 +3681,11 @@ public class UserManagerService extends IUserManager.Stub {
             synchronized (mUserStates) {
                 mUserStates.delete(userId);
             }
+        }
+
+        @Override
+        public int[] getUserIds() {
+            return UserManagerService.this.getUserIds();
         }
 
         @Override

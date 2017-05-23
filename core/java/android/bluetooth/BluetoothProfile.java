@@ -153,7 +153,13 @@ public interface BluetoothProfile {
      * the largest value assigned to a profile.
      * @hide
      */
-    public static final int MAX_PROFILE_ID = 19;
+    public static final int MAX_PROFILE_ID = 20;
+
+    /**
+     * DUN
+     * @hide
+     */
+    public static final int DUN = 20;
 
     /**
      * Default priority for devices that we try to auto-connect to and

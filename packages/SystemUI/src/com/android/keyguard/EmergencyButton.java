@@ -209,8 +209,10 @@ public class EmergencyButton extends Button {
                     // Some countries can't handle emergency calls while SIM is locked.
                     visible = mEnableEmergencyCallWhileSimLocked;
                 } else {
-                    // Only show if there is a secure screen (pin/pattern/SIM pin/SIM puk);
-                    visible = mLockPatternUtils.isSecure(KeyguardUpdateMonitor.getCurrentUser());
+                    //show if there is a secure screen (pin/pattern/SIM pin/SIM puk) or config set
+                    visible = mLockPatternUtils.isSecure(KeyguardUpdateMonitor.getCurrentUser()) ||
+                            mContext.getResources().getBoolean(
+                                    com.android.systemui.R.bool.config_showEmergencyButton);
                 }
 
                 if (mContext.getResources().getBoolean(com.android.systemui.R.bool.kg_hide_emgcy_btn_when_oos)) {

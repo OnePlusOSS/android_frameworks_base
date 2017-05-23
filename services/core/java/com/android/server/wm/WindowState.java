@@ -80,6 +80,7 @@ import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ORIENTATION;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_POWER;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_RESIZE;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_STARTING_WINDOW;
+import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_STARTING_WINDOW_VERBOSE;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_SURFACE_TRACE;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_VISIBILITY;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_WALLPAPER_LIGHT;
@@ -138,6 +139,7 @@ import com.android.internal.util.ToBooleanFunction;
 import com.android.server.input.InputWindowHandle;
 
 import java.io.PrintWriter;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
@@ -170,7 +172,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     final int mOwnerUid;
     /** The owner has {@link android.Manifest.permission#INTERNAL_SYSTEM_WINDOW} */
     final boolean mOwnerCanAddInternalSystemWindow;
-    final IWindowId mWindowId;
+    final WindowId mWindowId;
     WindowToken mToken;
     // The same object as mToken if this is an app window and null for non-app windows.
     AppWindowToken mAppToken;
@@ -208,7 +210,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     boolean mHidden;    // Used to determine if to show child windows.
     boolean mWallpaperVisible;  // for wallpaper, what was last vis report?
     private boolean mDragResizing;
-    private boolean mDragResizingChangeReported;
+    private boolean mDragResizingChangeReported = true;
     private int mResizeMode;
 
     private RemoteCallbackList<IWindowFocusObserver> mFocusCallbacks;
@@ -257,6 +259,16 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      */
     final Rect mContentInsets = new Rect();
     final Rect mLastContentInsets = new Rect();
+
+    /**
+     * The last content insets returned to the client in relayout. We use
+     * these in the bounds animation to ensure we only observe inset changes
+     * at the same time that a client resizes it's surface so that we may use
+     * the geometryAppliesWithResize synchronization mechanism to keep
+     * the contents in place.
+     */
+    final Rect mLastRelayoutContentInsets = new Rect();
+
     private boolean mContentInsetsChanged;
 
     /**
@@ -577,20 +589,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mAppToken = mToken.asAppWindowToken();
         mOwnerUid = ownerId;
         mOwnerCanAddInternalSystemWindow = ownerCanAddInternalSystemWindow;
-        mWindowId = new IWindowId.Stub() {
-            @Override
-            public void registerFocusObserver(IWindowFocusObserver observer) {
-                WindowState.this.registerFocusObserver(observer);
-            }
-            @Override
-            public void unregisterFocusObserver(IWindowFocusObserver observer) {
-                WindowState.this.unregisterFocusObserver(observer);
-            }
-            @Override
-            public boolean isFocused() {
-                return WindowState.this.isFocused();
-            }
-        };
+        mWindowId = new WindowId(this);
         mAttrs.copyFrom(a);
         mViewVisibility = viewVisibility;
         mPolicy = mService.mPolicy;
@@ -1145,11 +1144,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 return;
             }
 
-            mLastOverscanInsets.set(mOverscanInsets);
-            mLastContentInsets.set(mContentInsets);
-            mLastVisibleInsets.set(mVisibleInsets);
-            mLastStableInsets.set(mStableInsets);
-            mLastOutsets.set(mOutsets);
+            updateLastInsetValues();
             mService.makeWindowFreezingScreenIfNeededLocked(this);
 
             // If the orientation is changing, or we're starting or ending a drag resizing action,
@@ -1292,36 +1287,14 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     @Override
     boolean isVisible() {
-        // TODO: The check for hiddenRequested is commented out below, because the window can still
-        // be visible on screen when the flag is true. We would like the isVisible() method to
-        // return an answer closer to if the window is truly visible (can't be an exact answer
-        // without checking the surface state), so comment out the check for now so we can test to
-        // see what problem it causes.
-        // If it doesn't cause any issues, then we can remove just before we lock down the current
-        // release (O) and also consolidate this method with #isVisibleUnchecked() and possibly
-        // other methods like isVisibleNow().
-        // If it does cause problems, then we can look if there are other ways to solve the problem.
-        // If there isn't then uncomment and document here why it is needed.
-        if (/*(mAppToken == null || !mAppToken.hiddenRequested) && */isVisibleUnchecked()
-            // TODO: The window isn't considered visible when the token is hidden, however
-            // uncommenting the check below breaks the visual transition from an app to the launcher
-            // if the home buttons is pressed. Need to investigate an fix that issue before
-            // uncommenting.
-            /* && !mToken.hidden*/) {
-            // Is this window visible?  It is not visible if there is no surface, or we are in the
-            // process of running an exit animation that will remove the surface, or its app token
-            // has been hidden.
-            return true;
-        }
-        return false;
+        return wouldBeVisibleIfPolicyIgnored() && mPolicyVisibility;
     }
 
     /**
-     * Does the minimal check for visibility. Callers generally want to use one of the public
-     * methods as they perform additional checks on the app token.
-     * TODO: See if there are other places we can use this check below instead of duplicating...
+     * @return True if the window would be visible if we'd ignore policy visibility, false
+     *         otherwise.
      */
-    private boolean isVisibleUnchecked() {
+    boolean wouldBeVisibleIfPolicyIgnored() {
         return mHasSurface && mPolicyVisibility && !isParentWindowHidden()
                 && !mAnimatingExit && !mDestroying && (!mIsWallpaper || mWallpaperVisible);
     }
@@ -1338,7 +1311,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     // TODO: Can we consolidate this with #isVisible() or have a more appropriate name for this?
     boolean isWinVisibleLw() {
         return (mAppToken == null || !mAppToken.hiddenRequested || mAppToken.mAppAnimator.animating)
-                && isVisibleUnchecked();
+                && isVisible();
     }
 
     /**
@@ -1347,7 +1320,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      */
     boolean isVisibleNow() {
         return (!mToken.hidden || mAttrs.type == TYPE_APPLICATION_STARTING)
-                && isVisibleUnchecked();
+                && isVisible();
     }
 
     /**
@@ -2063,7 +2036,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // If app died visible, apply a dim over the window to indicate that it's inactive
             dc.mDimLayerController.applyDimAbove(getDimLayerUser(), mWinAnimator);
         } else if ((mAttrs.flags & FLAG_DIM_BEHIND) != 0
-                && dc != null && !mAnimatingExit && isVisibleUnchecked()) {
+                && dc != null && !mAnimatingExit && isVisible()) {
             dc.mDimLayerController.applyDimBehind(getDimLayerUser(), mWinAnimator);
         }
     }
@@ -3813,7 +3786,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     private void logPerformShow(String prefix) {
         if (DEBUG_VISIBILITY
-                || (DEBUG_STARTING_WINDOW && mAttrs.type == TYPE_APPLICATION_STARTING)) {
+                || (DEBUG_STARTING_WINDOW_VERBOSE && mAttrs.type == TYPE_APPLICATION_STARTING)) {
             Slog.v(TAG, prefix + this
                     + ": mDrawState=" + mWinAnimator.drawStateToString()
                     + " readyForDisplay=" + isReadyForDisplay()
@@ -4416,6 +4389,24 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return result;
     }
 
+    /**
+     * @return True if this window has been laid out at least once; false otherwise.
+     */
+    boolean isLaidOut() {
+        return mLayoutSeq != -1;
+    }
+
+    /**
+     * Updates the last inset values to the current ones.
+     */
+    void updateLastInsetValues() {
+        mLastOverscanInsets.set(mOverscanInsets);
+        mLastContentInsets.set(mContentInsets);
+        mLastVisibleInsets.set(mVisibleInsets);
+        mLastStableInsets.set(mStableInsets);
+        mLastOutsets.set(mOutsets);
+    }
+
     // TODO: Hack to work around the number of states AppWindowToken needs to access without having
     // access to its windows children. Need to investigate re-writing
     // {@link AppWindowToken#updateReportedVisibilityLocked} so this can be removed.
@@ -4430,6 +4421,40 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             numVisible = 0;
             numDrawn = 0;
             nowGone = true;
+        }
+    }
+
+    private static final class WindowId extends IWindowId.Stub {
+        private final WeakReference<WindowState> mOuter;
+
+        private WindowId(WindowState outer) {
+
+            // Use a weak reference for the outer class. This is important to prevent the following
+            // leak: Since we send this class to the client process, binder will keep it alive as
+            // long as the client keeps it alive. Now, if the window is removed, we need to clear
+            // out our reference so even though this class is kept alive we don't leak WindowState,
+            // which can keep a whole lot of classes alive.
+            mOuter = new WeakReference<>(outer);
+        }
+
+        @Override
+        public void registerFocusObserver(IWindowFocusObserver observer) {
+            final WindowState outer = mOuter.get();
+            if (outer != null) {
+                outer.registerFocusObserver(observer);
+            }
+        }
+        @Override
+        public void unregisterFocusObserver(IWindowFocusObserver observer) {
+            final WindowState outer = mOuter.get();
+            if (outer != null) {
+                outer.unregisterFocusObserver(observer);
+            }
+        }
+        @Override
+        public boolean isFocused() {
+            final WindowState outer = mOuter.get();
+            return outer != null && outer.isFocused();
         }
     }
 

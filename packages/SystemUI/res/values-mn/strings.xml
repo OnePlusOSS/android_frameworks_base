@@ -350,7 +350,8 @@
     <string name="description_target_search" msgid="3091587249776033139">"Хайх"</string>
     <string name="description_direction_up" msgid="7169032478259485180">"<xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>-г гулсуулах."</string>
     <string name="description_direction_left" msgid="7207478719805562165">"<xliff:g id="TARGET_DESCRIPTION">%s</xliff:g> хийх зүүнлүү гулсуулах."</string>
-    <string name="zen_priority_introduction" msgid="3070506961866919502">"Танд сэрүүлгэ, сануулга, үйл явдлын сануулга, таны сануулсан дуудлага зэргээс бусад дуу чимээ, чичиргээ танд садаа болохгүй."</string>
+    <string name="zen_priority_introduction" msgid="7577965386868311310">"Танд сэрүүлэг, сануулга, үйл ажиллагаа, таны сонгосон дуудлага илгээгчээс бусад дуу, чичиргээ саад болохгүй. Та хөгжим, видео, тоглоом зэрэг тоглуулахыг хүссэн бүх зүйлээ сонсох боломжтой хэвээр байна."</string>
+    <string name="zen_alarms_introduction" msgid="7034415210361973827">"Танд сэрүүлгээс бусад дуу, чичиргээ саад болохгүй. Та хөгжим, видео, тоглоом зэрэг тоглуулахыг хүссэн бүх зүйлээ сонсох боломжтой хэвээр байна."</string>
     <string name="zen_priority_customize_button" msgid="7948043278226955063">"Тохируулах"</string>
     <string name="zen_silence_introduction_voice" msgid="2284540992298200729">"Энэ нь сэрүүлэг, хөгжим, видео, тоглоом зэргийг оруулаад зэрэг БҮХ дуу, чичиргээг блоклодог. Та дуудлага хийх боломжтой хэвээр байна."</string>
     <string name="zen_silence_introduction" msgid="3137882381093271568">"Энэ нь сэрүүлэг, хөгжим, видео, тоглоом зэргийг оруулаад зэрэг БҮХ дуу, чичиргээг блоклодог."</string>
@@ -470,7 +471,7 @@
     <string name="hidden_notifications_cancel" msgid="3690709735122344913">"Үгүй"</string>
     <string name="hidden_notifications_setup" msgid="41079514801976810">"Тохируулах"</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
-    <string name="volume_zen_end_now" msgid="3179845345429841822">"Одоо дуусгах"</string>
+    <string name="volume_zen_end_now" msgid="6930243045593601084">"Одоо унтраах"</string>
     <string name="accessibility_volume_expand" msgid="5946812790999244205">"Дэлгэх"</string>
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"Хураах"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"Дэлгэц эхэнд байрлуулагдсан"</string>
@@ -529,7 +530,7 @@
     <string name="tuner_toast" msgid="603429811084428439">"Баяр хүргэе! Системийн UI Tохируулагчийг тохиргоонд нэмлээ"</string>
     <string name="remove_from_settings" msgid="8389591916603406378">"Тохиргооноос устгах"</string>
     <string name="remove_from_settings_prompt" msgid="6069085993355887748">"Системийн UI Тохируулагчийг тохиргооноос устгаж, үүнтэй холбоотой бүх тохиргоог ашиглахаа болих уу?"</string>
-    <string name="activity_not_found" msgid="348423244327799974">"Апп-ыг таны төхөөрөмжид суулгаагүй байна"</string>
+    <string name="activity_not_found" msgid="348423244327799974">"Аппыг таны төхөөрөмжид суулгаагүй байна"</string>
     <string name="clock_seconds" msgid="7689554147579179507">"Цагийн секундыг харуулах"</string>
     <string name="clock_seconds_desc" msgid="6282693067130470675">"Статус талбарт цагийн секундыг харуулах. Энэ нь тэжээлийн цэнэгт нөлөөлж болно."</string>
     <string name="qs_rearrange" msgid="8060918697551068765">"Түргэн тохиргоог дахин засварлах"</string>
@@ -761,4 +762,6 @@
     <string name="qs_dnd_until" msgid="3469471136280079874">"<xliff:g id="ID_1">%s</xliff:g> хүртэл"</string>
     <string name="qs_dnd_keep" msgid="1825009164681928736">"Хадгалах"</string>
     <string name="qs_dnd_replace" msgid="8019520786644276623">"Солих"</string>
+    <string name="running_foreground_services_title" msgid="381024150898615683">"Цаана ажиллаж буй апп"</string>
+    <string name="running_foreground_services_msg" msgid="6326247670075574355">"Батерей, дата ашиглалтын талаар дэлгэрэнгүйг харахын тулд товшино уу"</string>
 </resources>

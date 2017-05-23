@@ -352,7 +352,8 @@
     <string name="description_target_search" msgid="3091587249776033139">"ძიება"</string>
     <string name="description_direction_up" msgid="7169032478259485180">"გაასრიალეთ ზემოთ <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>-თვის."</string>
     <string name="description_direction_left" msgid="7207478719805562165">"გაასრიალეთ მარცხნივ <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>-თვის."</string>
-    <string name="zen_priority_introduction" msgid="3070506961866919502">"თქვენ მიერ მითითებული გაფრთხილებების, შეხსენებების, ღონისძიებებისა და აბონენტების გარდა, არავითარი ხმა და ვიბრაცია არ შეგაწუხებთ."</string>
+    <string name="zen_priority_introduction" msgid="7577965386868311310">"თქვენ მიერ მითითებული მაღვიძარების, შეხსენებების, ღონისძიებებისა და ზარების გარდა, არავითარი ხმა და ვიბრაცია არ შეგაწუხებთ. თქვენ მაინც შეგეძლებათ ნებისმიერი სასურველი რამის, მაგალითად, მუსიკის, ვიდეოებისა და თამაშების მოსმენა."</string>
+    <string name="zen_alarms_introduction" msgid="7034415210361973827">"მაღვიძარების გარდა, არავითარი ხმა და ვიბრაცია არ შეგაწუხებთ. თქვენ მაინც შეგეძლებათ ნებისმიერი სასურველი რამის, მაგალითად, მუსიკის, ვიდეოებისა და თამაშების მოსმენა."</string>
     <string name="zen_priority_customize_button" msgid="7948043278226955063">"მორგება"</string>
     <string name="zen_silence_introduction_voice" msgid="2284540992298200729">"ეს ბლოკავს ყველა ხმასა და ვიბრაციას, მათ შორის, მაღვიძარების, მუსიკის, ვიდეოებისა და თამაშების. მიუხედავად ამისა, თქვენ მაინც შეძლებთ სატელეფონო ზარების განხორციელებას."</string>
     <string name="zen_silence_introduction" msgid="3137882381093271568">"ეს ბლოკავს ყველა ხმასა და ვიბრაციას, მათ შორის, მაღვიძარების, მუსიკის, ვიდეოებისა და თამაშების."</string>
@@ -472,7 +473,7 @@
     <string name="hidden_notifications_cancel" msgid="3690709735122344913">"არა, გმადლობთ"</string>
     <string name="hidden_notifications_setup" msgid="41079514801976810">"დაყენება"</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
-    <string name="volume_zen_end_now" msgid="3179845345429841822">"გამორთვა"</string>
+    <string name="volume_zen_end_now" msgid="6930243045593601084">"ახლავე გამორთვა"</string>
     <string name="accessibility_volume_expand" msgid="5946812790999244205">"გავრცობა"</string>
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"ჩაკეცვა"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"ეკრანი ჩამაგრებულია"</string>
@@ -700,7 +701,7 @@
     <string name="dock_forced_resizable" msgid="5914261505436217520">"აპმა შეიძლება არ იმუშაოს გაყოფილი ეკრანის რეჟიმში."</string>
     <string name="dock_non_resizeble_failed_to_dock_text" msgid="3871617304250207291">"ეკრანის გაყოფა არ არის მხარდაჭერილი აპის მიერ."</string>
     <string name="forced_resizable_secondary_display" msgid="4230857851756391925">"აპმა შეიძლება არ იმუშაოს მეორეულ ეკრანზე."</string>
-    <string name="activity_launch_on_secondary_display_failed_text" msgid="7793821742158306742">"მეორეულ ეკრანზე გაშვება მხარდაუჭერელია აპის მიერ."</string>
+    <string name="activity_launch_on_secondary_display_failed_text" msgid="7793821742158306742">"აპს არ გააჩნია მეორეული ეკრანის მხარდაჭერა."</string>
     <string name="accessibility_quick_settings_settings" msgid="6132460890024942157">"პარამეტრების გახსნა."</string>
     <string name="accessibility_quick_settings_expand" msgid="2375165227880477530">"სწრაფი პარამეტრების გახსნა."</string>
     <string name="accessibility_quick_settings_collapse" msgid="1792625797142648105">"სწრაფი პარამეტრების დახურვა."</string>
@@ -761,4 +762,6 @@
     <string name="qs_dnd_until" msgid="3469471136280079874">"<xliff:g id="ID_1">%s</xliff:g>-მდე"</string>
     <string name="qs_dnd_keep" msgid="1825009164681928736">"შენარჩუნება"</string>
     <string name="qs_dnd_replace" msgid="8019520786644276623">"ჩანაცვლება"</string>
+    <string name="running_foreground_services_title" msgid="381024150898615683">"ფონურ რეჟიმში გაშვებული აპები"</string>
+    <string name="running_foreground_services_msg" msgid="6326247670075574355">"შეეხეთ ბატარეისა და მონაცემების მოხმარების შესახებ დეტალური ინფორმაციისთვის"</string>
 </resources>

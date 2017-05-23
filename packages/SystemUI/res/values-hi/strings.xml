@@ -352,7 +352,8 @@
     <string name="description_target_search" msgid="3091587249776033139">"खोजें"</string>
     <string name="description_direction_up" msgid="7169032478259485180">"<xliff:g id="TARGET_DESCRIPTION">%s</xliff:g> के लिए ऊपर स्‍लाइड करें."</string>
     <string name="description_direction_left" msgid="7207478719805562165">"<xliff:g id="TARGET_DESCRIPTION">%s</xliff:g> के लिए बाएं स्‍लाइड करें."</string>
-    <string name="zen_priority_introduction" msgid="3070506961866919502">"आपको आपके द्वारा निर्दिष्ट किए गए अलार्म, रिमाइंडर्स, इवेंट और कॉलर को छोड़कर अन्य ध्वनियों और कंपनों के द्वारा परेशान नहीं किया जाएगा."</string>
+    <string name="zen_priority_introduction" msgid="7577965386868311310">"आपको अलार्म, रिमाइंडर, इवेंट और आपने जिन कॉलर के बारे में विशेष रूप से बताया है, उन्हें छोड़कर ध्‍वनियों और कंपनों से परेशान नहीं किया जाएगा. आपको अभी भी संगीत, वीडियो और गेम सहित वह सब कुछ सुनाई देगा जो आपने चलाने के लिए चुना है."</string>
+    <string name="zen_alarms_introduction" msgid="7034415210361973827">"आपको अलार्म छोड़कर दूसरी ध्‍वनियों और कंपनों से परेशान नहीं किया जाएगा. आपको अभी भी संगीत, वीडियो और गेम सहित वह सब कुछ सुनाई देगा जो आपने चलाने के लिए चुना है."</string>
     <string name="zen_priority_customize_button" msgid="7948043278226955063">"कस्टमाइज़ करें"</string>
     <string name="zen_silence_introduction_voice" msgid="2284540992298200729">"इससे अलार्म, संगीत, वीडियो और गेम सहित सभी ध्‍वनियां और कंपन अवरुद्ध हो जाते हैं. आप अभी भी फ़ोन काॅल कर सकेंगे."</string>
     <string name="zen_silence_introduction" msgid="3137882381093271568">"इससे अलार्म, संगीत, वीडियो और गेम सहित सभी ध्वनियां और कंपन अवरुद्ध हो जाते हैं."</string>
@@ -472,7 +473,7 @@
     <string name="hidden_notifications_cancel" msgid="3690709735122344913">"नहीं धन्यवाद"</string>
     <string name="hidden_notifications_setup" msgid="41079514801976810">"सेट करें"</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
-    <string name="volume_zen_end_now" msgid="3179845345429841822">"अब समाप्त करें"</string>
+    <string name="volume_zen_end_now" msgid="6930243045593601084">"अभी बंद करें"</string>
     <string name="accessibility_volume_expand" msgid="5946812790999244205">"विस्तृत करें"</string>
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"संक्षिप्त करें"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"स्‍क्रीन पिन कर दी गई है"</string>
@@ -699,8 +700,8 @@
     <string name="accessibility_desc_notification_icon" msgid="8352414185263916335">"<xliff:g id="ID_1">%1$s</xliff:g> नोटिफ़िकेशन: <xliff:g id="ID_2">%2$s</xliff:g>"</string>
     <string name="dock_forced_resizable" msgid="5914261505436217520">"हो सकता है कि ऐप्लिकेशन विभाजित स्क्रीन के साथ काम ना करे."</string>
     <string name="dock_non_resizeble_failed_to_dock_text" msgid="3871617304250207291">"ऐप विभाजित स्‍क्रीन का समर्थन नहीं करता है."</string>
-    <string name="forced_resizable_secondary_display" msgid="4230857851756391925">"हो सकता है कि ऐप्लिकेशन दूसरे प्रदर्शन पर काम नहीं करे."</string>
-    <string name="activity_launch_on_secondary_display_failed_text" msgid="7793821742158306742">"दूसरे प्रदर्शन पर यह ऐप्लिकेशन लॉन्च नहीं हो सकता."</string>
+    <string name="forced_resizable_secondary_display" msgid="4230857851756391925">"हो सकता है कि ऐप प्राइमरी (मुख्य) डिस्प्ले के अलावा बाकी दूसरे डिस्प्ले पर काम न करे."</string>
+    <string name="activity_launch_on_secondary_display_failed_text" msgid="7793821742158306742">"प्राइमरी (मुख्य) डिस्प्ले के अलावा बाकी दूसरे डिस्प्ले पर ऐप लॉन्च नहीं किया जा सकता."</string>
     <string name="accessibility_quick_settings_settings" msgid="6132460890024942157">"सेटिंग खोलें."</string>
     <string name="accessibility_quick_settings_expand" msgid="2375165227880477530">"त्वरित सेटिंग खोलें."</string>
     <string name="accessibility_quick_settings_collapse" msgid="1792625797142648105">"त्वरित सेटिंग बंद करें."</string>
@@ -761,4 +762,6 @@
     <string name="qs_dnd_until" msgid="3469471136280079874">"<xliff:g id="ID_1">%s</xliff:g> तक"</string>
     <string name="qs_dnd_keep" msgid="1825009164681928736">"रखें"</string>
     <string name="qs_dnd_replace" msgid="8019520786644276623">"बदलें"</string>
+    <string name="running_foreground_services_title" msgid="381024150898615683">"बैकग्राउंड में चल रहे ऐप्लिकेशन"</string>
+    <string name="running_foreground_services_msg" msgid="6326247670075574355">"बैटरी और डेटा उपयोग के विवरण देखने के लिए टैप करें"</string>
 </resources>

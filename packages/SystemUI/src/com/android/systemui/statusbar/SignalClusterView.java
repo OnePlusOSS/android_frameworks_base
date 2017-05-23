@@ -122,7 +122,7 @@ public class SignalClusterView extends LinearLayout implements NetworkController
     private boolean mBlockEthernet;
     private boolean mActivityEnabled;
     private boolean mWifiActivityEnabled;
-
+    private boolean mForceBlockWifi;
 
     public SignalClusterView(Context context) {
         this(context, null);
@@ -154,6 +154,16 @@ public class SignalClusterView extends LinearLayout implements NetworkController
         updateActivityEnabled();
     }
 
+    public void setForceBlockWifi() {
+        mForceBlockWifi = true;
+        mBlockWifi = true;
+        if (isAttachedToWindow()) {
+            // Re-register to get new callbacks.
+            mNetworkController.removeCallback(this);
+            mNetworkController.addCallback(this);
+        }
+    }
+
     @Override
     public void onTuningChanged(String key, String newValue) {
         if (!StatusBarIconController.ICON_BLACKLIST.equals(key)) {
@@ -170,7 +180,7 @@ public class SignalClusterView extends LinearLayout implements NetworkController
             mBlockAirplane = blockAirplane;
             mBlockMobile = blockMobile;
             mBlockEthernet = blockEthernet;
-            mBlockWifi = blockWifi;
+            mBlockWifi = blockWifi || mForceBlockWifi;
             // Re-register to get new callbacks.
             mNetworkController.removeCallback(this);
             mNetworkController.addCallback(this);

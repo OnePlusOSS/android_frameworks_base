@@ -360,7 +360,8 @@
     <string name="description_target_search" msgid="3091587249776033139">"بحث"</string>
     <string name="description_direction_up" msgid="7169032478259485180">"تمرير لأعلى لـ <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>."</string>
     <string name="description_direction_left" msgid="7207478719805562165">"تمرير لليسار لـ <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>."</string>
-    <string name="zen_priority_introduction" msgid="3070506961866919502">"لن يتم إزعاجك بأصوات أو اهتزاز، عدا من التنبيهات والتذكيرات والأحداث والمتصلين الذين تحددهم."</string>
+    <string name="zen_priority_introduction" msgid="7577965386868311310">"لن يتم إزعاجك بالأصوات والاهتزاز، عدا من التنبيهات والتذكيرات والأحداث والمتصلين الذين تحددهم. وسيظل بإمكانك سماع أي عناصر أخرى تختار تشغيلها، بما في ذلك الموسيقى ومقاطع الفيديو والألعاب."</string>
+    <string name="zen_alarms_introduction" msgid="7034415210361973827">"لن يتم إزعاجك بالأصوات والاهتزاز، عدا من التنبيهات. وسيظل بإمكانك سماع أي عناصر أخرى تختار تشغيلها، بما في ذلك الموسيقى ومقاطع الفيديو والألعاب."</string>
     <string name="zen_priority_customize_button" msgid="7948043278226955063">"تخصيص"</string>
     <string name="zen_silence_introduction_voice" msgid="2284540992298200729">"سيؤدي هذا إلى حظر جميع الأصوات والاهتزازات، بما في ذلك ما يرد من التنبيهات والموسيقى والفيديو والألعاب. إلا أنه سيظل بإمكانك إجراء مكالمات هاتفية."</string>
     <string name="zen_silence_introduction" msgid="3137882381093271568">"سيؤدي هذا إلى حظر جميع الأصوات والاهتزازات، بما في ذلك ما يرد من التنبيهات والموسيقى والفيديو والألعاب."</string>
@@ -480,7 +481,7 @@
     <string name="hidden_notifications_cancel" msgid="3690709735122344913">"لا، شكرًا"</string>
     <string name="hidden_notifications_setup" msgid="41079514801976810">"إعداد"</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g>. <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
-    <string name="volume_zen_end_now" msgid="3179845345429841822">"إنهاء الآن"</string>
+    <string name="volume_zen_end_now" msgid="6930243045593601084">"إيقاف التشغيل الآن"</string>
     <string name="accessibility_volume_expand" msgid="5946812790999244205">"توسيع"</string>
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"تصغير"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"تم تثبيت الشاشة"</string>
@@ -716,7 +717,7 @@
     <string name="dock_forced_resizable" msgid="5914261505436217520">"يمكن ألا يعمل التطبيق مع وضع تقسيم الشاشة."</string>
     <string name="dock_non_resizeble_failed_to_dock_text" msgid="3871617304250207291">"التطبيق لا يتيح تقسيم الشاشة."</string>
     <string name="forced_resizable_secondary_display" msgid="4230857851756391925">"قد لا يعمل التطبيق على شاشة عرض ثانوية."</string>
-    <string name="activity_launch_on_secondary_display_failed_text" msgid="7793821742158306742">"التطبيق لا يسمح بتشغيله على شاشات عرض ثانوية."</string>
+    <string name="activity_launch_on_secondary_display_failed_text" msgid="7793821742158306742">"لا يمكن تشغيل التطبيق على شاشات عرض ثانوية."</string>
     <string name="accessibility_quick_settings_settings" msgid="6132460890024942157">"فتح الإعدادات."</string>
     <string name="accessibility_quick_settings_expand" msgid="2375165227880477530">"فتح الإعدادات السريعة."</string>
     <string name="accessibility_quick_settings_collapse" msgid="1792625797142648105">"إغلاق الإعدادات السريعة."</string>
@@ -770,11 +771,13 @@
     <string name="mobile_data" msgid="7094582042819250762">"بيانات الجوّال"</string>
     <string name="wifi_is_off" msgid="1838559392210456893">"‏تم إيقاف شبكة Wi-Fi"</string>
     <string name="bt_is_off" msgid="2640685272289706392">"تم إيقاف البلوتوث."</string>
-    <string name="dnd_is_off" msgid="6167780215212497572">"تم إيقاف وضع \"الرجاء عدم الإزعاج\""</string>
-    <string name="qs_dnd_prompt_auto_rule" msgid="862559028345233052">"تم تشغيل وضع \"الرجاء عدم الإزعاج\" بواسطة قاعدة تلقائية (<xliff:g id="ID_1">%s</xliff:g>)."</string>
-    <string name="qs_dnd_prompt_app" msgid="7978037419334156034">"تم تشغيل وضع \"الرجاء عدم الإزعاج\" بواسطة تطبيق (<xliff:g id="ID_1">%s</xliff:g>)."</string>
-    <string name="qs_dnd_prompt_auto_rule_app" msgid="2599343675391111951">"تم تشغيل وضع \"الرجاء عدم الإزعاج\" بواسطة قاعدة تلقائية أو تطبيق."</string>
+    <string name="dnd_is_off" msgid="6167780215212497572">"تم إيقاف وضع \"عدم الإزعاج\""</string>
+    <string name="qs_dnd_prompt_auto_rule" msgid="862559028345233052">"تم تشغيل وضع \"عدم الإزعاج\" بواسطة قاعدة تلقائية (<xliff:g id="ID_1">%s</xliff:g>)."</string>
+    <string name="qs_dnd_prompt_app" msgid="7978037419334156034">"تم تشغيل وضع \"عدم الإزعاج\" بواسطة تطبيق (<xliff:g id="ID_1">%s</xliff:g>)."</string>
+    <string name="qs_dnd_prompt_auto_rule_app" msgid="2599343675391111951">"تم تشغيل وضع \"عدم الإزعاج\" بواسطة قاعدة تلقائية أو تطبيق."</string>
     <string name="qs_dnd_until" msgid="3469471136280079874">"حتى <xliff:g id="ID_1">%s</xliff:g>"</string>
     <string name="qs_dnd_keep" msgid="1825009164681928736">"الإبقاء على الإعدادات"</string>
     <string name="qs_dnd_replace" msgid="8019520786644276623">"استبدال"</string>
+    <string name="running_foreground_services_title" msgid="381024150898615683">"التطبيقات التي تعمل في الخلفية"</string>
+    <string name="running_foreground_services_msg" msgid="6326247670075574355">"انقر للحصول على تفاصيل حول البطارية واستخدام البيانات"</string>
 </resources>

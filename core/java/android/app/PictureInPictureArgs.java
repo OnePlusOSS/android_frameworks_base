@@ -133,7 +133,20 @@ public final class PictureInPictureArgs implements Parcelable {
     @Nullable
     private Rect mSourceRectHintInsets;
 
-    private PictureInPictureArgs() {
+    /**
+     * @hide
+     */
+    @Deprecated
+    public PictureInPictureArgs() {
+    }
+
+    /**
+     * @hide
+     */
+    @Deprecated
+    public PictureInPictureArgs(float aspectRatio, List<RemoteAction> actions) {
+        setAspectRatio(aspectRatio);
+        setActions(actions);
     }
 
     private PictureInPictureArgs(Parcel in) {
@@ -147,9 +160,6 @@ public final class PictureInPictureArgs implements Parcelable {
         if (in.readInt() != 0) {
             mSourceRectHint = Rect.CREATOR.createFromParcel(in);
         }
-        if (in.readInt() != 0) {
-            mSourceRectHintInsets = Rect.CREATOR.createFromParcel(in);
-        }
     }
 
     private PictureInPictureArgs(Rational aspectRatio, List<RemoteAction> actions,
@@ -157,6 +167,40 @@ public final class PictureInPictureArgs implements Parcelable {
         mAspectRatio = aspectRatio;
         mUserActions = actions;
         mSourceRectHint = sourceRectHint;
+    }
+
+    /**
+     * @hide
+     */
+    @Deprecated
+    public void setAspectRatio(float aspectRatio) {
+        // Temporary workaround
+        mAspectRatio = new Rational((int) (aspectRatio * 1000000000), 1000000000);
+    }
+
+    /**
+     * @hide
+     */
+    @Deprecated
+    public void setActions(List<RemoteAction> actions) {
+        if (mUserActions != null) {
+            mUserActions = null;
+        }
+        if (actions != null) {
+            mUserActions = new ArrayList<>(actions);
+        }
+    }
+
+    /**
+     * @hide
+     */
+    @Deprecated
+    public void setSourceRectHint(Rect launchBounds) {
+        if (launchBounds == null) {
+            mSourceRectHint = null;
+        } else {
+            mSourceRectHint = new Rect(launchBounds);
+        }
     }
 
     /**
@@ -172,9 +216,6 @@ public final class PictureInPictureArgs implements Parcelable {
         }
         if (otherArgs.hasSourceBoundsHint()) {
             mSourceRectHint = new Rect(otherArgs.getSourceRectHint());
-        }
-        if (otherArgs.hasSourceBoundsHintInsets()) {
-            mSourceRectHintInsets = new Rect(otherArgs.getSourceRectHintInsets());
         }
     }
 
@@ -296,12 +337,6 @@ public final class PictureInPictureArgs implements Parcelable {
         if (mSourceRectHint != null) {
             out.writeInt(1);
             mSourceRectHint.writeToParcel(out, 0);
-        } else {
-            out.writeInt(0);
-        }
-        if (mSourceRectHintInsets != null) {
-            out.writeInt(1);
-            mSourceRectHintInsets.writeToParcel(out, 0);
         } else {
             out.writeInt(0);
         }

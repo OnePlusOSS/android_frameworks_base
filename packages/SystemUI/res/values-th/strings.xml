@@ -352,7 +352,8 @@
     <string name="description_target_search" msgid="3091587249776033139">"ค้นหา"</string>
     <string name="description_direction_up" msgid="7169032478259485180">"เลื่อนขึ้นเพื่อ <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>"</string>
     <string name="description_direction_left" msgid="7207478719805562165">"เลื่อนไปทางซ้ายเพื่อ <xliff:g id="TARGET_DESCRIPTION">%s</xliff:g>"</string>
-    <string name="zen_priority_introduction" msgid="3070506961866919502">"คุณจะไม่ถูกรบกวนจากเสียงและการสั่น ยกเว้นการปลุก การช่วยเตือน กิจกรรม และผู้โทรที่คุณระบุ"</string>
+    <string name="zen_priority_introduction" msgid="7577965386868311310">"คุณจะไม่ถูกรบกวนจากเสียงและการสั่น ยกเว้นเสียงนาฬิกาปลุก การช่วยเตือน กิจกรรม และผู้โทรที่ระบุไว้ คุณจะยังคงได้ยินสิ่งที่คุณเลือกเล่น เช่น เพลง วิดีโอ และเกม"</string>
+    <string name="zen_alarms_introduction" msgid="7034415210361973827">"คุณจะไม่ถูกรบกวนจากเสียงและการสั่น ยกเว้นเสียงนาฬิกาปลุก คุณจะยังคงได้ยินสิ่งที่คุณเลือกเล่น เช่น เพลง วิดีโอ และเกม"</string>
     <string name="zen_priority_customize_button" msgid="7948043278226955063">"กำหนดค่า"</string>
     <string name="zen_silence_introduction_voice" msgid="2284540992298200729">"การใช้โหมดนี้จะบล็อกเสียงและการสั่นทั้งหมด ซึ่งรวมถึงเสียงปลุก เพลง วิดีโอ และเกม คุณจะยังโทรออกได้อยู่"</string>
     <string name="zen_silence_introduction" msgid="3137882381093271568">"การใช้โหมดนี้จะบล็อกเสียงและการสั่นทั้งหมด ซึ่งรวมถึงเสียงปลุก เพลง วิดีโอ และเกม"</string>
@@ -472,7 +473,7 @@
     <string name="hidden_notifications_cancel" msgid="3690709735122344913">"ไม่เป็นไร"</string>
     <string name="hidden_notifications_setup" msgid="41079514801976810">"ตั้งค่า"</string>
     <string name="zen_mode_and_condition" msgid="4462471036429759903">"<xliff:g id="ZEN_MODE">%1$s</xliff:g> <xliff:g id="EXIT_CONDITION">%2$s</xliff:g>"</string>
-    <string name="volume_zen_end_now" msgid="3179845345429841822">"ไม่ใช้แล้ว"</string>
+    <string name="volume_zen_end_now" msgid="6930243045593601084">"ปิดเลย"</string>
     <string name="accessibility_volume_expand" msgid="5946812790999244205">"ขยาย"</string>
     <string name="accessibility_volume_collapse" msgid="3609549593031810875">"ยุบ"</string>
     <string name="screen_pinning_title" msgid="3273740381976175811">"ตรึงหน้าจอแล้ว"</string>
@@ -761,4 +762,6 @@
     <string name="qs_dnd_until" msgid="3469471136280079874">"จนถึง <xliff:g id="ID_1">%s</xliff:g>"</string>
     <string name="qs_dnd_keep" msgid="1825009164681928736">"เก็บไว้"</string>
     <string name="qs_dnd_replace" msgid="8019520786644276623">"แทนที่"</string>
+    <string name="running_foreground_services_title" msgid="381024150898615683">"แอปที่กำลังทำงานในเบื้องหลัง"</string>
+    <string name="running_foreground_services_msg" msgid="6326247670075574355">"แตะเพื่อดูรายละเอียดเกี่ยวกับแบตเตอรี่และปริมาณการใช้อินเทอร์เน็ต"</string>
 </resources>
