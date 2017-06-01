@@ -151,7 +151,7 @@ public class Clock extends TextView implements DemoMode, Tunable {
                     mClockFormatString = ""; // force refresh
                 }
             }
-            updateClock();
+            getHandler().post(() -> updateClock());
         }
     };
 
