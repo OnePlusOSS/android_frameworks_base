@@ -24,6 +24,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.ParcelUuid;
 import android.os.SystemClock;
+import android.os.Handler;
+import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
 import android.bluetooth.BluetoothAdapter;
@@ -61,6 +63,12 @@ public final class CachedBluetoothDevice implements Comparable<CachedBluetoothDe
     // List of profiles that were previously in mProfiles, but have been removed
     private final List<LocalBluetoothProfile> mRemovedProfiles =
             new ArrayList<LocalBluetoothProfile>();
+
+    // List of profiles in auto connecting list
+    private final List<LocalBluetoothProfile> mConnectingProfiles =
+            new ArrayList<LocalBluetoothProfile>();
+
+    private LocalBluetoothProfile ConnectingProfile = null;
 
     // Device supports PANU but not NAP: remove PanProfile after device disconnects from NAP
     private boolean mLocalNapRoleConnected;
@@ -102,6 +110,10 @@ public final class CachedBluetoothDevice implements Comparable<CachedBluetoothDe
     private static final long MAX_UUID_DELAY_FOR_AUTO_CONNECT = 5000;
     private static final long MAX_HOGP_DELAY_FOR_AUTO_CONNECT = 30000;
 
+    // Connect time out for profile ,trigger next profile connect
+    private static final int PROFILE_CONNECT_TIMEOUT = 5000;
+    private static final int MESSAGE_CONNECT_NEXT = 1;
+
     /** Auto-connect after pairing only if locally initiated. */
     private boolean mConnectAfterPairing;
 
@@ -132,6 +144,11 @@ public final class CachedBluetoothDevice implements Comparable<CachedBluetoothDe
         {
             if (Utils.D) Log.d(TAG, " BT Turninig Off...Profile conn state change ignored...");
             return;
+        }
+        if ((ConnectingProfile == profile ) && (newProfileState == BluetoothProfile.STATE_CONNECTED
+             || newProfileState == BluetoothProfile.STATE_DISCONNECTED)) {
+            if (Utils.D) Log.d(TAG, " Connect next profile in connect queue ");
+            connectProfilesInQueue();
         }
         mProfileConnectionState.put(profile, newProfileState);
         if (newProfileState == BluetoothProfile.STATE_CONNECTED) {
@@ -176,6 +193,11 @@ public final class CachedBluetoothDevice implements Comparable<CachedBluetoothDe
     public void disconnect() {
         for (LocalBluetoothProfile profile : mProfiles) {
             disconnect(profile);
+        }
+        synchronized (this) {
+            mTimeoutHandler.removeMessages(MESSAGE_CONNECT_NEXT);
+            mConnectingProfiles.clear();
+            ConnectingProfile = null;
         }
         // Disconnect  PBAP server in case its connected
         // This is to ensure all the profiles are disconnected as some CK/Hs do not
@@ -232,28 +254,55 @@ public final class CachedBluetoothDevice implements Comparable<CachedBluetoothDe
             if (connectAllProfiles ? profile.isConnectable() : profile.isAutoConnectable()) {
                 if (profile.isPreferred(mDevice)) {
                     ++preferredProfiles;
-                    connectInt(profile);
+                    mConnectingProfiles.add(profile);
                 }
             }
         }
         if (DEBUG) Log.d(TAG, "Preferred profiles = " + preferredProfiles);
 
         if (preferredProfiles == 0) {
-            connectAutoConnectableProfiles();
+            getAutoConnectableProfiles();
         }
+        connectProfilesInQueue();
     }
 
-    private void connectAutoConnectableProfiles() {
+    private void connectProfilesInQueue() {
         if (!ensurePaired()) {
             return;
         }
         // Reset the only-show-one-error-dialog tracking variable
         mIsConnectingErrorPossible = true;
+        synchronized (this) {
+            for (LocalBluetoothProfile profile : mConnectingProfiles) {
+                if (ConnectingProfile == null) {
+                    if (!isConnectedProfile(profile)) {
+                        connectInt(profile);
+                        ConnectingProfile = profile;
+                        connectTimeout();
+                        break;
+                    } else {
+                        continue;
+                    }
+                } else if (ConnectingProfile == profile) {
+                    ConnectingProfile = null;
+                    mTimeoutHandler.removeMessages(MESSAGE_CONNECT_NEXT);
+                    continue;
+                }
+            }
+            if (ConnectingProfile == null) {
+                Log.d(TAG,"All profile connections done,clear mConnectingProfiles");
+                mConnectingProfiles.clear();
+                mTimeoutHandler.removeMessages(MESSAGE_CONNECT_NEXT);
+            }
+        }
+    }
+
+    private void getAutoConnectableProfiles() {
 
         for (LocalBluetoothProfile profile : mProfiles) {
             if (profile.isAutoConnectable()) {
                 profile.setPreferred(mDevice, true);
-                connectInt(profile);
+                mConnectingProfiles.add(profile);
             }
         }
     }
@@ -581,6 +630,11 @@ public final class CachedBluetoothDevice implements Comparable<CachedBluetoothDe
             setSimPermissionChoice(ACCESS_UNKNOWN);
             mMessageRejectionCount = 0;
             saveMessageRejectionCount();
+            synchronized (this) {
+                mTimeoutHandler.removeMessages(MESSAGE_CONNECT_NEXT);
+                mConnectingProfiles.clear();
+                ConnectingProfile = null;
+            }
         }
 
         refresh();
@@ -905,4 +959,26 @@ public final class CachedBluetoothDevice implements Comparable<CachedBluetoothDe
 
         return getBondState() == BluetoothDevice.BOND_BONDING ? R.string.bluetooth_pairing : 0;
     }
+
+
+    private void connectTimeout() {
+        Message message = mTimeoutHandler.obtainMessage(MESSAGE_CONNECT_NEXT);
+        mTimeoutHandler.sendMessageDelayed(message, PROFILE_CONNECT_TIMEOUT);
+    }
+
+    private final Handler mTimeoutHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case MESSAGE_CONNECT_NEXT:
+                    if (ConnectingProfile != null) {
+                        Log.w(TAG, "Pofile connection timeout:trigger next profile connection");
+                        connectProfilesInQueue();
+                    }
+                break;
+                default:
+                    break;
+            }
+        }
+    };
 }
