@@ -557,6 +557,7 @@ public final class SystemServer {
         HardwarePropertiesManagerService hardwarePropertiesService = null;
         Object wigigP2pService = null;
         Object wigigService = null;
+        OemExService mOemExService = null;
 
         boolean disableStorage = SystemProperties.getBoolean("config.disable_storage", false);
         boolean disableBluetooth = SystemProperties.getBoolean("config.disable_bluetooth", false);
@@ -1160,6 +1161,8 @@ public final class SystemServer {
                 ServiceManager.addService(GraphicsStatsService.GRAPHICS_STATS_SERVICE,
                         new GraphicsStatsService(context));
             }
+            mOemExService = new OemExService(context);
+            ServiceManager.addService("OEMExService", mOemExService);
 
             if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_PRINTING)) {
                 mSystemServiceManager.startService(PRINT_MANAGER_SERVICE_CLASS);
@@ -1366,6 +1369,7 @@ public final class SystemServer {
         final TelephonyRegistry telephonyRegistryF = telephonyRegistry;
         final MediaRouterService mediaRouterF = mediaRouter;
         final MmsServiceBroker mmsServiceF = mmsService;
+        final OemExService mOemExServiceF = mOemExService;
 
         // We now tell the activity manager it is okay to run third party
         // code.  It will call back into us once it has gotten to the state
@@ -1501,6 +1505,13 @@ public final class SystemServer {
                     if (networkScoreF != null) networkScoreF.systemRunning();
                 } catch (Throwable e) {
                     reportWtf("Notifying NetworkScoreService running", e);
+                }
+                try {
+                    if (mOemExServiceF != null) {
+                        mOemExServiceF.systemRunning();
+                    }
+                } catch (Throwable e) {
+                    reportWtf("Notifying mOemExService running", e);
                 }
                 Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
             }

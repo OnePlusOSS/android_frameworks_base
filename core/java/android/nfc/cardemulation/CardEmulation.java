@@ -639,5 +639,4 @@ public final class CardEmulation {
         NfcAdapter adapter = NfcAdapter.getDefaultAdapter(mContext);
         sService = adapter.getCardEmulationService();
     }
-
 }

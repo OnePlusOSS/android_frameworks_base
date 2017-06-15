@@ -212,11 +212,22 @@ LOCAL_SRC_FILES += \
 	core/java/android/net/INetworkStatsSession.aidl \
 	core/java/android/net/nsd/INsdManager.aidl \
 	core/java/android/nfc/IAppCallback.aidl \
+	core/java/com/nxp/nfc/gsma/internal/INxpNfcController.aidl \
+	core/java/com/nxp/nfc/INxpNfcAdapter.aidl \
+	core/java/com/nxp/nfc/INxpNfcAdapterExtras.aidl \
+	core/java/com/nxp/nfc/INfcVzw.aidl \
 	core/java/android/nfc/INfcAdapter.aidl \
 	core/java/android/nfc/INfcAdapterExtras.aidl \
 	core/java/android/nfc/INfcTag.aidl \
 	core/java/android/nfc/INfcCardEmulation.aidl \
 	core/java/android/nfc/INfcFCardEmulation.aidl \
+	core/java/com/nxp/ese/spi/IEseSpiAdapter.aidl \
+	core/java/com/nxp/intf/ILoaderService.aidl \
+        core/java/com/nxp/intf/IJcopService.aidl \
+        core/java/com/nxp/intf/INxpExtrasService.aidl \
+	core/java/com/nxp/intf/IeSEClientServicesAdapter.aidl \
+	core/java/com/nxp/nfc/INfcDta.aidl \
+	core/java/com/nxp/nfc/INxpNfcAccessExtras.aidl \
 	core/java/android/nfc/INfcUnlockHandler.aidl \
 	core/java/android/nfc/ITagRemovedCallback.aidl \
 	core/java/android/os/IBatteryPropertiesListener.aidl \
@@ -316,6 +327,7 @@ LOCAL_SRC_FILES += \
 	core/java/com/android/internal/app/IVoiceInteractorCallback.aidl \
 	core/java/com/android/internal/app/IVoiceInteractorRequest.aidl \
 	core/java/com/android/internal/app/IMediaContainerService.aidl \
+	core/java/com/android/internal/app/IIFAAService.aidl \
 	core/java/com/android/internal/app/procstats/IProcessStats.aidl \
 	core/java/com/android/internal/appwidget/IAppWidgetService.aidl \
 	core/java/com/android/internal/appwidget/IAppWidgetHost.aidl \
@@ -468,6 +480,11 @@ LOCAL_SRC_FILES += \
 	core/java/android/service/quicksettings/IQSTileService.aidl \
 	telephony/java/com/android/internal/telephony/ISmsSecurityService.aidl \
 	telephony/java/com/android/internal/telephony/ISmsSecurityAgent.aidl \
+	core/java/com/oem/os/IOemExInputCallBack.aidl \
+	core/java/com/oem/os/IOemUeventCallback.aidl \
+	core/java/com/oem/os/IOemExService.aidl \
+	core/java/com/oem/os/IOemService.aidl \
+	core/java/com/oem/os/IThreeKeyPolicy.aidl \
 
 # The following are native binders that need to go with the native component
 # at system/update_engine/binder_bindings/. Use relative path to refer to them.
@@ -569,6 +586,9 @@ aidl_files := \
 	frameworks/base/wifi/java/android/net/wifi/WifiEnterpriseConfig.aidl \
 	frameworks/base/wifi/java/android/net/wifi/WifiConfiguration.aidl \
 	frameworks/base/wifi/java/android/net/wifi/WifiInfo.aidl \
+	frameworks/base/core/java/android/nfc/NdefMessage.aidl \
+	frameworks/base/core/java/android/nfc/NdefRecord.aidl \
+	frameworks/base/core/java/android/nfc/Tag.aidl \
 	frameworks/base/graphics/java/android/graphics/Region.aidl \
 	frameworks/base/graphics/java/android/graphics/Bitmap.aidl \
 	frameworks/base/graphics/java/android/graphics/Point.aidl \
@@ -725,10 +745,14 @@ $(gen): $(aidl_files) | $(AIDL)
 # TODO: deal with com/google/android/googleapps
 packages_to_document := \
 	android \
+	com/nxp/nfc \
+	com/nxp/intf \
+	com/nxp/nfc/gsma/internal \
+	com/nxp/eseclient \
+	com/nxp/ese/spi \
 	javax/microedition/khronos \
 	org/apache/http/conn \
 	org/apache/http/params
-
 
 # Search through the base framework dirs for these packages.
 # The result will be relative to frameworks/base.
