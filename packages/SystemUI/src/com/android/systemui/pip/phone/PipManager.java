@@ -25,6 +25,7 @@ import android.app.IActivityManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.ParceledListSlice;
+import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.os.Handler;
 import android.os.RemoteException;
@@ -70,7 +71,7 @@ public class PipManager implements BasePipManager {
     TaskStackListener mTaskStackListener = new TaskStackListener() {
         @Override
         public void onActivityPinned(String packageName, int taskId) {
-            if (!checkCurrentUserId(false /* debug */)) {
+            if (!checkCurrentUserId(mContext, false /* debug */)) {
                 return;
             }
 
@@ -85,7 +86,7 @@ public class PipManager implements BasePipManager {
 
         @Override
         public void onActivityUnpinned() {
-            if (!checkCurrentUserId(false /* debug */)) {
+            if (!checkCurrentUserId(mContext, false /* debug */)) {
                 return;
             }
 
@@ -114,7 +115,7 @@ public class PipManager implements BasePipManager {
 
         @Override
         public void onPinnedActivityRestartAttempt(boolean clearedTask) {
-            if (!checkCurrentUserId(false /* debug */)) {
+            if (!checkCurrentUserId(mContext, false /* debug */)) {
                 return;
             }
 
@@ -196,7 +197,7 @@ public class PipManager implements BasePipManager {
     /**
      * Updates the PIP per configuration changed.
      */
-    public void onConfigurationChanged() {
+    public void onConfigurationChanged(Configuration newConfig) {
         mTouchHandler.onConfigurationChanged();
     }
 

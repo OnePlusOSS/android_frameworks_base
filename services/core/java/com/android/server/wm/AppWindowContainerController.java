@@ -19,7 +19,6 @@ package com.android.server.wm;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER;
 import static com.android.server.wm.AppTransition.TRANSIT_UNSET;
-import static com.android.server.wm.WindowManagerDebugConfig.DEBUG;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ADD_REMOVE;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_APP_TRANSITIONS;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_ORIENTATION;
@@ -107,7 +106,7 @@ public class AppWindowContainerController
             if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM, "Remove starting " + mContainer
                     + ": startingWindow=" + mContainer.startingWindow
                     + " startingView=" + mContainer.startingSurface);
-            if (mContainer.startingWindow != null) {
+            if (mContainer.startingData != null) {
                 surface = mContainer.startingSurface;
                 mContainer.startingData = null;
                 mContainer.startingSurface = null;
@@ -164,18 +163,16 @@ public class AppWindowContainerController
         if (surface != null) {
             boolean abort = false;
             synchronized(mWindowMap) {
+                // If the window was successfully added, then
+                // we need to remove it.
                 if (container.removed || container.startingData == null) {
-                    // If the window was successfully added, then
-                    // we need to remove it.
-                    if (container.startingWindow != null) {
-                        if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM,
-                                "Aborted starting " + container
-                                        + ": removed=" + container.removed
-                                        + " startingData=" + container.startingData);
-                        container.startingWindow = null;
-                        container.startingData = null;
-                        abort = true;
-                    }
+                    if (DEBUG_STARTING_WINDOW) Slog.v(TAG_WM,
+                            "Aborted starting " + container
+                                    + ": removed=" + container.removed
+                                    + " startingData=" + container.startingData);
+                    container.startingWindow = null;
+                    container.startingData = null;
+                    abort = true;
                 } else {
                     container.startingSurface = surface;
                 }
@@ -348,6 +345,24 @@ public class AppWindowContainerController
 
             final AppWindowToken wtoken = mContainer;
 
+            // Don't set visibility to false if we were already not visible. This prevents WM from
+            // adding the app to the closing app list which doesn't make sense for something that is
+            // already not visible. However, set visibility to true even if we are already visible.
+            // This makes sure the app is added to the opening apps list so that the right
+            // transition can be selected.
+            // TODO: Probably a good idea to separate the concept of opening/closing apps from the
+            // concept of setting visibility...
+            if (!visible && wtoken.hiddenRequested) {
+
+                if (!deferHidingClient && wtoken.mDeferHidingClient) {
+                    // We previously deferred telling the client to hide itself when visibility was
+                    // initially set to false. Now we would like it to hide, so go ahead and set it.
+                    wtoken.mDeferHidingClient = deferHidingClient;
+                    wtoken.setClientHidden(true);
+                }
+                return;
+            }
+
             if (DEBUG_APP_TRANSITIONS || DEBUG_ORIENTATION) Slog.v(TAG_WM, "setAppVisibility("
                     + mToken + ", visible=" + visible + "): " + mService.mAppTransition
                     + " hidden=" + wtoken.hidden + " hiddenRequested="
@@ -365,6 +380,7 @@ public class AppWindowContainerController
                 // if made visible again.
                 wtoken.removeDeadWindows();
                 wtoken.setVisibleBeforeClientHidden();
+                mService.mUnknownAppVisibilityController.appRemovedOrHidden(wtoken);
             } else {
                 if (!mService.mAppTransition.isTransitionSet()
                         && mService.mAppTransition.isReady()) {

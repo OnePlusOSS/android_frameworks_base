@@ -77,8 +77,9 @@ final class DefaultPermissionGrantPolicy {
     private static final String TAG = "DefaultPermGrantPolicy"; // must be <= 23 chars
     private static final boolean DEBUG = false;
 
-    private static final int DEFAULT_FLAGS = PackageManager.MATCH_DIRECT_BOOT_AWARE
-            | PackageManager.MATCH_DIRECT_BOOT_UNAWARE;
+    private static final int DEFAULT_FLAGS =
+            PackageManager.MATCH_DIRECT_BOOT_AWARE | PackageManager.MATCH_DIRECT_BOOT_UNAWARE
+                    | PackageManager.MATCH_UNINSTALLED_PACKAGES;
 
     private static final String AUDIO_MIME_TYPE = "audio/mpeg";
 
@@ -935,7 +936,7 @@ final class DefaultPermissionGrantPolicy {
         // permissions if the version on the system image does not declare them.
         if (!isDefaultPhoneOrSms && pkg.isUpdatedSystemApp()) {
             PackageSetting sysPs = mService.mSettings.getDisabledSystemPkgLPr(pkg.packageName);
-            if (sysPs != null) {
+            if (sysPs != null && sysPs.pkg != null) {
                 if (sysPs.pkg.requestedPermissions.isEmpty()) {
                     return;
                 }

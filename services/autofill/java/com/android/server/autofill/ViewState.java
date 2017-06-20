@@ -16,6 +16,7 @@
 
 package com.android.server.autofill;
 
+import static android.service.autofill.FillRequest.FLAG_MANUAL_REQUEST;
 import static com.android.server.autofill.Helper.sDebug;
 import static com.android.server.autofill.Helper.sVerbose;
 
@@ -73,16 +74,14 @@ final class ViewState {
     private final Session mSession;
 
     private FillResponse mResponse;
-    private AutofillValue mInitialValue;
     private AutofillValue mCurrentValue;
     private AutofillValue mAutofilledValue;
     private Rect mVirtualBounds;
     private int mState;
 
-    ViewState(Session session, AutofillId id, AutofillValue value, Listener listener, int state) {
+    ViewState(Session session, AutofillId id, Listener listener, int state) {
         mSession = session;
         this.id = id;
-        mInitialValue = value;
         mListener = listener;
         mState = state;
     }
@@ -114,11 +113,6 @@ final class ViewState {
 
     void setAutofilledValue(@Nullable AutofillValue value) {
         mAutofilledValue = value;
-    }
-
-    @Nullable
-    AutofillValue getInitialValue() {
-        return mInitialValue;
     }
 
     @Nullable
@@ -157,7 +151,7 @@ final class ViewState {
     // TODO: refactor / rename / document this method (and maybeCallOnFillReady) to make it clear
     // that it can change the value and update the UI; similarly, should replace code that
     // directly sets mAutofillValue to use encapsulation.
-    void update(@Nullable AutofillValue autofillValue, @Nullable Rect virtualBounds) {
+    void update(@Nullable AutofillValue autofillValue, @Nullable Rect virtualBounds, int flags) {
         if (autofillValue != null) {
             mCurrentValue = autofillValue;
         }
@@ -165,7 +159,7 @@ final class ViewState {
             mVirtualBounds = virtualBounds;
         }
 
-        maybeCallOnFillReady();
+        maybeCallOnFillReady(flags);
     }
 
     /**
@@ -173,8 +167,8 @@ final class ViewState {
      * Listener#onFillReady(FillResponse, AutofillId, AutofillValue)} if the
      * fill UI is ready to be displayed (i.e. when response and bounds are set).
      */
-    void maybeCallOnFillReady() {
-        if ((mState & (STATE_AUTOFILLED | STATE_WAITING_DATASET_AUTH)) != 0) {
+    void maybeCallOnFillReady(int flags) {
+        if ((mState & STATE_AUTOFILLED) != 0 && (flags & FLAG_MANUAL_REQUEST) == 0) {
             if (sDebug) Slog.d(TAG, "Ignoring UI for " + id + " on " + getStateAsString());
             return;
         }
@@ -188,8 +182,8 @@ final class ViewState {
 
     @Override
     public String toString() {
-        return "ViewState: [id=" + id + ", initialValue=" + mInitialValue
-                + ", currentValue=" + mCurrentValue + ", autofilledValue=" + mAutofilledValue
+        return "ViewState: [id=" + id + ", currentValue=" + mCurrentValue
+                + ", autofilledValue=" + mAutofilledValue
                 + ", bounds=" + mVirtualBounds + ", state=" + getStateAsString() + "]";
     }
 
@@ -206,7 +200,6 @@ final class ViewState {
                 pw.println(mResponse.getRequestId());
             }
         }
-        pw.print(prefix); pw.print("initialValue:" ); pw.println(mInitialValue);
         pw.print(prefix); pw.print("currentValue:" ); pw.println(mCurrentValue);
         pw.print(prefix); pw.print("autofilledValue:" ); pw.println(mAutofilledValue);
         pw.print(prefix); pw.print("virtualBounds:" ); pw.println(mVirtualBounds);

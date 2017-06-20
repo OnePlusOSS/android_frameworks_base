@@ -22,6 +22,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
 import android.annotation.TestApi;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
@@ -117,6 +118,7 @@ import java.util.List;
  * be used for testing and debugging purposes only.
  * </p>
  */
+@SystemService(Context.ACTIVITY_SERVICE)
 public class ActivityManager {
     private static String TAG = "ActivityManager";
 
@@ -299,6 +301,19 @@ public class ActivityManager {
      * @hide
      */
     public static final int START_INTENT_NOT_RESOLVED = FIRST_START_FATAL_ERROR_CODE + 9;
+
+    /**
+     * Result for IActivityManager.startAssistantActivity: active session is currently hidden.
+     * @hide
+     */
+    public static final int START_ASSISTANT_HIDDEN_SESSION = FIRST_START_FATAL_ERROR_CODE + 10;
+
+    /**
+     * Result for IActivityManager.startAssistantActivity: active session does not match
+     * the requesting token.
+     * @hide
+     */
+    public static final int START_ASSISTANT_NOT_ACTIVE_SESSION = FIRST_START_FATAL_ERROR_CODE + 11;
 
     /**
      * Result for IActivityManaqer.startActivity: the activity was started
@@ -1139,8 +1154,12 @@ public class ActivityManager {
      * E.g. freeform, split-screen, picture-in-picture.
      * @hide
      */
-    static public boolean supportsMultiWindow() {
-        return !isLowRamDeviceStatic()
+    static public boolean supportsMultiWindow(Context context) {
+        // On watches, multi-window is used to present essential system UI, and thus it must be
+        // supported regardless of device memory characteristics.
+        boolean isWatch = context.getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_WATCH);
+        return (!isLowRamDeviceStatic() || isWatch)
                 && Resources.getSystem().getBoolean(
                     com.android.internal.R.bool.config_supportsMultiWindow);
     }
@@ -1149,8 +1168,8 @@ public class ActivityManager {
      * Returns true if the system supports split screen multi-window.
      * @hide
      */
-    static public boolean supportsSplitScreenMultiWindow() {
-        return supportsMultiWindow()
+    static public boolean supportsSplitScreenMultiWindow(Context context) {
+        return supportsMultiWindow(context)
                 && Resources.getSystem().getBoolean(
                     com.android.internal.R.bool.config_supportsSplitScreenMultiWindow);
     }
@@ -3593,6 +3612,7 @@ public class ActivityManager {
      * @hide
      */
     @SystemApi @TestApi
+    @RequiresPermission(Manifest.permission.PACKAGE_USAGE_STATS)
     public void addOnUidImportanceListener(OnUidImportanceListener listener,
             @RunningAppProcessInfo.Importance int importanceCutpoint) {
         synchronized (this) {
@@ -3621,6 +3641,7 @@ public class ActivityManager {
      * @hide
      */
     @SystemApi @TestApi
+    @RequiresPermission(Manifest.permission.PACKAGE_USAGE_STATS)
     public void removeOnUidImportanceListener(OnUidImportanceListener listener) {
         synchronized (this) {
             UidObserver observer = mImportanceListeners.remove(listener);
@@ -3988,6 +4009,10 @@ public class ActivityManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(anyOf = {
+            "android.permission.INTERACT_ACROSS_USERS",
+            "android.permission.INTERACT_ACROSS_USERS_FULL"
+    })
     public static int getCurrentUser() {
         UserInfo ui;
         try {

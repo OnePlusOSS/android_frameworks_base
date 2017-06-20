@@ -1827,11 +1827,11 @@ public class KeyguardViewMediator extends SystemUI {
 
             mWakeAndUnlocking = false;
             setShowingLocked(false);
+            mDismissCallbackRegistry.notifyDismissSucceeded();
             mStatusBarKeyguardViewManager.hide(startTime, fadeoutDuration);
             resetKeyguardDonePendingLocked();
             mHideAnimationRun = false;
             adjustStatusBarLocked();
-            mDismissCallbackRegistry.notifyDismissSucceeded();
             sendUserPresentBroadcast();
             mUpdateMonitor.setKeyguardGoingAway(false /* goingAway */);
         }
@@ -2011,6 +2011,10 @@ public class KeyguardViewMediator extends SystemUI {
                 new StartKeyguardExitAnimParams(startTime, fadeoutDuration));
         mHandler.sendMessage(msg);
         Trace.endSection();
+    }
+
+    public void onShortPowerPressedGoHome() {
+        // do nothing
     }
 
     public ViewMediatorCallback getViewMediatorCallback() {

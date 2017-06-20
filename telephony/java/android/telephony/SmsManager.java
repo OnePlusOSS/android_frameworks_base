@@ -16,6 +16,7 @@
 
 package android.telephony;
 
+import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.app.ActivityThread;
 import android.app.PendingIntent;
@@ -347,6 +348,7 @@ public final class SmsManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     public void sendTextMessageWithoutPersisting(
             String destinationAddress, String scAddress, String text,
             PendingIntent sentIntent, PendingIntent deliveryIntent) {
@@ -630,6 +632,7 @@ public final class SmsManager {
      * @hide
      **/
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     public void sendMultipartTextMessageWithoutPersisting(
             String destinationAddress, String scAddress, List<String> parts,
             List<PendingIntent> sentIntents, List<PendingIntent> deliveryIntents) {

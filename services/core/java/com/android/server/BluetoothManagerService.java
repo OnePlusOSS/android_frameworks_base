@@ -19,6 +19,7 @@ package com.android.server;
 import android.Manifest;
 import android.app.ActivityManager;
 import android.app.AppGlobals;
+import android.app.AppOpsManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.IBluetooth;
@@ -52,6 +53,7 @@ import android.os.Process;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.UserManagerInternal;
@@ -804,6 +806,10 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         return true;
     }
 
+    private boolean isStrictOpEnable() {
+        return SystemProperties.getBoolean("persist.sys.strict_op_enable", false);
+    }
+
     public boolean enable(String packageName) throws RemoteException {
         final int callingUid = Binder.getCallingUid();
         final boolean callerSystem = UserHandle.getAppId(callingUid) == Process.SYSTEM_UID;
@@ -830,7 +836,19 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                 return false;
             }
         }
-
+        if (isStrictOpEnable()) {
+            AppOpsManager mAppOpsManager = mContext.getSystemService(AppOpsManager.class);
+            String packages = mContext.getPackageManager().getNameForUid(Binder.getCallingUid());
+            if ((Binder.getCallingUid() >= Process.FIRST_APPLICATION_UID)
+                    && (packages.indexOf("android.uid.systemui") != 0)
+                    && (packages.indexOf("android.uid.system") != 0)) {
+                int result = mAppOpsManager.noteOp(AppOpsManager.OP_BLUETOOTH_ADMIN,
+                        Binder.getCallingUid(), packages);
+                if (result == AppOpsManager.MODE_IGNORED) {
+                    return false;
+                }
+            }
+        }
         if (DBG) {
             Slog.d(TAG,"enable(" + packageName + "):  mBluetooth =" + mBluetooth +
                     " mBinding = " + mBinding + " mState = " +

@@ -411,8 +411,8 @@ public class UsageStatsService extends SystemService implements
         }
     }
 
-    private boolean shouldObfuscateInstantAppsForCaller(int callingUid) {
-        return !mPackageManagerInternal.canAccessInstantApps(callingUid);
+    private boolean shouldObfuscateInstantAppsForCaller(int callingUid, int userId) {
+        return !mPackageManagerInternal.canAccessInstantApps(callingUid, userId);
     }
 
     void clearAppIdleForPackage(String packageName, int userId) {
@@ -831,6 +831,9 @@ public class UsageStatsService extends SystemService implements
             final UserUsageStatsService service =
                     getUserDataAndInitializeIfNeededLocked(userId, timeNow);
             List<UsageStats> list = service.queryUsageStats(bucketType, beginTime, endTime);
+            if (list == null) {
+                return null;
+            }
 
             // Mangle instant app names *using their current state (not whether they were ephemeral
             // when the data was recorded)*.
@@ -1387,7 +1390,7 @@ public class UsageStatsService extends SystemService implements
             }
 
             final boolean obfuscateInstantApps = shouldObfuscateInstantAppsForCaller(
-                    Binder.getCallingUid());
+                    Binder.getCallingUid(), UserHandle.getCallingUserId());
 
             final int userId = UserHandle.getCallingUserId();
             final long token = Binder.clearCallingIdentity();
@@ -1432,7 +1435,7 @@ public class UsageStatsService extends SystemService implements
             }
 
             final boolean obfuscateInstantApps = shouldObfuscateInstantAppsForCaller(
-                    Binder.getCallingUid());
+                    Binder.getCallingUid(), UserHandle.getCallingUserId());
 
             final int userId = UserHandle.getCallingUserId();
             final long token = Binder.clearCallingIdentity();
@@ -1453,7 +1456,7 @@ public class UsageStatsService extends SystemService implements
                 throw re.rethrowFromSystemServer();
             }
             final boolean obfuscateInstantApps = shouldObfuscateInstantAppsForCaller(
-                    Binder.getCallingUid());
+                    Binder.getCallingUid(), userId);
             final long token = Binder.clearCallingIdentity();
             try {
                 return UsageStatsService.this.isAppIdleFilteredOrParoled(packageName, userId,

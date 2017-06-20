@@ -37,6 +37,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -57,6 +58,7 @@ import java.util.Random;
 public class CaptivePortalLoginActivity extends Activity {
     private static final String TAG = CaptivePortalLoginActivity.class.getSimpleName();
     private static final boolean DBG = true;
+    private static final boolean VDBG = false;
 
     private static final int SOCKET_TIMEOUT_MS = 10000;
 
@@ -97,8 +99,6 @@ public class CaptivePortalLoginActivity extends Activity {
         // setContentView initializes the WebView logic which in turn reads the system properties.
         setContentView(R.layout.activity_captive_portal_login);
 
-        getActionBar().setDisplayShowHomeEnabled(false);
-
         // Exit app if Network disappears.
         final NetworkCapabilities networkCapabilities = mCm.getNetworkCapabilities(mNetwork);
         if (networkCapabilities == null) {
@@ -117,9 +117,14 @@ public class CaptivePortalLoginActivity extends Activity {
         }
         mCm.registerNetworkCallback(builder.build(), mNetworkCallback);
 
-        final WebView myWebView = findViewById(R.id.webview);
-        myWebView.clearCache(true);
-        WebSettings webSettings = myWebView.getSettings();
+        getActionBar().setDisplayShowHomeEnabled(false);
+        getActionBar().setElevation(0); // remove shadow
+        getActionBar().setTitle(getHeaderTitle());
+        getActionBar().setSubtitle("");
+
+        final WebView webview = getWebview();
+        webview.clearCache(true);
+        WebSettings webSettings = webview.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         webSettings.setUseWideViewPort(true);
@@ -128,11 +133,11 @@ public class CaptivePortalLoginActivity extends Activity {
         webSettings.setBuiltInZoomControls(true);
         webSettings.setDisplayZoomControls(false);
         mWebViewClient = new MyWebViewClient();
-        myWebView.setWebViewClient(mWebViewClient);
-        myWebView.setWebChromeClient(new MyWebChromeClient());
+        webview.setWebViewClient(mWebViewClient);
+        webview.setWebChromeClient(new MyWebChromeClient());
         // Start initial page load so WebView finishes loading proxy settings.
         // Actual load of mUrl is initiated by MyWebViewClient.
-        myWebView.loadData("", "text/html", null);
+        webview.loadData("", "text/html", null);
     }
 
     // Find WebView's proxy BroadcastReceiver and prompt it to read proxy system properties.
@@ -251,10 +256,14 @@ public class CaptivePortalLoginActivity extends Activity {
         if (url == null) {
             url = mCm.getCaptivePortalServerUrl();
         }
+        return makeURL(url);
+    }
+
+    private static URL makeURL(String url) {
         try {
             return new URL(url);
         } catch (MalformedURLException e) {
-            Log.e(TAG, "Invalid captive portal URL " + url);
+            Log.e(TAG, "Invalid URL " + url);
         }
         return null;
     }
@@ -303,6 +312,7 @@ public class CaptivePortalLoginActivity extends Activity {
 
     private class MyWebViewClient extends WebViewClient {
         private static final String INTERNAL_ASSETS = "file:///android_asset/";
+
         private final String mBrowserBailOutToken = Long.toString(new Random().nextLong());
         // How many Android device-independent-pixels per scaled-pixel
         // dp/sp = (px/sp) / (px/dp) = (1/sp) / (1/dp)
@@ -331,15 +341,16 @@ public class CaptivePortalLoginActivity extends Activity {
             // For internally generated pages, leave URL bar listing prior URL as this is the URL
             // the page refers to.
             if (!url.startsWith(INTERNAL_ASSETS)) {
-                final TextView myUrlBar = findViewById(R.id.url_bar);
-                myUrlBar.setText(url);
+                getActionBar().setSubtitle(getHeaderSubtitle(url));
             }
+            getProgressBar().setVisibility(View.VISIBLE);
             testForCaptivePortal();
         }
 
         @Override
         public void onPageFinished(WebView view, String url) {
             mPagesLoaded++;
+            getProgressBar().setVisibility(View.INVISIBLE);
             if (mPagesLoaded == 1) {
                 // Now that WebView has loaded at least one page we know it has read in the proxy
                 // settings.  Now prompt the WebView read the Network-specific proxy settings.
@@ -354,12 +365,6 @@ public class CaptivePortalLoginActivity extends Activity {
             testForCaptivePortal();
         }
 
-        // Convert Android device-independent-pixels (dp) to HTML size.
-        private String dp(int dp) {
-            // HTML px's are scaled just like dp's, so just add "px" suffix.
-            return Integer.toString(dp) + "px";
-        }
-
         // Convert Android scaled-pixels (sp) to HTML size.
         private String sp(int sp) {
             // Convert sp to dp's.
@@ -367,25 +372,11 @@ public class CaptivePortalLoginActivity extends Activity {
             // Apply a scale factor to make things look right.
             dp *= 1.3;
             // Convert dp's to HTML size.
-            return dp((int)dp);
+            // HTML px's are scaled just like dp's, so just add "px" suffix.
+            return Integer.toString((int)dp) + "px";
         }
 
         // A web page consisting of a large broken lock icon to indicate SSL failure.
-        private final String SSL_ERROR_HTML = "<html><head><style>" +
-                "body { margin-left:" + dp(48) + "; margin-right:" + dp(48) + "; " +
-                        "margin-top:" + dp(96) + "; background-color:#fafafa; }" +
-                "img { width:" + dp(48) + "; height:" + dp(48) + "; }" +
-                "div.warn { font-size:" + sp(16) + "; margin-top:" + dp(16) + "; " +
-                "           opacity:0.87; line-height:1.28; }" +
-                "div.example { font-size:" + sp(14) + "; margin-top:" + dp(16) + "; " +
-                "              opacity:0.54; line-height:1.21905; }" +
-                "a { font-size:" + sp(14) + "; text-decoration:none; text-transform:uppercase; " +
-                "    margin-top:" + dp(24) + "; display:inline-block; color:#4285F4; " +
-                "    height:" + dp(48) + "; font-weight:bold; }" +
-                "</style></head><body><p><img src=quantum_ic_warning_amber_96.png><br>" +
-                "<div class=warn>%s</div>" +
-                "<div class=example>%s</div>" +
-                "<a href=%s>%s</a></body></html>";
 
         @Override
         public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
@@ -393,10 +384,63 @@ public class CaptivePortalLoginActivity extends Activity {
                     // Only show host to avoid leaking private info.
                     Uri.parse(error.getUrl()).getHost() + " certificate: " +
                     error.getCertificate() + "); displaying SSL warning.");
-            final String html = String.format(SSL_ERROR_HTML, getString(R.string.ssl_error_warning),
-                    getString(R.string.ssl_error_example), mBrowserBailOutToken,
-                    getString(R.string.ssl_error_continue));
-            view.loadDataWithBaseURL(INTERNAL_ASSETS, html, "text/HTML", "UTF-8", null);
+            final String sslErrorPage = makeSslErrorPage();
+            if (VDBG) {
+                Log.d(TAG, sslErrorPage);
+            }
+            view.loadDataWithBaseURL(INTERNAL_ASSETS, sslErrorPage, "text/HTML", "UTF-8", null);
+        }
+
+        private String makeSslErrorPage() {
+            final String warningMsg = getString(R.string.ssl_error_warning);
+            final String exampleMsg = getString(R.string.ssl_error_example);
+            final String continueMsg = getString(R.string.ssl_error_continue);
+            return String.join("\n",
+                    "<html>",
+                    "<head>",
+                    "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+                    "  <style>",
+                    "    body {",
+                    "      background-color:#fafafa;",
+                    "      margin:auto;",
+                    "      width:80%;",
+                    "      margin-top: 96px",
+                    "    }",
+                    "    img {",
+                    "      height:48px;",
+                    "      width:48px;",
+                    "    }",
+                    "    div.warn {",
+                    "      font-size:" + sp(16) + ";",
+                    "      line-height:1.28;",
+                    "      margin-top:16px;",
+                    "      opacity:0.87;",
+                    "    }",
+                    "    div.example {",
+                    "      font-size:" + sp(14) + ";",
+                    "      line-height:1.21905;",
+                    "      margin-top:16px;",
+                    "      opacity:0.54;",
+                    "    }",
+                    "    a {",
+                    "      color:#4285F4;",
+                    "      display:inline-block;",
+                    "      font-size:" + sp(14) + ";",
+                    "      font-weight:bold;",
+                    "      height:48px;",
+                    "      margin-top:24px;",
+                    "      text-decoration:none;",
+                    "      text-transform:uppercase;",
+                    "    }",
+                    "  </style>",
+                    "</head>",
+                    "<body>",
+                    "  <p><img src=quantum_ic_warning_amber_96.png><br>",
+                    "  <div class=warn>" + warningMsg + "</div>",
+                    "  <div class=example>" + exampleMsg + "</div>",
+                    "  <a href=" + mBrowserBailOutToken + ">" + continueMsg + "</a>",
+                    "</body>",
+                    "</html>");
         }
 
         @Override
@@ -412,8 +456,31 @@ public class CaptivePortalLoginActivity extends Activity {
     private class MyWebChromeClient extends WebChromeClient {
         @Override
         public void onProgressChanged(WebView view, int newProgress) {
-            final ProgressBar myProgressBar = findViewById(R.id.progress_bar);
-            myProgressBar.setProgress(newProgress);
+            getProgressBar().setProgress(newProgress);
         }
+    }
+
+    private ProgressBar getProgressBar() {
+        return findViewById(R.id.progress_bar);
+    }
+
+    private WebView getWebview() {
+        return findViewById(R.id.webview);
+    }
+
+    private String getHeaderTitle() {
+        return getString(R.string.action_bar_label);
+    }
+
+    private String getHeaderSubtitle(String urlString) {
+        URL url = makeURL(urlString);
+        if (url == null) {
+            return urlString;
+        }
+        final String https = "https";
+        if (https.equals(url.getProtocol())) {
+            return https + "://" + url.getHost();
+        }
+        return url.getHost();
     }
 }

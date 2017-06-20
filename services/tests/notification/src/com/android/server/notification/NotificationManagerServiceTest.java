@@ -17,6 +17,7 @@
 package com.android.server.notification;
 
 import static android.app.NotificationManager.IMPORTANCE_LOW;
+import static android.app.NotificationManager.IMPORTANCE_NONE;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
@@ -67,7 +68,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import com.android.server.lights.Light;
@@ -91,6 +91,8 @@ public class NotificationManagerServiceTest extends NotificationTestCase {
     private TestableLooper mTestableLooper;
     @Mock
     private RankingHelper mRankingHelper;
+    @Mock
+    private NotificationUsageStats mUsageStats;
     private NotificationChannel mTestNotificationChannel = new NotificationChannel(
             TEST_CHANNEL_ID, TEST_CHANNEL_ID, NotificationManager.IMPORTANCE_DEFAULT);
     @Mock
@@ -147,7 +149,7 @@ public class NotificationManagerServiceTest extends NotificationTestCase {
         when(mNotificationListeners.checkServiceTokenLocked(any())).thenReturn(mListener);
         mNotificationManagerService.init(mTestableLooper.getLooper(), mPackageManager,
                 mPackageManagerClient, mockLightsManager, mNotificationListeners, mCompanionMgr,
-                mSnoozeHelper);
+                mSnoozeHelper, mUsageStats);
 
         // Tests call directly into the Binder.
         mBinderService = mNotificationManagerService.getBinderService();
@@ -261,40 +263,38 @@ public class NotificationManagerServiceTest extends NotificationTestCase {
 
     @Test
     public void testBlockedNotifications_suspended() throws Exception {
-        NotificationUsageStats usageStats = mock(NotificationUsageStats.class);
         when(mPackageManager.isPackageSuspendedForUser(anyString(), anyInt())).thenReturn(true);
 
         NotificationChannel channel = new NotificationChannel("id", "name",
                 NotificationManager.IMPORTANCE_HIGH);
         NotificationRecord r = generateNotificationRecord(channel);
-        assertTrue(mNotificationManagerService.isBlocked(r, usageStats));
-        verify(usageStats, times(1)).registerSuspendedByAdmin(eq(r));
+        assertTrue(mNotificationManagerService.isBlocked(r, mUsageStats));
+        verify(mUsageStats, times(1)).registerSuspendedByAdmin(eq(r));
     }
 
     @Test
     public void testBlockedNotifications_blockedChannel() throws Exception {
-        NotificationUsageStats usageStats = mock(NotificationUsageStats.class);
         when(mPackageManager.isPackageSuspendedForUser(anyString(), anyInt())).thenReturn(false);
 
         NotificationChannel channel = new NotificationChannel("id", "name",
                 NotificationManager.IMPORTANCE_HIGH);
         channel.setImportance(NotificationManager.IMPORTANCE_NONE);
         NotificationRecord r = generateNotificationRecord(channel);
-        assertTrue(mNotificationManagerService.isBlocked(r, usageStats));
-        verify(usageStats, times(1)).registerBlocked(eq(r));
+        assertTrue(mNotificationManagerService.isBlocked(r, mUsageStats));
+        verify(mUsageStats, times(1)).registerBlocked(eq(r));
     }
 
     @Test
-    public void testBlockedNotifications_blockedApp() throws Exception {
-        NotificationUsageStats usageStats = mock(NotificationUsageStats.class);
+    public void testEnqueuedBlockedNotifications_blockedApp() throws Exception {
         when(mPackageManager.isPackageSuspendedForUser(anyString(), anyInt())).thenReturn(false);
 
-        NotificationChannel channel = new NotificationChannel("id", "name",
-                NotificationManager.IMPORTANCE_HIGH);
-        NotificationRecord r = generateNotificationRecord(channel);
-        r.setUserImportance(NotificationManager.IMPORTANCE_NONE);
-        assertTrue(mNotificationManagerService.isBlocked(r, usageStats));
-        verify(usageStats, times(1)).registerBlocked(eq(r));
+        mBinderService.setNotificationsEnabledForPackage(PKG, uid, false);
+
+        final StatusBarNotification sbn = generateNotificationRecord(null).sbn;
+        mBinderService.enqueueNotificationWithTag(PKG, "opPkg", "tag",
+                sbn.getId(), sbn.getNotification(), sbn.getUserId());
+        waitForIdle();
+        assertEquals(0, mBinderService.getActiveNotifications(sbn.getPackageName()).length);
     }
 
     @Test
@@ -645,6 +645,7 @@ public class NotificationManagerServiceTest extends NotificationTestCase {
         associations.add("a");
         when(mCompanionMgr.getAssociations(PKG, uid)).thenReturn(associations);
         mListener = mock(ManagedServices.ManagedServiceInfo.class);
+        mListener.component = new ComponentName(PKG, PKG);
         when(mListener.enabledAndUserMatches(anyInt())).thenReturn(false);
         when(mNotificationListeners.checkServiceTokenLocked(any())).thenReturn(mListener);
 

@@ -109,7 +109,7 @@
     <string name="tts_default_pitch_title" msgid="6135942113172488671">"Ton"</string>
     <string name="tts_default_pitch_summary" msgid="1944885882882650009">"Afecta ao ton da voz sintetizada"</string>
     <string name="tts_default_lang_title" msgid="8018087612299820556">"Idioma"</string>
-    <string name="tts_lang_use_system" msgid="2679252467416513208">"Utilizar idioma do sistema"</string>
+    <string name="tts_lang_use_system" msgid="2679252467416513208">"Utiliza o idioma do sistema"</string>
     <string name="tts_lang_not_selected" msgid="7395787019276734765">"Idioma non seleccionado"</string>
     <string name="tts_default_lang_summary" msgid="5219362163902707785">"Define a voz específica do idioma para o texto falado"</string>
     <string name="tts_play_example_title" msgid="7094780383253097230">"Escoitar un exemplo"</string>
@@ -272,6 +272,8 @@
     <string name="app_process_limit_title" msgid="4280600650253107163">"Límite proceso 2º plano"</string>
     <string name="show_all_anrs" msgid="28462979638729082">"Mostrar todos os ANR"</string>
     <string name="show_all_anrs_summary" msgid="641908614413544127">"Informa que aplicación segundo plano non responde"</string>
+    <string name="show_notification_channel_warnings" msgid="1399948193466922683">"Mostrar avisos de notificacións"</string>
+    <string name="show_notification_channel_warnings_summary" msgid="5536803251863694895">"Mostra avisos cando unha aplicación publica notificacións sen unha canle válida"</string>
     <string name="force_allow_on_external" msgid="3215759785081916381">"Forzar permiso de aplicacións de forma externa"</string>
     <string name="force_allow_on_external_summary" msgid="3640752408258034689">"Permite que calquera aplicación apta se poida escribir nun almacenamento externo, independentemente dos valores expresados"</string>
     <string name="force_resizable_activities" msgid="8615764378147824985">"Forzar o axuste do tamaño das actividades"</string>

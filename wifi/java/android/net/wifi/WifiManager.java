@@ -17,9 +17,12 @@
 package android.net.wifi;
 
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
+import android.annotation.SuppressLint;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
 import android.content.Context;
 import android.content.pm.ParceledListSlice;
 import android.net.ConnectivityManager;
@@ -56,27 +59,30 @@ import java.util.concurrent.CountDownLatch;
 
 /**
  * This class provides the primary API for managing all aspects of Wi-Fi
- * connectivity. Get an instance of this class by calling
- * {@link android.content.Context#getSystemService(String) Context.getSystemService(Context.WIFI_SERVICE)}.
- * On releases before NYC, it should only be obtained from an application context, and not from
- * any other derived context to avoid memory leaks within the calling process.
-
+ * connectivity.
+ * <p>
+ * On releases before {@link android.os.Build.VERSION_CODES#N}, this object
+ * should only be obtained from an {@linkplain Context#getApplicationContext()
+ * application context}, and not from any other derived context to avoid memory
+ * leaks within the calling process.
+ * <p>
  * It deals with several categories of items:
  * <ul>
- * <li>The list of configured networks. The list can be viewed and updated,
- * and attributes of individual entries can be modified.</li>
+ * <li>The list of configured networks. The list can be viewed and updated, and
+ * attributes of individual entries can be modified.</li>
  * <li>The currently active Wi-Fi network, if any. Connectivity can be
- * established or torn down, and dynamic information about the state of
- * the network can be queried.</li>
- * <li>Results of access point scans, containing enough information to
- * make decisions about what access point to connect to.</li>
- * <li>It defines the names of various Intent actions that are broadcast
- * upon any sort of change in Wi-Fi state.
+ * established or torn down, and dynamic information about the state of the
+ * network can be queried.</li>
+ * <li>Results of access point scans, containing enough information to make
+ * decisions about what access point to connect to.</li>
+ * <li>It defines the names of various Intent actions that are broadcast upon
+ * any sort of change in Wi-Fi state.
  * </ul>
- * This is the API to use when performing Wi-Fi specific operations. To
- * perform operations that pertain to network connectivity at an abstract
- * level, use {@link android.net.ConnectivityManager}.
+ * This is the API to use when performing Wi-Fi specific operations. To perform
+ * operations that pertain to network connectivity at an abstract level, use
+ * {@link android.net.ConnectivityManager}.
  */
+@SystemService(Context.WIFI_SERVICE)
 public class WifiManager {
 
     private static final String TAG = "WifiManager";
@@ -160,6 +166,8 @@ public class WifiManager {
      *
      * <p>Note: The broadcast is only delivered to registered receivers - no manifest registered
      * components will be launched.
+     *
+     * @hide
      */
     public static final String ACTION_PASSPOINT_ICON = "android.net.wifi.action.PASSPOINT_ICON";
     /**
@@ -167,6 +175,8 @@ public class WifiManager {
      * String representation.
      *
      * Retrieve with {@link android.content.Intent#getLongExtra(String, long)}.
+     *
+     * @hide
      */
     public static final String EXTRA_BSSID_LONG = "android.net.wifi.extra.BSSID_LONG";
     /**
@@ -174,12 +184,16 @@ public class WifiManager {
      *
      * Retrieve with {@link android.content.Intent#getParcelableExtra(String)} and cast into
      * {@link android.graphics.drawable.Icon}.
+     *
+     * @hide
      */
     public static final String EXTRA_ICON = "android.net.wifi.extra.ICON";
     /**
      * Name of a file.
      *
      * Retrieve with {@link android.content.Intent#getStringExtra(String)}.
+     *
+     * @hide
      */
     public static final String EXTRA_FILENAME = "android.net.wifi.extra.FILENAME";
 
@@ -195,6 +209,7 @@ public class WifiManager {
      * <p>Note: The broadcast is only delivered to registered receivers - no manifest registered
      * components will be launched.
      *
+     * @hide
      */
     public static final String ACTION_PASSPOINT_OSU_PROVIDERS_LIST =
             "android.net.wifi.action.PASSPOINT_OSU_PROVIDERS_LIST";
@@ -202,6 +217,8 @@ public class WifiManager {
      * Raw binary data of an ANQP (Access Network Query Protocol) element.
      *
      * Retrieve with {@link android.content.Intent#getByteArrayExtra(String)}.
+     *
+     * @hide
      */
     public static final String EXTRA_ANQP_ELEMENT_DATA =
             "android.net.wifi.extra.ANQP_ELEMENT_DATA";
@@ -220,6 +237,7 @@ public class WifiManager {
      * <p>Note: The broadcast is only delivered to registered receivers - no manifest registered
      * components will be launched.
      *
+     * @hide
      */
     public static final String ACTION_PASSPOINT_DEAUTH_IMMINENT =
             "android.net.wifi.action.PASSPOINT_DEAUTH_IMMINENT";
@@ -228,18 +246,24 @@ public class WifiManager {
      * {@code true} for ESS.
      *
      * Retrieve with {@link android.content.Intent#getBooleanExtra(String, boolean)}.
+     *
+     * @hide
      */
     public static final String EXTRA_ESS = "android.net.wifi.extra.ESS";
     /**
      * Delay in seconds.
      *
      * Retrieve with {@link android.content.Intent#getIntExtra(String, int)}.
+     *
+     * @hide
      */
     public static final String EXTRA_DELAY = "android.net.wifi.extra.DELAY";
     /**
      * String representation of an URL.
      *
      * Retrieve with {@link android.content.Intent#getStringExtra(String)}.
+     *
+     * @hide
      */
     public static final String EXTRA_URL = "android.net.wifi.extra.URL";
 
@@ -254,8 +278,10 @@ public class WifiManager {
      *
      * Receiver Required Permission: android.Manifest.permission.ACCESS_WIFI_STATE
      *
-     ** <p>Note: The broadcast is only delivered to registered receivers - no manifest registered
+     * <p>Note: The broadcast is only delivered to registered receivers - no manifest registered
      * components will be launched.
+     *
+     * @hide
      */
     public static final String ACTION_PASSPOINT_SUBSCRIPTION_REMEDIATION =
             "android.net.wifi.action.PASSPOINT_SUBSCRIPTION_REMEDIATION";
@@ -265,6 +291,8 @@ public class WifiManager {
      * 1 - SOAP XML SPP
      *
      * Retrieve with {@link android.content.Intent#getIntExtra(String, int)}.
+     *
+     * @hide
      */
     public static final String EXTRA_SUBSCRIPTION_REMEDIATION_METHOD =
             "android.net.wifi.extra.SUBSCRIPTION_REMEDIATION_METHOD";
@@ -382,6 +410,21 @@ public class WifiManager {
      */
     @SystemApi
     public static final String EXTRA_PREVIOUS_WIFI_AP_STATE = "previous_wifi_state";
+    /**
+     * The interface used for the softap.
+     *
+     * @hide
+     */
+    public static final String EXTRA_WIFI_AP_INTERFACE_NAME = "wifi_ap_interface_name";
+    /**
+     * The intended ip mode for this softap.
+     * @see #IFACE_IP_MODE_TETHERED
+     * @see #IFACE_IP_MODE_LOCAL_ONLY
+     *
+     * @hide
+     */
+    public static final String EXTRA_WIFI_AP_MODE = "wifi_ap_mode";
+
     /**
      * Wi-Fi AP is currently being disabled. The state will change to
      * {@link #WIFI_AP_STATE_DISABLED} if it finishes successfully.
@@ -929,6 +972,7 @@ public class WifiManager {
 
     /** @hide */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.READ_WIFI_CREDENTIAL)
     public List<WifiConfiguration> getPrivilegedConfiguredNetworks() {
         try {
             ParceledListSlice<WifiConfiguration> parceledList =
@@ -944,6 +988,7 @@ public class WifiManager {
 
     /** @hide */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.READ_WIFI_CREDENTIAL)
     public WifiConnectionStatistics getConnectionStatistics() {
         try {
             return mService.getConnectionStatistics();
@@ -1043,11 +1088,9 @@ public class WifiManager {
      * Name).  In the case when there is an existing configuration with the same
      * FQDN, the new configuration will replace the existing configuration.
      *
-     * An {@link IllegalArgumentException} will be thrown on failure.
-     * An {@link UnsupportedOperationException} will be thrown if Passpoint is not enabled
-     * on the device.
-     *
      * @param config The Passpoint configuration to be added
+     * @throws IllegalArgumentException if configuration is invalid
+     * @throws UnsupportedOperationException if Passpoint is not enabled on the device.
      */
     public void addOrUpdatePasspointConfiguration(PasspointConfiguration config) {
         try {
@@ -1062,11 +1105,9 @@ public class WifiManager {
     /**
      * Remove the Passpoint configuration identified by its FQDN (Fully Qualified Domain Name).
      *
-     * An {@link IllegalArgumentException} will be thrown on failure.
-     * An {@link UnsupportedOperationException} will be thrown if Passpoint is not enabled
-     * on the device.
-     *
      * @param fqdn The FQDN of the Passpoint configuration to be removed
+     * @throws IllegalArgumentException if no configuration is associated with the given FQDN.
+     * @throws UnsupportedOperationException if Passpoint is not enabled on the device.
      */
     public void removePasspointConfiguration(String fqdn) {
         try {
@@ -1083,10 +1124,8 @@ public class WifiManager {
      *
      * An empty list will be returned when no configurations are installed.
      *
-     * An {@link UnsupportedOperationException} will be thrown if Passpoint is not enabled
-     * on the device.
-     *
      * @return A list of {@link PasspointConfiguration}
+     * @throws UnsupportedOperationException if Passpoint is not enabled on the device.
      */
     public List<PasspointConfiguration> getPasspointConfigurations() {
         try {
@@ -1102,11 +1141,11 @@ public class WifiManager {
      * {@link #EXTRA_ICON} will indicate the result of the request.
      * A missing intent extra {@link #EXTRA_ICON} will indicate a failure.
      *
-     * An {@link UnsupportedOperationException} will be thrown if Passpoint is not enabled
-     * on the device.
-     *
      * @param bssid The BSSID of the AP
      * @param fileName Name of the icon file (remote file) to query from the AP
+     *
+     * @throws UnsupportedOperationException if Passpoint is not enabled on the device.
+     * @hide
      */
     public void queryPasspointIcon(long bssid, String fileName) {
         try {
@@ -1491,6 +1530,7 @@ public class WifiManager {
 
     /** @hide */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.UPDATE_DEVICE_STATS)
     public boolean startScan(WorkSource workSource) {
         try {
             String packageName = mContext.getOpPackageName();
@@ -1511,6 +1551,7 @@ public class WifiManager {
      */
     @Deprecated
     @SystemApi
+    @SuppressLint("Doclava125")
     public boolean startLocationRestrictedScan(WorkSource workSource) {
         return false;
     }
@@ -1525,6 +1566,7 @@ public class WifiManager {
      */
     @Deprecated
     @SystemApi
+    @SuppressLint("Doclava125")
     public boolean isBatchedScanSupported() {
         return false;
     }
@@ -1538,6 +1580,7 @@ public class WifiManager {
      */
     @Deprecated
     @SystemApi
+    @SuppressLint("Doclava125")
     public List<BatchedScanResult> getBatchedScanResults() {
         return null;
     }
@@ -1764,25 +1807,26 @@ public class WifiManager {
     }
 
     /**
-     * Start AccessPoint mode with the specified
-     * configuration. If the radio is already running in
-     * AP mode, update the new configuration
-     * Note that starting in access point mode disables station
-     * mode operation
+     * This call will be deprecated and removed in an upcoming release.  It is no longer used to
+     * start WiFi Tethering.  Please use {@link ConnectivityManager#startTethering(int, boolean,
+     * ConnectivityManager#OnStartTetheringCallback)} if
+     * the caller has proper permissions.  Callers can also use the LocalOnlyHotspot feature for a
+     * hotspot capable of communicating with co-located devices {@link
+     * WifiManager#startLocalOnlyHotspot(LocalOnlyHotspotCallback)}.
+     *
      * @param wifiConfig SSID, security and channel details as
      *        part of WifiConfiguration
-     * @return {@code true} if the operation succeeds, {@code false} otherwise
+     * @return {@code false}
      *
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.TETHER_PRIVILEGED)
     public boolean setWifiApEnabled(WifiConfiguration wifiConfig, boolean enabled) {
-        try {
-            mService.setWifiApEnabled(wifiConfig, enabled);
-            return true;
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        String packageName = mContext.getOpPackageName();
+
+        Log.w(TAG, packageName + " attempted call to setWifiApEnabled: enabled = " + enabled);
+        return false;
     }
 
     /**
@@ -1900,7 +1944,9 @@ public class WifiManager {
             LocalOnlyHotspotCallbackProxy proxy =
                     new LocalOnlyHotspotCallbackProxy(this, looper, callback);
             try {
-                int returnCode = mService.startLocalOnlyHotspot(proxy.getMessenger(), new Binder());
+                String packageName = mContext.getOpPackageName();
+                int returnCode = mService.startLocalOnlyHotspot(
+                        proxy.getMessenger(), new Binder(), packageName);
                 if (returnCode != LocalOnlyHotspotCallback.REQUEST_REGISTERED) {
                     // Send message to the proxy to make sure we call back on the correct thread
                     proxy.notifyFailed(returnCode);
@@ -2021,6 +2067,7 @@ public class WifiManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.ACCESS_WIFI_STATE)
     public int getWifiApState() {
         try {
             return mService.getWifiApEnabledState();
@@ -2037,6 +2084,7 @@ public class WifiManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.ACCESS_WIFI_STATE)
     public boolean isWifiApEnabled() {
         return getWifiApState() == WIFI_AP_STATE_ENABLED;
     }
@@ -2048,6 +2096,7 @@ public class WifiManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.ACCESS_WIFI_STATE)
     public WifiConfiguration getWifiApConfiguration() {
         try {
             return mService.getWifiApConfiguration();
@@ -2063,6 +2112,7 @@ public class WifiManager {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.CHANGE_WIFI_STATE)
     public boolean setWifiApConfiguration(WifiConfiguration wifiConfig) {
         try {
             mService.setWifiApConfiguration(wifiConfig);

@@ -19,6 +19,7 @@ package android.view;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
 import android.annotation.TestApi;
 import android.app.KeyguardManager;
 import android.app.Presentation;
@@ -39,8 +40,6 @@ import java.util.Objects;
 
 /**
  * The interface that apps use to talk to the window manager.
- * <p>
- * Use <code>Context.getSystemService(Context.WINDOW_SERVICE)</code> to get one of these.
  * </p><p>
  * Each window manager instance is bound to a particular {@link Display}.
  * To obtain a {@link WindowManager} for a different display, use
@@ -52,10 +51,8 @@ import java.util.Objects;
  * {@link Presentation}.  The presentation will automatically obtain a
  * {@link WindowManager} and {@link Context} for that display.
  * </p>
- *
- * @see android.content.Context#getSystemService
- * @see android.content.Context#WINDOW_SERVICE
  */
+@SystemService(Context.WINDOW_SERVICE)
 public interface WindowManager extends ViewManager {
 
     /** @hide */
@@ -1903,6 +1900,7 @@ public interface WindowManager extends ViewManager {
          *
          * @hide
          */
+        @TestApi
         public CharSequence accessibilityTitle;
 
         /**
@@ -2185,6 +2183,7 @@ public interface WindowManager extends ViewManager {
         /** {@hide} */
         public static final int ACCESSIBILITY_ANCHOR_CHANGED = 1 << 24;
         /** {@hide} */
+        @TestApi
         public static final int ACCESSIBILITY_TITLE_CHANGED = 1 << 25;
         /** {@hide} */
         public static final int EVERYTHING_CHANGED = 0xffffffff;

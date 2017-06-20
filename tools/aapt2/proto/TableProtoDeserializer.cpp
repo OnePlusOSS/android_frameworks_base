@@ -32,8 +32,7 @@ class ReferenceIdToNameVisitor : public ValueVisitor {
  public:
   using ValueVisitor::Visit;
 
-  explicit ReferenceIdToNameVisitor(
-      const std::map<ResourceId, ResourceNameRef>* mapping)
+  explicit ReferenceIdToNameVisitor(const std::map<ResourceId, ResourceNameRef>* mapping)
       : mapping_(mapping) {
     CHECK(mapping_ != nullptr);
   }
@@ -75,13 +74,11 @@ class PackagePbDeserializer {
 
     std::map<ResourceId, ResourceNameRef> idIndex;
 
-    ResourceTablePackage* pkg =
-        table->CreatePackage(pbPackage.package_name(), id);
+    ResourceTablePackage* pkg = table->CreatePackage(pbPackage.package_name(), id);
     for (const pb::Type& pbType : pbPackage.types()) {
       const ResourceType* resType = ParseResourceType(pbType.name());
       if (!resType) {
-        diag_->Error(DiagMessage(source_) << "unknown type '" << pbType.name()
-                                          << "'");
+        diag_->Error(DiagMessage(source_) << "unknown type '" << pbType.name() << "'");
         return {};
       }
 
@@ -95,21 +92,20 @@ class PackagePbDeserializer {
         if (pbEntry.has_symbol_status()) {
           const pb::SymbolStatus& pbStatus = pbEntry.symbol_status();
           if (pbStatus.has_source()) {
-            DeserializeSourceFromPb(pbStatus.source(), *source_pool_,
-                                    &entry->symbol_status.source);
+            DeserializeSourceFromPb(pbStatus.source(), *source_pool_, &entry->symbol_status.source);
           }
 
           if (pbStatus.has_comment()) {
             entry->symbol_status.comment = pbStatus.comment();
           }
 
-          SymbolState visibility =
-              DeserializeVisibilityFromPb(pbStatus.visibility());
+          entry->symbol_status.allow_new = pbStatus.allow_new();
+
+          SymbolState visibility = DeserializeVisibilityFromPb(pbStatus.visibility());
           entry->symbol_status.state = visibility;
 
           if (visibility == SymbolState::kPublic) {
-            // This is a public symbol, we must encode the ID now if there is
-            // one.
+            // This is a public symbol, we must encode the ID now if there is one.
             if (pbEntry.has_id()) {
               entry->id = static_cast<uint16_t>(pbEntry.id());
             }
@@ -142,16 +138,15 @@ class PackagePbDeserializer {
             return {};
           }
 
-          ResourceConfigValue* configValue =
-              entry->FindOrCreateValue(config, pbConfig.product());
+          ResourceConfigValue* configValue = entry->FindOrCreateValue(config, pbConfig.product());
           if (configValue->value) {
             // Duplicate config.
             diag_->Error(DiagMessage(source_) << "duplicate configuration");
             return {};
           }
 
-          configValue->value = DeserializeValueFromPb(
-              pbConfigValue.value(), config, &table->string_pool);
+          configValue->value =
+              DeserializeValueFromPb(pbConfigValue.value(), config, &table->string_pool);
           if (!configValue->value) {
             return {};
           }
@@ -348,26 +343,19 @@ class PackagePbDeserializer {
     return value;
   }
 
-  bool DeserializeReferenceFromPb(const pb::Reference& pb_ref,
-                                  Reference* out_ref) {
+  bool DeserializeReferenceFromPb(const pb::Reference& pb_ref, Reference* out_ref) {
     out_ref->reference_type = DeserializeReferenceTypeFromPb(pb_ref.type());
     out_ref->private_reference = pb_ref.private_();
-
-    if (!pb_ref.has_id() && !pb_ref.has_symbol_idx()) {
-      return false;
-    }
 
     if (pb_ref.has_id()) {
       out_ref->id = ResourceId(pb_ref.id());
     }
 
     if (pb_ref.has_symbol_idx()) {
-      const std::string str_symbol =
-          util::GetString(*symbol_pool_, pb_ref.symbol_idx());
+      const std::string str_symbol = util::GetString(*symbol_pool_, pb_ref.symbol_idx());
       ResourceNameRef name_ref;
       if (!ResourceUtils::ParseResourceName(str_symbol, &name_ref, nullptr)) {
-        diag_->Error(DiagMessage(source_) << "invalid reference name '"
-                                          << str_symbol << "'");
+        diag_->Error(DiagMessage(source_) << "invalid reference name '" << str_symbol << "'");
         return false;
       }
 

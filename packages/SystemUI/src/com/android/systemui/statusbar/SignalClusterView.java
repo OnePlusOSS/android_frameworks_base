@@ -123,6 +123,8 @@ public class SignalClusterView extends LinearLayout implements NetworkController
     private boolean mActivityEnabled;
     private boolean mWifiActivityEnabled;
     private boolean mForceBlockWifi;
+    private boolean mQsSignal;
+    private boolean mReadIconsFromXML;
 
     public SignalClusterView(Context context) {
         this(context, null);
@@ -152,11 +154,13 @@ public class SignalClusterView extends LinearLayout implements NetworkController
         mNetworkController = Dependency.get(NetworkController.class);
         mSecurityController = Dependency.get(SecurityController.class);
         updateActivityEnabled();
+        mReadIconsFromXML = res.getBoolean(R.bool.config_read_icons_from_xml);
     }
 
-    public void setForceBlockWifi() {
+    public void setQsSignalCluster() {
         mForceBlockWifi = true;
         mBlockWifi = true;
+        mQsSignal = true;
         if (isAttachedToWindow()) {
             // Re-register to get new callbacks.
             mNetworkController.removeCallback(this);
@@ -295,27 +299,27 @@ public class SignalClusterView extends LinearLayout implements NetworkController
         mWifiStrengthId = statusIcon.icon;
         mWifiBadgeId = statusIcon.iconOverlay;
         mWifiDescription = statusIcon.contentDescription;
-        mWifiIn = activityIn && mWifiActivityEnabled;
-        mWifiOut = activityOut && mWifiActivityEnabled;
+        mWifiIn = activityIn && mActivityEnabled && mWifiVisible;
+        mWifiOut = activityOut && mActivityEnabled && mWifiVisible;
 
         apply();
     }
 
     @Override
-    public void setMobileDataIndicators(IconState statusIcon, IconState qsIcon, int statusType,
+    public void setMobileDataIndicators(IconState icon, IconState qsIcon, int type,
             int qsType, boolean activityIn, boolean activityOut, int dataActivityId,
-            int stackedDataId, int stackedVoiceId, String typeContentDescription,
+            int stackedDataId, int stackedVoiceId,String typeContentDescription,
             String description, boolean isWide, int subId, boolean roaming) {
         PhoneState state = getState(subId);
         if (state == null) {
             return;
         }
-        state.mMobileVisible = statusIcon.visible && !mBlockMobile;
-        state.mMobileStrengthId = statusIcon.icon;
-        state.mMobileTypeId = statusType;
-        state.mMobileDescription = statusIcon.contentDescription;
+        state.mMobileVisible = icon.visible && !mBlockMobile;
+        state.mMobileStrengthId = icon.icon;
+        state.mMobileTypeId = type;
+        state.mMobileDescription = icon.contentDescription;
         state.mMobileTypeDescription = typeContentDescription;
-        state.mIsMobileTypeIconWide = statusType != 0 && isWide;
+        state.mIsMobileTypeIconWide = type != 0 && isWide;
         state.mRoaming = roaming;
         state.mActivityIn = activityIn && mActivityEnabled;
         state.mActivityOut = activityOut && mActivityEnabled;
@@ -728,8 +732,13 @@ public class SignalClusterView extends LinearLayout implements NetworkController
         public boolean apply(boolean isSecondaryIcon) {
             if (mMobileVisible && !mIsAirplaneMode) {
                 if (mLastMobileStrengthId != mMobileStrengthId) {
-                    mMobile.getDrawable().setLevel(mMobileStrengthId);
-                    mMobileDark.getDrawable().setLevel(mMobileStrengthId);
+                    if (mReadIconsFromXML) {
+                        setIconForView(mMobile, mMobileStrengthId);
+                        setIconForView(mMobileDark, mMobileStrengthId);
+                    } else {
+                        mMobile.getDrawable().setLevel(mMobileStrengthId);
+                        mMobileDark.getDrawable().setLevel(mMobileStrengthId);
+                    }
                     mLastMobileStrengthId = mMobileStrengthId;
                 }
 
@@ -773,7 +782,7 @@ public class SignalClusterView extends LinearLayout implements NetworkController
                         (mMobileVisible ? "VISIBLE" : "GONE"), mMobileStrengthId, mMobileTypeId));
 
             mMobileType.setVisibility(mMobileTypeId != 0 ? View.VISIBLE : View.GONE);
-            mMobileRoaming.setVisibility((mRoaming && mDataActivityId == 0)? View.VISIBLE : View.GONE);
+            mMobileRoaming.setVisibility((mRoaming && !mReadIconsFromXML)? View.VISIBLE : View.GONE);
             mMobileActivityIn.setVisibility(mActivityIn ? View.VISIBLE : View.GONE);
             mMobileActivityOut.setVisibility(mActivityOut ? View.VISIBLE : View.GONE);
             mDataActivity.setVisibility(mDataActivityId != 0 ? View.VISIBLE : View.GONE);

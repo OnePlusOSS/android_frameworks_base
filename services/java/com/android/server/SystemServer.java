@@ -187,6 +187,8 @@ public final class SystemServer {
             "com.google.android.clockwork.ThermalObserver";
     private static final String WEAR_CONNECTIVITY_SERVICE_CLASS =
             "com.google.android.clockwork.connectivity.WearConnectivityService";
+    private static final String WEAR_DISPLAY_SERVICE_CLASS =
+            "com.google.android.clockwork.display.WearDisplayService";
     private static final String WEAR_TIME_SERVICE_CLASS =
             "com.google.android.clockwork.time.WearTimeService";
     private static final String ACCOUNT_SERVICE_CLASS =
@@ -679,7 +681,6 @@ public final class SystemServer {
         VibratorService vibrator = null;
         IStorageManager storageManager = null;
         NetworkManagementService networkManagement = null;
-        IpSecService ipSecService = null;
         NetworkStatsService networkStats = null;
         NetworkPolicyManagerService networkPolicy = null;
         ConnectivityService connectivity = null;
@@ -1030,15 +1031,6 @@ public final class SystemServer {
                     ServiceManager.addService(Context.NETWORKMANAGEMENT_SERVICE, networkManagement);
                 } catch (Throwable e) {
                     reportWtf("starting NetworkManagement Service", e);
-                }
-                traceEnd();
-
-                traceBeginAndSlog("StartIpSecService");
-                try {
-                    ipSecService = IpSecService.create(context);
-                    ServiceManager.addService(Context.IPSEC_SERVICE, ipSecService);
-                } catch (Throwable e) {
-                    reportWtf("starting IpSec Service", e);
                 }
                 traceEnd();
             }
@@ -1517,6 +1509,7 @@ public final class SystemServer {
 
             if (!disableNonCoreServices) {
                 traceBeginAndSlog("StartWearTimeService");
+                mSystemServiceManager.startService(WEAR_DISPLAY_SERVICE_CLASS);
                 mSystemServiceManager.startService(WEAR_TIME_SERVICE_CLASS);
                 traceEnd();
             }
@@ -1651,7 +1644,7 @@ public final class SystemServer {
         final TelephonyRegistry telephonyRegistryF = telephonyRegistry;
         final MediaRouterService mediaRouterF = mediaRouter;
         final MmsServiceBroker mmsServiceF = mmsService;
-        final IpSecService ipSecServiceF = ipSecService;
+        final WindowManagerService windowManagerF = wm;
 
         // We now tell the activity manager it is okay to run third party
         // code.  It will call back into us once it has gotten to the state
@@ -1691,7 +1684,7 @@ public final class SystemServer {
 
             traceBeginAndSlog("StartSystemUI");
             try {
-                startSystemUi(context);
+                startSystemUi(context, windowManagerF);
             } catch (Throwable e) {
                 reportWtf("starting System UI", e);
             }
@@ -1713,13 +1706,6 @@ public final class SystemServer {
             if (networkPolicyF != null) {
                 networkPolicyInitReadySignal = networkPolicyF
                         .networkScoreAndNetworkManagementServiceReady();
-            }
-            traceEnd();
-            traceBeginAndSlog("MakeIpSecServiceReady");
-            try {
-                if (ipSecServiceF != null) ipSecServiceF.systemReady();
-            } catch (Throwable e) {
-                reportWtf("making IpSec Service ready", e);
             }
             traceEnd();
             traceBeginAndSlog("MakeNetworkStatsServiceReady");
@@ -1845,13 +1831,14 @@ public final class SystemServer {
         }, BOOT_TIMINGS_TRACE_LOG);
     }
 
-    static final void startSystemUi(Context context) {
+    static final void startSystemUi(Context context, WindowManagerService windowManager) {
         Intent intent = new Intent();
         intent.setComponent(new ComponentName("com.android.systemui",
                     "com.android.systemui.SystemUIService"));
         intent.addFlags(Intent.FLAG_DEBUG_TRIAGED_MISSING);
         //Slog.d(TAG, "Starting service: " + intent);
         context.startServiceAsUser(intent, UserHandle.SYSTEM);
+        windowManager.onSystemUiStarted();
     }
 
     private static void traceBeginAndSlog(String name) {

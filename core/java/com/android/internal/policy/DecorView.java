@@ -16,6 +16,8 @@
 
 package com.android.internal.policy;
 
+import android.graphics.Outline;
+import android.view.ViewOutlineProvider;
 import android.view.accessibility.AccessibilityNodeInfo;
 import com.android.internal.R;
 import com.android.internal.policy.PhoneWindow.PanelFeatureState;
@@ -135,12 +137,28 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
                     com.android.internal.R.id.navigationBarBackground,
                     0 /* hideWindowFlag */);
 
+    // This is used to workaround an issue where the PiP shadow can be transparent if the window
+    // background is transparent
+    private static final ViewOutlineProvider PIP_OUTLINE_PROVIDER = new ViewOutlineProvider() {
+        @Override
+        public void getOutline(View view, Outline outline) {
+            outline.setRect(0, 0, view.getWidth(), view.getHeight());
+            outline.setAlpha(1f);
+        }
+    };
+
     // Cludge to address b/22668382: Set the shadow size to the maximum so that the layer
     // size calculation takes the shadow size into account. We set the elevation currently
     // to max until the first layout command has been executed.
     private boolean mAllowUpdateElevation = false;
 
     private boolean mElevationAdjustedForStack = false;
+
+    // Keeps track of the picture-in-picture mode for the view shadow
+    private boolean mIsInPictureInPictureMode;
+
+    // Stores the previous outline provider prior to applying PIP_OUTLINE_PROVIDER
+    private ViewOutlineProvider mLastOutlineProvider;
 
     int mDefaultOpacity = PixelFormat.OPAQUE;
 
@@ -296,7 +314,11 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
     @Override
     public void onDraw(Canvas c) {
         super.onDraw(c);
-        mBackgroundFallback.draw(mContentRoot, c, mWindow.mContentParent);
+
+        // When we are resizing, we need the fallback background to cover the area where we have our
+        // system bar background views as the navigation bar will be hidden during resizing.
+        mBackgroundFallback.draw(isResizing() ? this : mContentRoot, mContentRoot, c,
+                mWindow.mContentParent);
     }
 
     @Override
@@ -1400,6 +1422,41 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
         }
     }
 
+    /**
+     * Overrides the view outline when the activity enters picture-in-picture to ensure that it has
+     * an opaque shadow even if the window background is completely transparent. This only applies
+     * to activities that are currently the task root.
+     */
+    public void updatePictureInPictureOutlineProvider(boolean isInPictureInPictureMode) {
+        if (mIsInPictureInPictureMode == isInPictureInPictureMode) {
+            return;
+        }
+
+        if (isInPictureInPictureMode) {
+            final Window.WindowControllerCallback callback =
+                    mWindow.getWindowControllerCallback();
+            if (callback != null && callback.isTaskRoot()) {
+                // Call super implementation directly as we don't want to save the PIP outline
+                // provider to be restored
+                super.setOutlineProvider(PIP_OUTLINE_PROVIDER);
+            }
+        } else {
+            // Restore the previous outline provider
+            if (getOutlineProvider() != mLastOutlineProvider) {
+                setOutlineProvider(mLastOutlineProvider);
+            }
+        }
+        mIsInPictureInPictureMode = isInPictureInPictureMode;
+    }
+
+    @Override
+    public void setOutlineProvider(ViewOutlineProvider provider) {
+        super.setOutlineProvider(provider);
+
+        // Save the outline provider set to ensure that we can restore when the activity leaves PiP
+        mLastOutlineProvider = provider;
+    }
+
     private void drawableChanged() {
         if (mChanging) {
             return;
@@ -1755,8 +1812,9 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
             mFloatingActionMode.finish();
         }
         cleanupFloatingActionModeViews();
+        mFloatingToolbar = new FloatingToolbar(mContext, mWindow);
         final FloatingActionMode mode =
-                new FloatingActionMode(mContext, callback, originatingView);
+                new FloatingActionMode(mContext, callback, originatingView, mFloatingToolbar);
         mFloatingActionModeOriginatingView = originatingView;
         mFloatingToolbarPreDrawListener =
             new ViewTreeObserver.OnPreDrawListener() {
@@ -1771,8 +1829,6 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
 
     private void setHandledFloatingActionMode(ActionMode mode) {
         mFloatingActionMode = mode;
-        mFloatingToolbar = new FloatingToolbar(mContext, mWindow);
-        ((FloatingActionMode) mFloatingActionMode).setFloatingToolbar(mFloatingToolbar);
         mFloatingActionMode.invalidate();  // Will show the floating toolbar if necessary.
         mFloatingActionModeOriginatingView.getViewTreeObserver()
             .addOnPreDrawListener(mFloatingToolbarPreDrawListener);

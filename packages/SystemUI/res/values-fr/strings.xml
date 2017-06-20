@@ -575,6 +575,7 @@
     <string name="snooze_option_15_min" msgid="1068727451405610715">"15 minutes"</string>
     <string name="snooze_option_30_min" msgid="867081342535195788">"30 minutes"</string>
     <string name="snooze_option_1_hour" msgid="1098086401880077154">"1 heure"</string>
+    <string name="snooze_option_2_hour" msgid="8332218255658969475">"2 heures"</string>
     <string name="snooze_undo" msgid="6074877317002985129">"ANNULER"</string>
     <string name="snoozed_for_time" msgid="2390718332980204462">"Répétée après <xliff:g id="TIME_AMOUNT">%1$s</xliff:g>"</string>
     <string name="battery_panel_title" msgid="7944156115535366613">"Utilisation batterie"</string>
@@ -719,8 +720,8 @@
     <string name="pip_phone_minimize" msgid="1079119422589131792">"Réduire"</string>
     <string name="pip_phone_close" msgid="8416647892889710330">"Fermer"</string>
     <string name="pip_phone_dismiss_hint" msgid="6351678169095923899">"Faire glisser vers le bas pour ignorer"</string>
-    <string name="pip_menu_title" msgid="3328510504196964712">"Menu PIP"</string>
-    <string name="pip_notification_title" msgid="3204024940158161322">"<xliff:g id="NAME">%s</xliff:g> est en mode PIP"</string>
+    <string name="pip_menu_title" msgid="3328510504196964712">"Menu Picture-in-picture"</string>
+    <string name="pip_notification_title" msgid="3204024940158161322">"<xliff:g id="NAME">%s</xliff:g> est en mode Picture-in-picture"</string>
     <string name="pip_notification_message" msgid="4171698133469539591">"Si vous ne voulez pas que l\'application <xliff:g id="NAME">%s</xliff:g> utilise cette fonctionnalité, appuyez ici pour ouvrir les paramètres et la désactiver."</string>
     <string name="pip_play" msgid="1417176722760265888">"Lecture"</string>
     <string name="pip_pause" msgid="8881063404466476571">"Suspendre"</string>

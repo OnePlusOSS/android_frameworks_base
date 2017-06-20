@@ -341,6 +341,7 @@ public final class ThreadedRenderer {
 
     private boolean mEnabled;
     private boolean mRequested = true;
+    private boolean mIsOpaque = false;
 
     ThreadedRenderer(Context context, boolean translucent, String name) {
         final TypedArray a = context.obtainStyledAttributes(null, R.styleable.Lighting, 0, 0);
@@ -355,6 +356,7 @@ public final class ThreadedRenderer {
         long rootNodePtr = nCreateRootRenderNode();
         mRootNode = RenderNode.adopt(rootNodePtr);
         mRootNode.setClipToBounds(false);
+        mIsOpaque = !translucent;
         mNativeProxy = nCreateProxy(translucent, rootNodePtr);
         nSetName(mNativeProxy, name);
 
@@ -571,7 +573,12 @@ public final class ThreadedRenderer {
      * Change the ThreadedRenderer's opacity
      */
     void setOpaque(boolean opaque) {
-        nSetOpaque(mNativeProxy, opaque && !mHasInsets);
+        mIsOpaque = opaque && !mHasInsets;
+        nSetOpaque(mNativeProxy, mIsOpaque);
+    }
+
+    boolean isOpaque() {
+        return mIsOpaque;
     }
 
     /**
@@ -872,6 +879,15 @@ public final class ThreadedRenderer {
         }
     }
 
+    /**
+     * Creates a {@link android.graphics.Bitmap.Config#HARDWARE} bitmap from the given
+     * RenderNode. Note that the RenderNode should be created as a root node (so x/y of 0,0), and
+     * not the RenderNode from a View.
+     **/
+    public static Bitmap createHardwareBitmap(RenderNode node, int width, int height) {
+        return nCreateHardwareBitmap(node.getNativeDisplayList(), width, height);
+    }
+
     @Override
     protected void finalize() throws Throwable {
         try {
@@ -1015,4 +1031,6 @@ public final class ThreadedRenderer {
 
     private static native int nCopySurfaceInto(Surface surface,
             int srcLeft, int srcTop, int srcRight, int srcBottom, Bitmap bitmap);
+
+    private static native Bitmap nCreateHardwareBitmap(long renderNode, int width, int height);
 }

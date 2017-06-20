@@ -151,7 +151,7 @@ public class Resources {
     /** @hide */
     public static int selectSystemTheme(int curTheme, int targetSdkVersion, int orig, int holo,
             int dark, int deviceDefault) {
-        if (curTheme != 0) {
+        if (curTheme != ResourceId.ID_NULL) {
             return curTheme;
         }
         if (targetSdkVersion < Build.VERSION_CODES.HONEYCOMB) {
@@ -1760,7 +1760,9 @@ public class Resources {
     public final Theme newTheme() {
         Theme theme = new Theme();
         theme.setImpl(mResourcesImpl.newThemeImpl());
-        mThemeRefs.add(new WeakReference<>(theme));
+        synchronized (mThemeRefs) {
+            mThemeRefs.add(new WeakReference<>(theme));
+        }
         return theme;
     }
 

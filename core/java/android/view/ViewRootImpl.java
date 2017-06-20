@@ -40,6 +40,7 @@ import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
@@ -73,6 +74,7 @@ import android.util.MergedConfiguration;
 import android.util.Slog;
 import android.util.TimeUtils;
 import android.util.TypedValue;
+import android.util.BoostFramework;
 import android.view.Surface.OutOfResourcesException;
 import android.view.View.AttachInfo;
 import android.view.View.FocusDirection;
@@ -473,6 +475,9 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private String mTag = TAG;
+    boolean mHaveMoveEvent = false;
+    boolean mIsPerfLockAcquired = false;
+    BoostFramework mPerf = null;
 
     public ViewRootImpl(Context context, Display display) {
         mContext = context;
@@ -2330,7 +2335,7 @@ public final class ViewRootImpl implements ViewParent,
 
         // Remember if we must report the next draw.
         if ((relayoutResult & WindowManagerGlobal.RELAYOUT_RES_FIRST_TIME) != 0) {
-            mReportNextDraw = true;
+            reportNextDraw();
         }
 
         boolean cancelDraw = mAttachInfo.mTreeObserver.dispatchOnPreDraw() || !isViewVisible;
@@ -2651,6 +2656,15 @@ public final class ViewRootImpl implements ViewParent,
 
     @Override
     public void onPreDraw(DisplayListCanvas canvas) {
+        // If mCurScrollY is not 0 then this influences the hardwareYOffset. The end result is we
+        // can apply offsets that are not handled by anything else, resulting in underdraw as
+        // the View is shifted (thus shifting the window background) exposing unpainted
+        // content. To handle this with minimal glitches we just clear to BLACK if the window
+        // is opaque. If it's not opaque then HWUI already internally does a glClear to
+        // transparent, so there's no risk of underdraw on non-opaque surfaces.
+        if (mCurScrollY != 0 && mHardwareYOffset != 0 && mAttachInfo.mThreadedRenderer.isOpaque()) {
+            canvas.drawColor(Color.BLACK);
+        }
         canvas.translate(-mHardwareXOffset, -mHardwareYOffset);
     }
 
@@ -2668,7 +2682,7 @@ public final class ViewRootImpl implements ViewParent,
     void outputDisplayList(View view) {
         view.mRenderNode.output();
         if (mAttachInfo.mThreadedRenderer != null) {
-            ((ThreadedRenderer)mAttachInfo.mThreadedRenderer).serializeDisplayListTree();
+            mAttachInfo.mThreadedRenderer.serializeDisplayListTree();
         }
     }
 
@@ -2731,11 +2745,8 @@ public final class ViewRootImpl implements ViewParent,
     /**
      * A count of the number of calls to pendingDrawFinished we
      * require to notify the WM drawing is complete.
-     *
-     * This starts at 1, for the ViewRootImpl surface itself.
-     * Subsurfaces may debt the value with drawPending.
      */
-    int mDrawsNeededToReport = 1;
+    int mDrawsNeededToReport = 0;
 
     /**
      * Delay notifying WM of draw finished until
@@ -2761,7 +2772,7 @@ public final class ViewRootImpl implements ViewParent,
 
     private void reportDrawFinished() {
         try {
-            mDrawsNeededToReport = 1;
+            mDrawsNeededToReport = 0;
             mWindowSession.finishDrawing(mWindow);
         } catch (RemoteException e) {
             // Have fun!
@@ -2851,6 +2862,16 @@ public final class ViewRootImpl implements ViewParent,
         scrollToRectOrFocus(null, false);
 
         if (mAttachInfo.mViewScrollChanged) {
+            if (mHaveMoveEvent && !mIsPerfLockAcquired) {
+                mIsPerfLockAcquired = true;
+                if (mPerf == null) {
+                    mPerf = new BoostFramework();
+                }
+                if (mPerf != null) {
+                    String currentPackage = mContext.getPackageName();
+                    mPerf.perfHint(BoostFramework.VENDOR_HINT_SCROLL_BOOST, currentPackage, -1, BoostFramework.Scroll.PREFILING);
+                }
+            }
             mAttachInfo.mViewScrollChanged = false;
             mAttachInfo.mTreeObserver.dispatchOnScrollChanged();
         }
@@ -3772,13 +3793,12 @@ public final class ViewRootImpl implements ViewParent,
                     args.recycle();
 
                     if (msg.what == MSG_RESIZED_REPORT) {
-                        mReportNextDraw = true;
+                        reportNextDraw();
                     }
 
                     if (mView != null && framesChanged) {
                         forceLayout(mView);
                     }
-
                     requestLayout();
                 }
                 break;
@@ -4763,6 +4783,13 @@ public final class ViewRootImpl implements ViewParent,
             mAttachInfo.mUnbufferedDispatchRequested = false;
             mAttachInfo.mHandlingPointerEvent = true;
             boolean handled = mView.dispatchPointerEvent(event);
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_MOVE) {
+                mHaveMoveEvent = true;
+            } else if (action == MotionEvent.ACTION_UP) {
+                mHaveMoveEvent = false;
+                mIsPerfLockAcquired = false;
+            }
             maybeUpdatePointerIcon(event);
             maybeUpdateTooltip(event);
             mAttachInfo.mHandlingPointerEvent = false;
@@ -7343,6 +7370,14 @@ public final class ViewRootImpl implements ViewParent,
         return false;
     }
 
+
+    private void reportNextDraw() {
+        if (mReportNextDraw == false) {
+            drawPending();
+        }
+        mReportNextDraw = true;
+    }
+
     /**
      * Force the window to report its next draw.
      * <p>
@@ -7352,7 +7387,7 @@ public final class ViewRootImpl implements ViewParent,
      * @hide
      */
     public void setReportNextDraw() {
-        mReportNextDraw = true;
+        reportNextDraw();
         invalidate();
     }
 

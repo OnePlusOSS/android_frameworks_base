@@ -313,7 +313,7 @@ public class MobileSignalController extends SignalController<
         String description = null;
         // Only send data sim callbacks to QS.
         if (mCurrentState.dataSim) {
-            qsTypeIcon = showDataIcon ? icons.mQsDataType : 0;
+            qsTypeIcon = showDataIcon ? icons.mDataType : 0;
             qsIcon = new IconState(mCurrentState.enabled
                     && !mCurrentState.isEmergency, getQsCurrentIconId(), contentDescription);
             description = mCurrentState.isEmergency ? null : mCurrentState.networkName;
@@ -597,7 +597,7 @@ public class MobileSignalController extends SignalController<
         if (dataType == TelephonyManager.NETWORK_TYPE_IWLAN) {
             // wimax is a special 4g network not handled by telephony
             dataTypeIcon = TelephonyIcons.ICON_4G;
-            qsDataTypeIcon = TelephonyIcons.QS_DATA_4G;
+            qsDataTypeIcon = TelephonyIcons.ICON_4G;
             dataContentDesc = R.string.accessibility_data_connection_4g;
         } else {
             dataTypeIcon = TelephonyIcons.getDataTypeIcon(slotId);

@@ -18,7 +18,9 @@ package com.android.server.wm;
 
 import static android.app.ActivityManager.ENABLE_TASK_SNAPSHOTS;
 import static android.app.ActivityManager.StackId;
+import static android.app.ActivityManager.StackId.FREEFORM_WORKSPACE_STACK_ID;
 import static android.app.ActivityManager.StackId.INVALID_STACK_ID;
+import static android.app.ActivityManager.StackId.PINNED_STACK_ID;
 import static android.app.ActivityManager.isLowRamDeviceStatic;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.Display.DEFAULT_DISPLAY;
@@ -761,16 +763,19 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             final WindowState imeWin = mService.mInputMethodWindow;
             // IME is up and obscuring this window. Adjust the window position so it is visible.
             if (imeWin != null && imeWin.isVisibleNow() && mService.mInputMethodTarget == this) {
-                    if (windowsAreFloating && mContainingFrame.bottom > contentFrame.bottom) {
-                        // In freeform we want to move the top up directly.
-                        // TODO: Investigate why this is contentFrame not parentFrame.
-                        mContainingFrame.top -= mContainingFrame.bottom - contentFrame.bottom;
-                    } else if (mContainingFrame.bottom > parentFrame.bottom) {
-                        // But in docked we want to behave like fullscreen
-                        // and behave as if the task were given smaller bounds
-                        // for the purposes of layout.
-                        mContainingFrame.bottom = parentFrame.bottom;
-                    }
+                final int stackId = getStackId();
+                if (stackId == FREEFORM_WORKSPACE_STACK_ID
+                        && mContainingFrame.bottom > contentFrame.bottom) {
+                    // In freeform we want to move the top up directly.
+                    // TODO: Investigate why this is contentFrame not parentFrame.
+                    mContainingFrame.top -= mContainingFrame.bottom - contentFrame.bottom;
+                } else if (stackId != PINNED_STACK_ID
+                        && mContainingFrame.bottom > parentFrame.bottom) {
+                    // But in docked we want to behave like fullscreen and behave as if the task
+                    // were given smaller bounds for the purposes of layout. Skip adjustments for
+                    // the pinned stack, they are handled separately in the PinnedStackController.
+                    mContainingFrame.bottom = parentFrame.bottom;
+                }
             }
 
             if (windowsAreFloating) {
@@ -1295,7 +1300,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      *         otherwise.
      */
     boolean wouldBeVisibleIfPolicyIgnored() {
-        return mHasSurface && mPolicyVisibility && !isParentWindowHidden()
+        return mHasSurface && !isParentWindowHidden()
                 && !mAnimatingExit && !mDestroying && (!mIsWallpaper || mWallpaperVisible);
     }
 
@@ -1401,6 +1406,16 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 && ((!isParentWindowHidden() && mViewVisibility == View.VISIBLE && !mToken.hidden)
                         || mWinAnimator.mAnimation != null
                         || ((mAppToken != null) && (mAppToken.mAppAnimator.animation != null)));
+    }
+
+    // TODO: Another visibility method that was added late in the release to minimize risk.
+    @Override
+    public boolean canAffectSystemUiFlags() {
+        final boolean shown = mWinAnimator.getShown();
+        final boolean exiting = mAnimatingExit || mDestroying
+                || mAppToken != null && mAppToken.hidden;
+        final boolean translucent = mAttrs.alpha == 0.0f;
+        return shown && !exiting && !translucent;
     }
 
     /**
@@ -2192,18 +2207,30 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
     }
 
-    void prepareWindowToDisplayDuringRelayout(MergedConfiguration mergedConfiguration) {
-        if ((mAttrs.softInputMode & SOFT_INPUT_MASK_ADJUST)
-                == SOFT_INPUT_ADJUST_RESIZE) {
-            mLayoutNeeded = true;
-        }
-        if (isDrawnLw() && mService.okToDisplay()) {
-            mWinAnimator.applyEnterAnimationLocked();
-        }
+    void prepareWindowToDisplayDuringRelayout(MergedConfiguration mergedConfiguration,
+            boolean wasVisible) {
+        // We need to turn on screen regardless of visibility.
         if ((mAttrs.flags & FLAG_TURN_SCREEN_ON) != 0) {
             if (DEBUG_VISIBILITY) Slog.v(TAG, "Relayout window turning screen on: " + this);
             mTurnOnScreen = true;
         }
+
+        // If we were already visible, skip rest of preparation.
+        if (wasVisible) {
+            if (DEBUG_VISIBILITY) Slog.v(TAG,
+                    "Already visible and does not turn on screen, skip preparing: " + this);
+            return;
+        }
+
+        if ((mAttrs.softInputMode & SOFT_INPUT_MASK_ADJUST)
+                == SOFT_INPUT_ADJUST_RESIZE) {
+            mLayoutNeeded = true;
+        }
+
+        if (isDrawnLw() && mService.okToDisplay()) {
+            mWinAnimator.applyEnterAnimationLocked();
+        }
+
         if (isConfigChanged()) {
             final Configuration globalConfig = mService.mRoot.getConfiguration();
             final Configuration overrideConfig = getMergedOverrideConfiguration();
@@ -3397,7 +3424,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             pw.print(prefix); pw.print("mOrientationChanging=");
                     pw.print(mOrientationChanging);
                     pw.print(" mAppFreezing="); pw.print(mAppFreezing);
-                    pw.print(" mTurnOnScreen="); pw.println(mTurnOnScreen);
+                    pw.print(" mTurnOnScreen="); pw.print(mTurnOnScreen);
                     pw.print(" mReportOrientationChanged="); pw.println(mReportOrientationChanged);
         }
         if (mLastFreezeDuration != 0) {
@@ -4338,9 +4365,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mLastVisibleLayoutRotation = getDisplayContent().getRotation();
 
         mWinAnimator.mEnteringAnimation = true;
-        if (!wasVisible) {
-            prepareWindowToDisplayDuringRelayout(mergedConfiguration);
-        }
+
+        prepareWindowToDisplayDuringRelayout(mergedConfiguration, wasVisible);
+
         if ((attrChanges & FORMAT_CHANGED) != 0) {
             // If the format can't be changed in place, preserve the old surface until the app draws
             // on the new one. This prevents blinking when we change elevation of freeform and

@@ -148,4 +148,46 @@ TEST(ResourceValuesTest, StyleClone) {
   EXPECT_TRUE(a->Equals(b.get()));
 }
 
+TEST(ResourceValuesTest, StyleMerges) {
+  StringPool pool_a;
+  StringPool pool_b;
+
+  std::unique_ptr<Style> a =
+      test::StyleBuilder()
+          .SetParent("android:style/Parent")
+          .AddItem("android:attr/a", util::make_unique<String>(pool_a.MakeRef("FooA")))
+          .AddItem("android:attr/b", util::make_unique<String>(pool_a.MakeRef("FooB")))
+          .Build();
+
+  std::unique_ptr<Style> b =
+      test::StyleBuilder()
+          .SetParent("android:style/OverlayParent")
+          .AddItem("android:attr/c", util::make_unique<String>(pool_b.MakeRef("OverlayFooC")))
+          .AddItem("android:attr/a", util::make_unique<String>(pool_b.MakeRef("OverlayFooA")))
+          .Build();
+
+  a->MergeWith(b.get(), &pool_a);
+
+  StringPool pool;
+  std::unique_ptr<Style> expected =
+      test::StyleBuilder()
+          .SetParent("android:style/OverlayParent")
+          .AddItem("android:attr/a", util::make_unique<String>(pool.MakeRef("OverlayFooA")))
+          .AddItem("android:attr/b", util::make_unique<String>(pool.MakeRef("FooB")))
+          .AddItem("android:attr/c", util::make_unique<String>(pool.MakeRef("OverlayFooC")))
+          .Build();
+
+  EXPECT_TRUE(a->Equals(expected.get()));
+}
+
+// TYPE_NULL is encoded as TYPE_REFERENCE with a value of 0. This is represented in AAPT2
+// by a default constructed Reference value.
+TEST(ResourcesValuesTest, EmptyReferenceFlattens) {
+  android::Res_value value = {};
+  ASSERT_TRUE(Reference().Flatten(&value));
+
+  EXPECT_EQ(android::Res_value::TYPE_REFERENCE, value.dataType);
+  EXPECT_EQ(0x0u, value.data);
+}
+
 } // namespace aapt

@@ -401,6 +401,13 @@ public interface WindowManagerPolicy {
         boolean isAnimatingLw();
 
         /**
+         * @return Whether the window can affect SystemUI flags, meaning that SystemUI (system bars,
+         *         for example) will be  affected by the flags specified in this window. This is the
+         *         case when the surface is on screen but not exiting.
+         */
+        boolean canAffectSystemUiFlags();
+
+        /**
          * Is this window considered to be gone for purposes of layout?
          */
         boolean isGoneForLayoutLw();
@@ -589,6 +596,13 @@ public interface WindowManagerPolicy {
          * Notifies window manager that {@link #isKeyguardTrustedLw} has changed.
          */
         void notifyKeyguardTrustedChanged();
+
+        /**
+         * Notifies the window manager that screen is being turned off.
+         *
+         * @param listener callback to call when display can be turned off
+         */
+        void screenTurningOff(ScreenOffListener listener);
     }
 
     public interface PointerEventListener {
@@ -1267,12 +1281,28 @@ public interface WindowManagerPolicy {
     public void screenTurnedOn();
 
     /**
+     * Called when the display would like to be turned off. This gives policy a chance to do some
+     * things before the display power state is actually changed to off.
+     *
+     * @param screenOffListener Must be called to tell that the display power state can actually be
+     *                          changed now after policy has done its work.
+     */
+    public void screenTurningOff(ScreenOffListener screenOffListener);
+
+    /**
      * Called when the device has turned the screen off.
      */
     public void screenTurnedOff();
 
     public interface ScreenOnListener {
         void onScreenOn();
+    }
+
+    /**
+     * See {@link #screenTurnedOff}
+     */
+    public interface ScreenOffListener {
+        void onScreenOff();
     }
 
     /**
@@ -1661,4 +1691,16 @@ public interface WindowManagerPolicy {
     public void onConfigurationChanged();
 
     public boolean shouldRotateSeamlessly(int oldRotation, int newRotation);
+
+    /**
+     * Called when System UI has been started.
+     */
+    void onSystemUiStarted();
+
+    /**
+     * Checks whether the policy is ready for dismissing the boot animation and completing the boot.
+     *
+     * @return true if ready; false otherwise.
+     */
+    boolean canDismissBootAnimation();
 }

@@ -1906,6 +1906,10 @@
                 android:description="@string/permdesc_useDataInBackground"
                 android:protectionLevel="normal" />
 
+    <!-- @hide Allows an application to set display offsets for the screen.
+         This permission is not available to third party applications. -->
+    <permission android:name="android.permission.SET_DISPLAY_OFFSET"
+        android:protectionLevel="signature|privileged" />
 
     <!-- ================================== -->
     <!-- Permissions affecting the system wallpaper -->
@@ -3322,11 +3326,15 @@
          confirmation UI for full backup/restore -->
     <uses-permission android:name="android.permission.CONFIRM_FULL_BACKUP"/>
 
-
-    <!-- Allows the holder to access the instant applications on the device.
+    <!-- Allows the holder to access and manage instant applications on the device.
     @hide -->
     <permission android:name="android.permission.ACCESS_INSTANT_APPS"
             android:protectionLevel="signature|installer|verifier" />
+
+    <!-- Allows the holder to view the instant applications on the device.
+    @hide -->
+    <permission android:name="android.permission.VIEW_INSTANT_APPS"
+            android:protectionLevel="signature|preinstalled" />
 
     <!-- Allows receiving the usage of media resource e.g. video/audio codec and
          graphic memory.

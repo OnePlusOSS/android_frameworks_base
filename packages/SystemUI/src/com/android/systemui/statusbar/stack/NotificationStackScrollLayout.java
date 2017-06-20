@@ -53,7 +53,6 @@ import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
-import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.animation.Interpolator;
 import android.widget.OverScroller;
@@ -120,7 +119,7 @@ public class NotificationStackScrollLayout extends ViewGroup
     private boolean mSwipingInProgress;
     private int mCurrentStackHeight = Integer.MAX_VALUE;
     private final Paint mBackgroundPaint = new Paint();
-    private boolean mShouldDrawNotificationBackground;
+    private final boolean mShouldDrawNotificationBackground;
 
     private float mExpandedHeight;
     private int mOwnScrollY;
@@ -451,7 +450,8 @@ public class NotificationStackScrollLayout extends ViewGroup
     }
 
     protected void onDraw(Canvas canvas) {
-        if (mShouldDrawNotificationBackground && mCurrentBounds.top < mCurrentBounds.bottom) {
+        if (mShouldDrawNotificationBackground && !mAmbientState.isDark()
+                && mCurrentBounds.top < mCurrentBounds.bottom) {
             canvas.drawRect(0, mCurrentBounds.top, getWidth(), mCurrentBounds.bottom,
                     mBackgroundPaint);
         }
@@ -815,7 +815,8 @@ public class NotificationStackScrollLayout extends ViewGroup
      */
     private float getAppearEndPosition() {
         int appearPosition;
-        if (mEmptyShadeView.getVisibility() == GONE) {
+        int notGoneChildCount = getNotGoneChildCount();
+        if (mEmptyShadeView.getVisibility() == GONE && notGoneChildCount != 0) {
             int minNotificationsForShelf = 1;
             if (mTrackingHeadsUp || mHeadsUpManager.hasPinnedHeadsUp()) {
                 appearPosition = mHeadsUpManager.getTopHeadsUpPinnedHeight();
@@ -823,7 +824,7 @@ public class NotificationStackScrollLayout extends ViewGroup
             } else {
                 appearPosition = 0;
             }
-            if (getNotGoneChildCount() >= minNotificationsForShelf) {
+            if (notGoneChildCount >= minNotificationsForShelf) {
                 appearPosition += mShelf.getIntrinsicHeight();
             }
         } else {
@@ -1940,7 +1941,7 @@ public class NotificationStackScrollLayout extends ViewGroup
         int numShownItems = 0;
         boolean finish = false;
         int maxDisplayedNotifications = mAmbientState.isDark()
-                ? (isPulsing() ? 1 : 0)
+                ? (hasPulsingNotifications() ? 1 : 0)
                 : mMaxDisplayedNotifications;
 
         for (int i = 0; i < getChildCount(); i++) {
@@ -1949,7 +1950,8 @@ public class NotificationStackScrollLayout extends ViewGroup
                     && !expandableView.hasNoContentHeight()) {
                 boolean limitReached = maxDisplayedNotifications != -1
                         && numShownItems >= maxDisplayedNotifications;
-                boolean notificationOnAmbientThatIsNotPulsing = isPulsing()
+                boolean notificationOnAmbientThatIsNotPulsing = mAmbientState.isDark()
+                        && hasPulsingNotifications()
                         && expandableView instanceof ExpandableNotificationRow
                         && !isPulsing(((ExpandableNotificationRow) expandableView).getEntry());
                 if (limitReached || notificationOnAmbientThatIsNotPulsing) {
@@ -2007,7 +2009,7 @@ public class NotificationStackScrollLayout extends ViewGroup
         return false;
     }
 
-    private boolean isPulsing() {
+    public boolean hasPulsingNotifications() {
         return mPulsing != null;
     }
 
@@ -2219,14 +2221,15 @@ public class NotificationStackScrollLayout extends ViewGroup
         ActivatableNotificationView firstView = mFirstVisibleBackgroundChild;
         int top = 0;
         if (firstView != null) {
-            int finalTranslationY = (int) ViewState.getFinalTranslationY(firstView);
+            // Round Y up to avoid seeing the background during animation
+            int finalTranslationY = (int) Math.ceil(ViewState.getFinalTranslationY(firstView));
             if (mAnimateNextBackgroundTop
                     || mTopAnimator == null && mCurrentBounds.top == finalTranslationY
                     || mTopAnimator != null && mEndAnimationRect.top == finalTranslationY) {
                 // we're ending up at the same location as we are now, lets just skip the animation
                 top = finalTranslationY;
             } else {
-                top = (int) firstView.getTranslationY();
+                top = (int) Math.ceil(firstView.getTranslationY());
             }
         }
         ActivatableNotificationView lastView = mShelf.hasItemsInStableShelf()
@@ -2836,7 +2839,7 @@ public class NotificationStackScrollLayout extends ViewGroup
     }
 
     private void updateNotificationAnimationStates() {
-        boolean running = mAnimationsEnabled || isPulsing();
+        boolean running = mAnimationsEnabled || hasPulsingNotifications();
         mShelf.setAnimationsEnabled(running);
         int childCount = getChildCount();
         for (int i = 0; i < childCount; i++) {
@@ -2847,7 +2850,7 @@ public class NotificationStackScrollLayout extends ViewGroup
     }
 
     private void updateAnimationState(View child) {
-        updateAnimationState((mAnimationsEnabled || isPulsing())
+        updateAnimationState((mAnimationsEnabled || hasPulsingNotifications())
                 && (mIsExpanded || isPinnedHeadsUp(child)), child);
     }
 
@@ -3688,11 +3691,8 @@ public class NotificationStackScrollLayout extends ViewGroup
      * {@link #mAmbientState}'s dark mode is toggled.
      */
     private void updateWillNotDraw() {
-       if (mAmbientState.isDark()) {
-           setWillNotDraw(!DEBUG);
-       } else {
-           setWillNotDraw(!mShouldDrawNotificationBackground && !DEBUG);
-       }
+        boolean willDraw = !mAmbientState.isDark() && mShouldDrawNotificationBackground || DEBUG;
+        setWillNotDraw(!willDraw);
     }
 
     private void setBackgroundFadeAmount(float fadeAmount) {
@@ -4119,7 +4119,7 @@ public class NotificationStackScrollLayout extends ViewGroup
             return;
         }
         mPulsing = pulsing;
-        mAmbientState.setPulsing(isPulsing());
+        mAmbientState.setHasPulsingNotifications(hasPulsingNotifications());
         updateNotificationAnimationStates();
         updateContentHeight();
         notifyHeightChangeListener(mShelf);
@@ -4353,6 +4353,10 @@ public class NotificationStackScrollLayout extends ViewGroup
         @Override
         public void snooze(StatusBarNotification sbn, SnoozeOption snoozeOption) {
             mStatusBar.setNotificationSnoozed(sbn, snoozeOption);
+        }
+
+        public boolean isFalseGesture(MotionEvent ev) {
+            return super.isFalseGesture(ev);
         }
 
         private void handleMenuCoveredOrDismissed() {

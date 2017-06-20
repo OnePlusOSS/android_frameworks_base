@@ -47,6 +47,8 @@ oneway interface IConnectionService {
             boolean isUnknown,
             in Session.Info sessionInfo);
 
+    void createConnectionComplete(String callId, in Session.Info sessionInfo);
+
     void createConnectionFailed(in PhoneAccountHandle connectionManagerPhoneAccount, String callId,
             in ConnectionRequest request, boolean isIncoming, in Session.Info sessionInfo);
 
@@ -98,4 +100,6 @@ oneway interface IConnectionService {
 
     void respondToRttUpgradeRequest(String callId, in ParcelFileDescriptor fromInCall,
     in ParcelFileDescriptor toInCall, in Session.Info sessionInfo);
+
+    void addParticipantWithConference(String callId, String recipients);
 }

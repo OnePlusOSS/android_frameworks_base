@@ -100,6 +100,7 @@ public abstract class ConnectionService extends Service {
     private static final String SESSION_ADD_CS_ADAPTER = "CS.aCSA";
     private static final String SESSION_REMOVE_CS_ADAPTER = "CS.rCSA";
     private static final String SESSION_CREATE_CONN = "CS.crCo";
+    private static final String SESSION_CREATE_CONN_COMPLETE = "CS.crCoC";
     private static final String SESSION_CREATE_CONN_FAILED = "CS.crCoF";
     private static final String SESSION_ABORT = "CS.ab";
     private static final String SESSION_ANSWER = "CS.an";
@@ -152,6 +153,9 @@ public abstract class ConnectionService extends Service {
     private static final int MSG_ON_START_RTT = 26;
     private static final int MSG_ON_STOP_RTT = 27;
     private static final int MSG_RTT_UPGRADE_RESPONSE = 28;
+    private static final int MSG_CREATE_CONNECTION_COMPLETE = 29;
+    //Proprietary values starts after this.
+    private static final int MSG_ADD_PARTICIPANT_WITH_CONFERENCE = 40;
 
     private static Connection sNullConnection;
 
@@ -215,6 +219,19 @@ public abstract class ConnectionService extends Service {
                 args.argi1 = isIncoming ? 1 : 0;
                 args.argi2 = isUnknown ? 1 : 0;
                 mHandler.obtainMessage(MSG_CREATE_CONNECTION, args).sendToTarget();
+            } finally {
+                Log.endSession();
+            }
+        }
+
+        @Override
+        public void createConnectionComplete(String id, Session.Info sessionInfo) {
+            Log.startSession(sessionInfo, SESSION_CREATE_CONN_COMPLETE);
+            try {
+                SomeArgs args = SomeArgs.obtain();
+                args.arg1 = id;
+                args.arg2 = Log.createSubsession();
+                mHandler.obtainMessage(MSG_CREATE_CONNECTION_COMPLETE, args).sendToTarget();
             } finally {
                 Log.endSession();
             }
@@ -430,6 +447,14 @@ public abstract class ConnectionService extends Service {
         }
 
         @Override
+        public void addParticipantWithConference(String callId, String participant) {
+            SomeArgs args = SomeArgs.obtain();
+            args.arg1 = callId;
+            args.arg2 = participant;
+            mHandler.obtainMessage(MSG_ADD_PARTICIPANT_WITH_CONFERENCE, args).sendToTarget();
+        }
+
+        @Override
         public void mergeConference(String callId, Session.Info sessionInfo) {
             Log.startSession(sessionInfo, SESSION_MERGE_CONFERENCE);
             try {
@@ -630,6 +655,33 @@ public abstract class ConnectionService extends Service {
                     }
                     break;
                 }
+                case MSG_CREATE_CONNECTION_COMPLETE: {
+                    SomeArgs args = (SomeArgs) msg.obj;
+                    Log.continueSession((Session) args.arg2,
+                            SESSION_HANDLER + SESSION_CREATE_CONN_COMPLETE);
+                    try {
+                        final String id = (String) args.arg1;
+                        if (!mAreAccountsInitialized) {
+                            Log.d(this, "Enqueueing pre-init request %s", id);
+                            mPreInitializationConnectionRequests.add(
+                                    new android.telecom.Logging.Runnable(
+                                            SESSION_HANDLER + SESSION_CREATE_CONN_COMPLETE
+                                                    + ".pICR",
+                                            null /*lock*/) {
+                                        @Override
+                                        public void loggedRun() {
+                                            notifyCreateConnectionComplete(id);
+                                        }
+                                    }.prepare());
+                        } else {
+                            notifyCreateConnectionComplete(id);
+                        }
+                    } finally {
+                        args.recycle();
+                        Log.endSession();
+                    }
+                    break;
+                }
                 case MSG_CREATE_CONNECTION_FAILED: {
                     SomeArgs args = (SomeArgs) msg.obj;
                     Log.continueSession((Session) args.arg3, SESSION_HANDLER +
@@ -801,6 +853,17 @@ public abstract class ConnectionService extends Service {
                     } finally {
                         args.recycle();
                         Log.endSession();
+                    }
+                    break;
+                }
+                case MSG_ADD_PARTICIPANT_WITH_CONFERENCE: {
+                    SomeArgs args = (SomeArgs) msg.obj;
+                    try {
+                        String callId = (String) args.arg1;
+                        String participant = (String) args.arg2;
+                        addParticipantWithConference(callId, participant);
+                    } finally {
+                        args.recycle();
                     }
                     break;
                 }
@@ -1373,6 +1436,17 @@ public abstract class ConnectionService extends Service {
         }
     }
 
+    /**
+     * Called by Telecom when the creation of a new Connection has completed and it is now added
+     * to Telecom.
+     * @param callId The ID of the connection.
+     */
+    private void notifyCreateConnectionComplete(final String callId) {
+        Log.i(this, "notifyCreateConnectionComplete %s", callId);
+        onCreateConnectionComplete(findConnectionForAction(callId,
+                "notifyCreateConnectionComplete"));
+    }
+
     private void abort(String callId) {
         Log.d(this, "abort %s", callId);
         findConnectionForAction(callId, "abort").onAbort();
@@ -1518,6 +1592,17 @@ public abstract class ConnectionService extends Service {
         Conference conference = connection.getConference();
         if (conference != null) {
             conference.onSeparate(connection);
+        }
+    }
+
+    private void addParticipantWithConference(String callId, String participant) {
+        Log.d(this, "ConnectionService addParticipantWithConference(%s, %s)", participant, callId);
+        Conference conference = findConferenceForAction(callId, "addParticipantWithConference");
+        Connection connection = findConnectionForAction(callId, "addParticipantWithConnection");
+        if (connection != getNullConnection()) {
+            onAddParticipant(connection, participant);
+        } else if (conference != getNullConference()) {
+            conference.onAddParticipant(participant);
         }
     }
 
@@ -1770,10 +1855,28 @@ public abstract class ConnectionService extends Service {
      */
     public final void addExistingConnection(PhoneAccountHandle phoneAccountHandle,
             Connection connection) {
+        addExistingConnection(phoneAccountHandle, connection, null /* conference */);
+    }
+
+    /**
+     * Adds a connection created by the {@link ConnectionService} and informs telecom of the new
+     * connection.
+     *
+     * @param phoneAccountHandle The phone account handle for the connection.
+     * @param connection The connection to add.
+     * @param conference The parent conference of the new connection.
+     * @hide
+     */
+    public final void addExistingConnection(PhoneAccountHandle phoneAccountHandle,
+            Connection connection, Conference conference) {
 
         String id = addExistingConnectionInternal(phoneAccountHandle, connection);
         if (id != null) {
             List<String> emptyList = new ArrayList<>(0);
+            String conferenceId = null;
+            if (conference != null) {
+                conferenceId = mIdByConference.get(conference);
+            }
 
             ParcelableConnection parcelableConnection = new ParcelableConnection(
                     phoneAccountHandle,
@@ -1794,7 +1897,8 @@ public abstract class ConnectionService extends Service {
                     connection.getStatusHints(),
                     connection.getDisconnectCause(),
                     emptyList,
-                    connection.getExtras());
+                    connection.getExtras(),
+                    conferenceId);
             mAdapter.addExistingConnection(id, parcelableConnection);
         }
     }
@@ -1833,6 +1937,18 @@ public abstract class ConnectionService extends Service {
             PhoneAccountHandle connectionManagerPhoneAccount,
             ConnectionRequest request) {
         return null;
+    }
+
+    /**
+     * Called after the {@link Connection} returned by
+     * {@link #onCreateIncomingConnection(PhoneAccountHandle, ConnectionRequest)}
+     * or {@link #onCreateOutgoingConnection(PhoneAccountHandle, ConnectionRequest)} has been
+     * added to the {@link ConnectionService} and sent to Telecom.
+     *
+     * @param connection the {@link Connection}.
+     * @hide
+     */
+    public void onCreateConnectionComplete(Connection connection) {
     }
 
     /**
@@ -1934,6 +2050,19 @@ public abstract class ConnectionService extends Service {
      * @param connection2 A connection to merge into a conference call.
      */
     public void onConference(Connection connection1, Connection connection2) {}
+
+    /**
+     * Add participant with connection. Invoked when user has made a request to add
+     * participant with specified connection. In response, the participant should add with
+     * the connection.
+     *
+     * @param connection A connection where participant need to add.
+     * @param participant Address of participant which will be added.
+     * @return
+     *
+     * @hide
+     */
+    public void onAddParticipant(Connection connection, String participant) {}
 
     /**
      * Indicates that a remote conference has been created for existing {@link RemoteConnection}s.

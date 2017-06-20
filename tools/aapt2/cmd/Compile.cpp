@@ -372,6 +372,8 @@ static bool IsValidFile(IAaptContext* context, const StringPiece& input_path) {
     if (file_type == file::FileType::kDirectory) {
       context->GetDiagnostics()->Error(DiagMessage(input_path)
                                        << "resource file cannot be a directory");
+    } else if (file_type == file::FileType::kNonexistant) {
+      context->GetDiagnostics()->Error(DiagMessage(input_path) << "file not found");
     } else {
       context->GetDiagnostics()->Error(DiagMessage(input_path)
                                        << "not a valid resource file");
@@ -476,7 +478,8 @@ static bool CompilePng(IAaptContext* context, const CompileOptions& options,
 
   {
     std::string content;
-    if (!android::base::ReadFileToString(path_data.source.path, &content)) {
+    if (!android::base::ReadFileToString(path_data.source.path, &content,
+                                         true /*follow_symlinks*/)) {
       context->GetDiagnostics()->Error(DiagMessage(path_data.source)
                                        << android::base::SystemErrorCodeToString(errno));
       return false;
@@ -488,7 +491,7 @@ static bool CompilePng(IAaptContext* context, const CompileOptions& options,
     // Ensure that we only keep the chunks we care about if we end up
     // using the original PNG instead of the crunched one.
     PngChunkFilter png_chunk_filter(content);
-    std::unique_ptr<Image> image = ReadPng(context, &png_chunk_filter);
+    std::unique_ptr<Image> image = ReadPng(context, path_data.source, &png_chunk_filter);
     if (!image) {
       return false;
     }

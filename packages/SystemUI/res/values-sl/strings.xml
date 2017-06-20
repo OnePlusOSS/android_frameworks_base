@@ -583,6 +583,7 @@
     <string name="snooze_option_15_min" msgid="1068727451405610715">"15 minut"</string>
     <string name="snooze_option_30_min" msgid="867081342535195788">"30 minut"</string>
     <string name="snooze_option_1_hour" msgid="1098086401880077154">"1 ura"</string>
+    <string name="snooze_option_2_hour" msgid="8332218255658969475">"2 uri"</string>
     <string name="snooze_undo" msgid="6074877317002985129">"RAZVELJAVI"</string>
     <string name="snoozed_for_time" msgid="2390718332980204462">"Preloženo za <xliff:g id="TIME_AMOUNT">%1$s</xliff:g>"</string>
     <string name="battery_panel_title" msgid="7944156115535366613">"Poraba akumulatorja"</string>
@@ -758,8 +759,8 @@
     <string name="notification_channel_screenshot" msgid="6314080179230000938">"Posnetki zaslona"</string>
     <string name="notification_channel_general" msgid="4525309436693914482">"Splošna sporočila"</string>
     <string name="notification_channel_storage" msgid="3077205683020695313">"Shramba"</string>
-    <string name="instant_apps" msgid="6647570248119804907">"Aplikacije brez nameščanja"</string>
-    <string name="instant_apps_message" msgid="8116608994995104836">"Aplikacij brez nameščanja ni treba namestiti."</string>
+    <string name="instant_apps" msgid="6647570248119804907">"Nenamestljive aplikacije"</string>
+    <string name="instant_apps_message" msgid="8116608994995104836">"Nenamestljivih aplikacij ni treba namestiti."</string>
     <string name="app_info" msgid="6856026610594615344">"Podatki o aplikaciji"</string>
     <string name="go_to_web" msgid="1106022723459948514">"Pojdi v splet"</string>
     <string name="mobile_data" msgid="7094582042819250762">"Mobilni podatki"</string>

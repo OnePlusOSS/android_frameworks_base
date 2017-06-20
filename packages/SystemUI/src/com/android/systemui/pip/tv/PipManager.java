@@ -26,6 +26,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ParceledListSlice;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Rect;
 import android.media.session.MediaController;
@@ -116,6 +117,7 @@ public class PipManager implements BasePipManager {
     private Rect mDefaultPipBounds = new Rect();
     private Rect mSettingsPipBounds;
     private Rect mMenuModePipBounds;
+    private int mLastOrientation = Configuration.ORIENTATION_UNDEFINED;
     private boolean mInitialized;
     private int mPipTaskId = TASK_ID_NO_PIP;
     private ComponentName mPipComponentName;
@@ -237,7 +239,11 @@ public class PipManager implements BasePipManager {
             }
         }
 
-        loadConfigurationsAndApply();
+        // Initialize the last orientation and apply the current configuration
+        Configuration initialConfig = mContext.getResources().getConfiguration();
+        mLastOrientation = initialConfig.orientation;
+        loadConfigurationsAndApply(initialConfig);
+
         mMediaSessionManager =
                 (MediaSessionManager) mContext.getSystemService(Context.MEDIA_SESSION_SERVICE);
 
@@ -250,7 +256,14 @@ public class PipManager implements BasePipManager {
         mPipNotification = new PipNotification(context);
     }
 
-    private void loadConfigurationsAndApply() {
+    private void loadConfigurationsAndApply(Configuration newConfig) {
+        if (mLastOrientation != newConfig.orientation) {
+            // Don't resize the pinned stack on orientation change. TV does not care about this case
+            // and this could clobber the existing animation to the new bounds calculated by WM.
+            mLastOrientation = newConfig.orientation;
+            return;
+        }
+
         Resources res = mContext.getResources();
         mSettingsPipBounds = Rect.unflattenFromString(res.getString(
                 R.string.pip_settings_bounds));
@@ -267,8 +280,8 @@ public class PipManager implements BasePipManager {
     /**
      * Updates the PIP per configuration changed.
      */
-    public void onConfigurationChanged() {
-        loadConfigurationsAndApply();
+    public void onConfigurationChanged(Configuration newConfig) {
+        loadConfigurationsAndApply(newConfig);
         mPipNotification.onConfigurationChanged(mContext);
     }
 
@@ -577,7 +590,7 @@ public class PipManager implements BasePipManager {
         @Override
         public void onTaskStackChanged() {
             if (DEBUG) Log.d(TAG, "onTaskStackChanged()");
-            if (!checkCurrentUserId(DEBUG)) {
+            if (!checkCurrentUserId(mContext, DEBUG)) {
                 return;
             }
             if (getState() != STATE_NO_PIP) {
@@ -614,7 +627,7 @@ public class PipManager implements BasePipManager {
         @Override
         public void onActivityPinned(String packageName, int taskId) {
             if (DEBUG) Log.d(TAG, "onActivityPinned()");
-            if (!checkCurrentUserId(DEBUG)) {
+            if (!checkCurrentUserId(mContext, DEBUG)) {
                 return;
             }
             StackInfo stackInfo = getPinnedStackInfo();
@@ -641,7 +654,7 @@ public class PipManager implements BasePipManager {
         @Override
         public void onPinnedActivityRestartAttempt(boolean clearedTask) {
             if (DEBUG) Log.d(TAG, "onPinnedActivityRestartAttempt()");
-            if (!checkCurrentUserId(DEBUG)) {
+            if (!checkCurrentUserId(mContext, DEBUG)) {
                 return;
             }
             // If PIPed activity is launched again by Launcher or intent, make it fullscreen.
@@ -651,7 +664,7 @@ public class PipManager implements BasePipManager {
         @Override
         public void onPinnedStackAnimationEnded() {
             if (DEBUG) Log.d(TAG, "onPinnedStackAnimationEnded()");
-            if (!checkCurrentUserId(DEBUG)) {
+            if (!checkCurrentUserId(mContext, DEBUG)) {
                 return;
             }
             switch (getState()) {

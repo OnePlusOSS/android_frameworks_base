@@ -73,6 +73,7 @@ public class VibratorService extends IVibratorService.Stub
 
     private final LinkedList<VibrationInfo> mPreviousVibrations;
     private final int mPreviousVibrationsLimit;
+    private final boolean mAllowPriorityVibrationsInLowPowerMode;
     private final boolean mSupportsAmplitudeControl;
     private final int mDefaultVibrationAmplitude;
     private final VibrationEffect[] mFallbackEffects;
@@ -213,6 +214,9 @@ public class VibratorService extends IVibratorService.Stub
         mDefaultVibrationAmplitude = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_defaultVibrationAmplitude);
 
+        mAllowPriorityVibrationsInLowPowerMode = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_allowPriorityVibrationsInLowPowerMode);
+
         mPreviousVibrations = new LinkedList<>();
 
         IntentFilter filter = new IntentFilter();
@@ -221,12 +225,19 @@ public class VibratorService extends IVibratorService.Stub
 
         long[] clickEffectTimings = getLongIntArray(context.getResources(),
                 com.android.internal.R.array.config_virtualKeyVibePattern);
-        VibrationEffect clickEffect = VibrationEffect.createWaveform(clickEffectTimings, -1);
+        VibrationEffect clickEffect;
+        if (clickEffectTimings.length == 0) {
+            clickEffect = null;
+        } else if (clickEffectTimings.length == 1) {
+            clickEffect = VibrationEffect.createOneShot(
+                    clickEffectTimings[0], VibrationEffect.DEFAULT_AMPLITUDE);
+        } else {
+            clickEffect = VibrationEffect.createWaveform(clickEffectTimings, -1);
+        }
         VibrationEffect doubleClickEffect = VibrationEffect.createWaveform(
                 new long[] {0, 30, 100, 30} /*timings*/, -1);
 
         mFallbackEffects = new VibrationEffect[] { clickEffect, doubleClickEffect };
-
     }
 
     public void systemReady() {
@@ -449,7 +460,7 @@ public class VibratorService extends IVibratorService.Stub
     }
 
     private void startVibrationLocked(final Vibration vib) {
-        if (mLowPowerMode && vib.mUsageHint != AudioAttributes.USAGE_NOTIFICATION_RINGTONE) {
+        if (!isAllowedToVibrate(vib)) {
             if (DEBUG) {
                 Slog.e(TAG, "Vibrate ignored, low power mode");
             }
@@ -496,6 +507,26 @@ public class VibratorService extends IVibratorService.Stub
         } else {
             Slog.e(TAG, "Unknown vibration type, ignoring");
         }
+    }
+
+    private boolean isAllowedToVibrate(Vibration vib) {
+        if (!mLowPowerMode) {
+            return true;
+        }
+        if (vib.mUsageHint == AudioAttributes.USAGE_NOTIFICATION_RINGTONE) {
+            return true;
+        }
+        if (!mAllowPriorityVibrationsInLowPowerMode) {
+            return false;
+        }
+        if (vib.mUsageHint == AudioAttributes.USAGE_ALARM ||
+            vib.mUsageHint == AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY ||
+            vib.mUsageHint == AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_REQUEST) {
+
+            return true;
+        }
+
+        return false;
     }
 
     private boolean shouldVibrateForRingtone() {
@@ -695,7 +726,7 @@ public class VibratorService extends IVibratorService.Stub
                 }
             }
             final int id = prebaked.getId();
-            if (id < 0 || id >= mFallbackEffects.length) {
+            if (id < 0 || id >= mFallbackEffects.length || mFallbackEffects[id] == null) {
                 Slog.w(TAG, "Failed to play prebaked effect, no fallback");
                 return 0;
             }

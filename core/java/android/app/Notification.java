@@ -22,6 +22,7 @@ import android.annotation.ColorInt;
 import android.annotation.DrawableRes;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
+import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemApi;
@@ -1009,6 +1010,7 @@ public class Notification implements Parcelable
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.NOTIFICATION_DURING_SETUP)
     public static final String EXTRA_ALLOW_DURING_SETUP = "android.allowDuringSetup";
 
     /**
@@ -1110,6 +1112,7 @@ public class Notification implements Parcelable
 
     /** @hide */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.SUBSTITUTE_NOTIFICATION_APP_NAME)
     public static final String EXTRA_SUBSTITUTE_APP_NAME = "android.substName";
 
     /**
@@ -2637,6 +2640,20 @@ public class Notification implements Parcelable
      */
     public boolean isGroupChild() {
         return mGroupKey != null && (flags & FLAG_GROUP_SUMMARY) == 0;
+    }
+
+    /**
+     * @hide
+     */
+    public boolean suppressAlertingDueToGrouping() {
+        if (isGroupSummary()
+                && getGroupAlertBehavior() == Notification.GROUP_ALERT_CHILDREN) {
+            return true;
+        } else if (isGroupChild()
+                && getGroupAlertBehavior() == Notification.GROUP_ALERT_SUMMARY) {
+            return true;
+        }
+        return false;
     }
 
     /**

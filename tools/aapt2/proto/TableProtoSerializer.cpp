@@ -190,8 +190,7 @@ class PbSerializerVisitor : public RawValueVisitor {
     }
 
     if (ref.name) {
-      StringPool::Ref symbol_ref =
-          symbol_pool_->MakeRef(ref.name.value().ToString());
+      StringPool::Ref symbol_ref = symbol_pool_->MakeRef(ref.name.value().ToString());
       pb_ref->set_symbol_idx(static_cast<uint32_t>(symbol_ref.index()));
     }
 
@@ -250,19 +249,16 @@ std::unique_ptr<pb::ResourceTable> SerializeTableToPb(ResourceTable* table) {
 
         // Write the SymbolStatus struct.
         pb::SymbolStatus* pb_status = pb_entry->mutable_symbol_status();
-        pb_status->set_visibility(
-            SerializeVisibilityToPb(entry->symbol_status.state));
-        SerializeSourceToPb(entry->symbol_status.source, &source_pool,
-                            pb_status->mutable_source());
+        pb_status->set_visibility(SerializeVisibilityToPb(entry->symbol_status.state));
+        SerializeSourceToPb(entry->symbol_status.source, &source_pool, pb_status->mutable_source());
         pb_status->set_comment(entry->symbol_status.comment);
+        pb_status->set_allow_new(entry->symbol_status.allow_new);
 
         for (auto& config_value : entry->values) {
           pb::ConfigValue* pb_config_value = pb_entry->add_config_values();
-          SerializeConfig(config_value->config,
-                          pb_config_value->mutable_config());
+          SerializeConfig(config_value->config, pb_config_value->mutable_config());
           if (!config_value->product.empty()) {
-            pb_config_value->mutable_config()->set_product(
-                config_value->product);
+            pb_config_value->mutable_config()->set_product(config_value->product);
           }
 
           pb::Value* pb_value = pb_config_value->mutable_value();

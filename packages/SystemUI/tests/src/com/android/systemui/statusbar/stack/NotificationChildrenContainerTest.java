@@ -19,31 +19,32 @@ package com.android.systemui.statusbar.stack;
 import android.content.Context;
 import android.support.test.InstrumentationRegistry;
 import android.support.test.annotation.UiThreadTest;
+import android.support.test.filters.FlakyTest;
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
 import android.view.NotificationHeaderView;
 import android.view.View;
 
+import com.android.systemui.SysuiTestCase;
 import com.android.systemui.statusbar.ExpandableNotificationRow;
 import com.android.systemui.statusbar.NotificationTestHelper;
 
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
-public class NotificationChildrenContainerTest {
+public class NotificationChildrenContainerTest extends SysuiTestCase {
 
-    private Context mContext;
     private ExpandableNotificationRow mGroup;
     private int mId;
     private NotificationTestHelper mNotificationTestHelper;
 
     @Before
     public void setUp() throws Exception {
-        mContext = InstrumentationRegistry.getTargetContext();
         mNotificationTestHelper = new NotificationTestHelper(mContext);
         mGroup = mNotificationTestHelper.createGroup();
     }
@@ -58,5 +59,13 @@ public class NotificationChildrenContainerTest {
         mGroup.setIsLowPriority(false);
         Assert.assertTrue(lowPriorityHeaderView.getParent() == null);
         Assert.assertTrue(childrenContainer.getLowPriorityHeaderView() == null);
+    }
+
+    @Test
+    public void testRecreateNotificationHeader_hasHeader() {
+        NotificationChildrenContainer childrenContainer = mGroup.getChildrenContainer();
+        childrenContainer.recreateNotificationHeader(null);
+        Assert.assertNotNull("Children container must have a header after recreation",
+                childrenContainer.getCurrentHeaderView());
     }
 }

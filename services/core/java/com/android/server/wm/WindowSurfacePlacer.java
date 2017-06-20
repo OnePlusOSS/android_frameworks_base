@@ -15,6 +15,7 @@ import static com.android.server.wm.AppTransition.TRANSIT_FLAG_KEYGUARD_GOING_AW
 import static com.android.server.wm.AppTransition.TRANSIT_FLAG_KEYGUARD_GOING_AWAY_WITH_WALLPAPER;
 import static com.android.server.wm.AppTransition.TRANSIT_KEYGUARD_GOING_AWAY;
 import static com.android.server.wm.AppTransition.TRANSIT_KEYGUARD_GOING_AWAY_ON_WALLPAPER;
+import static com.android.server.wm.AppTransition.TRANSIT_NONE;
 import static com.android.server.wm.AppTransition.TRANSIT_TASK_CLOSE;
 import static com.android.server.wm.AppTransition.TRANSIT_TASK_IN_PLACE;
 import static com.android.server.wm.AppTransition.TRANSIT_TASK_OPEN;
@@ -37,8 +38,7 @@ import static com.android.server.wm.WindowManagerService.MAX_ANIMATION_DURATION;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_PLACING_SURFACES;
 
 import android.content.res.Configuration;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
+import android.graphics.GraphicBuffer;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.os.Binder;
@@ -580,6 +580,11 @@ class WindowSurfacePlacer {
 
     private int maybeUpdateTransitToWallpaper(int transit, boolean openingAppHasWallpaper,
             boolean closingAppHasWallpaper) {
+        // Given no app transition pass it through instead of a wallpaper transition
+        if (transit == TRANSIT_NONE) {
+            return TRANSIT_NONE;
+        }
+
         // if wallpaper is animating in or out set oldWallpaper to null else to wallpaper
         final WindowState wallpaperTarget = mWallpaperControllerLocked.getWallpaperTarget();
         final WindowState oldWallpaper = mWallpaperControllerLocked.isWallpaperTargetAnimating()
@@ -669,8 +674,9 @@ class WindowSurfacePlacer {
             return;
         }
         final int taskId = appToken.getTask().mTaskId;
-        Bitmap thumbnailHeader = mService.mAppTransition.getAppTransitionThumbnailHeader(taskId);
-        if (thumbnailHeader == null || thumbnailHeader.getConfig() == Bitmap.Config.ALPHA_8) {
+        final GraphicBuffer thumbnailHeader =
+                mService.mAppTransition.getAppTransitionThumbnailHeader(taskId);
+        if (thumbnailHeader == null) {
             if (DEBUG_APP_TRANSITIONS) Slog.d(TAG, "No thumbnail header bitmap for: " + taskId);
             return;
         }
@@ -688,18 +694,17 @@ class WindowSurfacePlacer {
             SurfaceControl surfaceControl = new SurfaceControl(mService.mFxSession,
                     "thumbnail anim", dirty.width(), dirty.height(),
                     PixelFormat.TRANSLUCENT, SurfaceControl.HIDDEN,
-                    appToken.windowType, window.mOwnerUid);
+                    appToken.windowType,
+                    window != null ? window.mOwnerUid : Binder.getCallingUid());
             surfaceControl.setLayerStack(display.getLayerStack());
             if (SHOW_TRANSACTIONS) {
                 Slog.i(TAG, "  THUMBNAIL " + surfaceControl + ": CREATE");
             }
 
-            // Draw the thumbnail onto the surface
+            // Transfer the thumbnail to the surface
             Surface drawSurface = new Surface();
             drawSurface.copyFrom(surfaceControl);
-            Canvas c = drawSurface.lockCanvas(dirty);
-            c.drawBitmap(thumbnailHeader, 0, 0, null);
-            drawSurface.unlockCanvasAndPost(c);
+            drawSurface.attachAndQueueBuffer(thumbnailHeader);
             drawSurface.release();
 
             // Get the thumbnail animation

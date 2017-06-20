@@ -18,12 +18,14 @@ package com.android.systemui.qs;
 
 import static com.android.internal.logging.nano.MetricsProto.MetricsEvent.ACTION_QS_DATE;
 
+import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.graphics.PorterDuff.Mode;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.UserManager;
@@ -42,6 +44,7 @@ import android.widget.Toast;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto;
 import com.android.keyguard.KeyguardStatusView;
+import com.android.settingslib.Utils;
 import com.android.systemui.Dependency;
 import com.android.systemui.FontSizeUtils;
 import com.android.systemui.R;
@@ -101,6 +104,8 @@ public class QSFooter extends FrameLayout implements
     private boolean mShowEditIcon;
     private TouchAnimator mAnimator;
     private View mDateTimeGroup;
+    private boolean mKeyguardShowing;
+    private TouchAnimator mAlarmAnimator;
 
     public QSFooter(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -163,13 +168,14 @@ public class QSFooter extends FrameLayout implements
         int remaining = (width - numTiles * size) / (numTiles - 1);
         int defSpace = mContext.getResources().getDimensionPixelOffset(R.dimen.default_gear_space);
 
-        final Builder builder = new Builder()
+        mAnimator = new Builder()
                 .addFloat(mSettingsContainer, "translationX", -(remaining - defSpace), 0)
                 .addFloat(mSettingsButton, "rotation", -120, 0)
-                .addFloat(mAlarmStatus, "alpha", 0, 1);
+                .build();
         if (mAlarmShowing) {
-            builder.addFloat(mDate, "alpha", 1, 0)
+            mAlarmAnimator = new Builder().addFloat(mDate, "alpha", 1, 0)
                     .addFloat(mDateTimeGroup, "translationX", 0, -mDate.getWidth())
+                    .addFloat(mAlarmStatus, "alpha", 0, 1)
                     .setListener(new ListenerAdapter() {
                         @Override
                         public void onAnimationAtStart() {
@@ -180,13 +186,13 @@ public class QSFooter extends FrameLayout implements
                         public void onAnimationStarted() {
                             mAlarmStatus.setVisibility(View.VISIBLE);
                         }
-                    });
+                    }).build();
         } else {
+            mAlarmAnimator = null;
             mAlarmStatus.setVisibility(View.GONE);
             mDate.setAlpha(1);
             mDateTimeGroup.setTranslationX(0);
         }
-        mAnimator = builder.build();
         setExpansion(mExpansionAmount);
     }
 
@@ -235,6 +241,7 @@ public class QSFooter extends FrameLayout implements
         }
 
         TouchAnimator.Builder animatorBuilder = new TouchAnimator.Builder();
+        animatorBuilder.setStartDelay(QSAnimator.EXPANDED_TILE_DELAY);
 
         if (mShowEditIcon) {
             animatorBuilder.addFloat(mEdit, "alpha", 0, 1);
@@ -245,6 +252,11 @@ public class QSFooter extends FrameLayout implements
         }
 
         return animatorBuilder.build();
+    }
+
+    public void setKeyguardShowing(boolean keyguardShowing) {
+        mKeyguardShowing = keyguardShowing;
+        setExpansion(mExpansionAmount);
     }
 
     public void setExpanded(boolean expanded) {
@@ -274,6 +286,8 @@ public class QSFooter extends FrameLayout implements
     public void setExpansion(float headerExpansionFraction) {
         mExpansionAmount = headerExpansionFraction;
         if (mAnimator != null) mAnimator.setPosition(headerExpansionFraction);
+        if (mAlarmAnimator != null) mAlarmAnimator.setPosition(
+                mKeyguardShowing ? 0 : headerExpansionFraction);
 
         if (mSettingsAlpha != null) {
             mSettingsAlpha.setPosition(headerExpansionFraction);
@@ -412,6 +426,13 @@ public class QSFooter extends FrameLayout implements
 
     @Override
     public void onUserInfoChanged(String name, Drawable picture, String userAccount) {
+        if (picture != null &&
+                UserManager.get(mContext).isGuestUser(ActivityManager.getCurrentUser())) {
+            picture = picture.getConstantState().newDrawable().mutate();
+            picture.setColorFilter(
+                    Utils.getColorAttr(mContext, android.R.attr.colorForeground),
+                    Mode.SRC_IN);
+        }
         mMultiUserAvatar.setImageDrawable(picture);
     }
 }

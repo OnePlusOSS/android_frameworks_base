@@ -60,7 +60,6 @@ import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_FORCE_DRAW_ST
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_FORCE_STATUS_BAR_VISIBLE_TRANSPARENT;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_KEYGUARD;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_SHOW_FOR_ALL_USERS;
-import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_TASK_SNAPSHOT;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_SYSTEM_ERROR;
 import static android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_CROSSFADE;
 import static android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_JUMPCUT;
@@ -234,6 +233,7 @@ import com.android.internal.util.ScreenShapeHelper;
 import com.android.internal.widget.PointerLocationView;
 import com.android.server.GestureLauncherService;
 import com.android.server.LocalServices;
+import com.android.server.SystemServiceManager;
 import com.android.server.policy.keyguard.KeyguardServiceDelegate;
 import com.android.server.policy.keyguard.KeyguardServiceDelegate.DrawnListener;
 import com.android.server.policy.keyguard.KeyguardStateMonitor.StateCallback;
@@ -476,6 +476,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     boolean mBootMessageNeedsHiding;
     KeyguardServiceDelegate mKeyguardDelegate;
+    private boolean mKeyguardBound;
     final Runnable mWindowManagerDrawCallback = new Runnable() {
         @Override
         public void run() {
@@ -530,7 +531,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     boolean mSystemReady;
     boolean mSystemBooted;
-    private boolean mDeferBindKeyguard;
     boolean mHdmiPlugged;
     HdmiControl mHdmiControl;
     IUiModeManager mUiModeManager;
@@ -1127,16 +1127,25 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 + ", mOrientationSensorEnabled=" + mOrientationSensorEnabled
                 + ", mKeyguardDrawComplete=" + mKeyguardDrawComplete
                 + ", mWindowManagerDrawComplete=" + mWindowManagerDrawComplete);
+        final boolean keyguardGoingAway = mWindowManagerInternal.isKeyguardGoingAway();
+
         boolean disable = true;
         // Note: We postpone the rotating of the screen until the keyguard as well as the
-        // window manager have reported a draw complete.
-        if (mScreenOnEarly && mAwake &&
-                mKeyguardDrawComplete && mWindowManagerDrawComplete) {
+        // window manager have reported a draw complete or the keyguard is going away in dismiss
+        // mode.
+        if (mScreenOnEarly && mAwake && ((mKeyguardDrawComplete && mWindowManagerDrawComplete)
+                || keyguardGoingAway)) {
             if (needSensorRunningLp()) {
                 disable = false;
                 //enable listener if not already enabled
                 if (!mOrientationSensorEnabled) {
-                    mOrientationListener.enable();
+                    // Don't clear the current sensor orientation if the keyguard is going away in
+                    // dismiss mode. This allows window manager to use the last sensor reading to
+                    // determine the orientation vs. falling back to the last known orientation if
+                    // the sensor reading was cleared which can cause it to relaunch the app that
+                    // will show in the wrong orientation first before correcting leading to app
+                    // launch delays.
+                    mOrientationListener.enable(!keyguardGoingAway /* clearCurrentRotation */);
                     if(localLOGV) Slog.v(TAG, "Enabling listeners");
                     mOrientationSensorEnabled = true;
                 }
@@ -1409,7 +1418,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     launchHomeFromHotKey();
                     break;
                 case SHORT_PRESS_POWER_GO_HOME:
-                    launchHomeFromHotKey(true /* awakenFromDreams */, false /*respectKeyguard*/);
+                    shortPressPowerGoHome();
                     break;
                 case SHORT_PRESS_POWER_CLOSE_IME_OR_GO_HOME: {
                     if (mDismissImeOnBackKeyPressed) {
@@ -1421,12 +1430,20 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             mInputMethodManagerInternal.hideCurrentInputMethod();
                         }
                     } else {
-                        launchHomeFromHotKey(true /* awakenFromDreams */,
-                                false /*respectKeyguard*/);
+                        shortPressPowerGoHome();
                     }
                     break;
                 }
             }
+        }
+    }
+
+    private void shortPressPowerGoHome() {
+        launchHomeFromHotKey(true /* awakenFromDreams */, false /*respectKeyguard*/);
+        if (isKeyguardShowingAndNotOccluded()) {
+            // Notify keyguard so it can do any special handling for the power button since the
+            // device will not power off and only launch home.
+            mKeyguardDelegate.onShortPowerPressedGoHome();
         }
     }
 
@@ -2087,6 +2104,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 handleStartTransitionForKeyguardLw(transit, null /* transit */);
             }
         });
+        mKeyguardDelegate = new KeyguardServiceDelegate(mContext,
+                new StateCallback() {
+                    @Override
+                    public void onTrustedChanged() {
+                        mWindowManagerFuncs.notifyKeyguardTrustedChanged();
+                    }
+                });
     }
 
     /**
@@ -5325,11 +5349,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     @Override
     public void applyPostLayoutPolicyLw(WindowState win, WindowManager.LayoutParams attrs,
             WindowState attached, WindowState imeTarget) {
-        final boolean visible = win.isVisibleLw() && win.getAttrs().alpha > 0f;
-        if (DEBUG_LAYOUT) Slog.i(TAG, "Win " + win + ": isVisible=" + visible);
+        final boolean affectsSystemUi = win.canAffectSystemUiFlags();
+        if (DEBUG_LAYOUT) Slog.i(TAG, "Win " + win + ": affectsSystemUi=" + affectsSystemUi);
         applyKeyguardPolicyLw(win, imeTarget);
         final int fl = PolicyControl.getWindowFlags(win, attrs);
-        if (mTopFullscreenOpaqueWindowState == null && visible && attrs.type == TYPE_INPUT_METHOD) {
+        if (mTopFullscreenOpaqueWindowState == null && affectsSystemUi
+                && attrs.type == TYPE_INPUT_METHOD) {
             mForcingShowNavBar = true;
             mForcingShowNavBarLayer = win.getSurfaceLayer();
         }
@@ -5345,7 +5370,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         boolean appWindow = attrs.type >= FIRST_APPLICATION_WINDOW
                 && attrs.type < FIRST_SYSTEM_WINDOW;
         final int stackId = win.getStackId();
-        if (mTopFullscreenOpaqueWindowState == null && visible) {
+        if (mTopFullscreenOpaqueWindowState == null && affectsSystemUi) {
             if ((fl & FLAG_FORCE_NOT_FULLSCREEN) != 0) {
                 mForceStatusBar = true;
             }
@@ -5377,7 +5402,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         // Voice interaction overrides both top fullscreen and top docked.
-        if (visible && win.getAttrs().type == TYPE_VOICE_INTERACTION) {
+        if (affectsSystemUi && win.getAttrs().type == TYPE_VOICE_INTERACTION) {
             if (mTopFullscreenOpaqueWindowState == null) {
                 mTopFullscreenOpaqueWindowState = win;
                 if (mTopFullscreenOpaqueOrDimmingWindowState == null) {
@@ -5393,7 +5418,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         // Keep track of the window if it's dimming but not necessarily fullscreen.
-        if (mTopFullscreenOpaqueOrDimmingWindowState == null && visible
+        if (mTopFullscreenOpaqueOrDimmingWindowState == null && affectsSystemUi
                 && win.isDimming() && StackId.normallyFullscreenWindows(stackId)) {
             mTopFullscreenOpaqueOrDimmingWindowState = win;
         }
@@ -5401,7 +5426,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // We need to keep track of the top "fullscreen" opaque window for the docked stack
         // separately, because both the "real fullscreen" opaque window and the one for the docked
         // stack can control View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.
-        if (mTopDockedOpaqueWindowState == null && visible && appWindow && attached == null
+        if (mTopDockedOpaqueWindowState == null && affectsSystemUi && appWindow && attached == null
                 && isFullscreen(attrs) && stackId == DOCKED_STACK_ID) {
             mTopDockedOpaqueWindowState = win;
             if (mTopDockedOpaqueOrDimmingWindowState == null) {
@@ -5411,7 +5436,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         // Also keep track of any windows that are dimming but not necessarily fullscreen in the
         // docked stack.
-        if (mTopDockedOpaqueOrDimmingWindowState == null && visible && win.isDimming()
+        if (mTopDockedOpaqueOrDimmingWindowState == null && affectsSystemUi && win.isDimming()
                 && stackId == DOCKED_STACK_ID) {
             mTopDockedOpaqueOrDimmingWindowState = win;
         }
@@ -6631,6 +6656,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         reportScreenStateToVrManager(false);
     }
 
+    private long getKeyguardDrawnTimeout() {
+        final boolean bootCompleted =
+                LocalServices.getService(SystemServiceManager.class).isBootCompleted();
+        // Set longer timeout if it has not booted yet to prevent showing empty window.
+        return bootCompleted ? 1000 : 5000;
+    }
+
     // Called on the DisplayManager's DisplayPowerController thread.
     @Override
     public void screenTurningOn(final ScreenOnListener screenOnListener) {
@@ -6646,7 +6678,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
             if (mKeyguardDelegate != null) {
                 mHandler.removeMessages(MSG_KEYGUARD_DRAWN_TIMEOUT);
-                mHandler.sendEmptyMessageDelayed(MSG_KEYGUARD_DRAWN_TIMEOUT, 1000);
+                mHandler.sendEmptyMessageDelayed(MSG_KEYGUARD_DRAWN_TIMEOUT,
+                        getKeyguardDrawnTimeout());
                 mKeyguardDelegate.onScreenTurningOn(mKeyguardDrawnCallback);
             } else {
                 if (DEBUG_WAKEUP) Slog.d(TAG,
@@ -6665,6 +6698,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
         }
         reportScreenStateToVrManager(true);
+    }
+
+    @Override
+    public void screenTurningOff(ScreenOffListener screenOffListener) {
+        mWindowManagerFuncs.screenTurningOff(screenOffListener);
     }
 
     private void reportScreenStateToVrManager(boolean isScreenOn) {
@@ -7154,16 +7192,26 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         return out;
     }
 
+    private void bindKeyguard() {
+        synchronized (mLock) {
+            if (mKeyguardBound) {
+                return;
+            }
+            mKeyguardBound = true;
+        }
+        mKeyguardDelegate.bindService(mContext);
+    }
+
+    @Override
+    public void onSystemUiStarted() {
+        bindKeyguard();
+    }
+
     /** {@inheritDoc} */
     @Override
     public void systemReady() {
-        mKeyguardDelegate = new KeyguardServiceDelegate(mContext,
-                new StateCallback() {
-                    @Override
-                    public void onTrustedChanged() {
-                        mWindowManagerFuncs.notifyKeyguardTrustedChanged();
-                    }
-                });
+        // In normal flow, systemReady is called before other system services are ready.
+        // So it is better not to bind keyguard here.
         mKeyguardDelegate.onSystemReady();
 
         mVrManagerInternal = LocalServices.getService(VrManagerInternal.class);
@@ -7173,7 +7221,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         readCameraLensCoverState();
         updateUiMode();
-        boolean bindKeyguardNow;
         synchronized (mLock) {
             updateOrientationListenerLp();
             mSystemReady = true;
@@ -7183,18 +7230,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     updateSettings();
                 }
             });
-
-            bindKeyguardNow = mDeferBindKeyguard;
-            if (bindKeyguardNow) {
-                // systemBooted ran but wasn't able to bind to the Keyguard, we'll do it now.
-                mDeferBindKeyguard = false;
+            // If this happens, for whatever reason, systemReady came later than systemBooted.
+            // And keyguard should be already bound from systemBooted
+            if (mSystemBooted) {
+                mKeyguardDelegate.onBootCompleted();
             }
         }
 
-        if (bindKeyguardNow) {
-            mKeyguardDelegate.bindService(mContext);
-            mKeyguardDelegate.onBootCompleted();
-        }
         mSystemGestures.systemReady();
         mImmersiveModeConfirmation.systemReady();
     }
@@ -7202,28 +7244,23 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     /** {@inheritDoc} */
     @Override
     public void systemBooted() {
-        boolean bindKeyguardNow = false;
-        synchronized (mLock) {
-            // Time to bind Keyguard; take care to only bind it once, either here if ready or
-            // in systemReady if not.
-            if (mKeyguardDelegate != null) {
-                bindKeyguardNow = true;
-            } else {
-                // Because mKeyguardDelegate is null, we know that the synchronized block in
-                // systemReady didn't run yet and setting this will actually have an effect.
-                mDeferBindKeyguard = true;
-            }
-        }
-        if (bindKeyguardNow) {
-            mKeyguardDelegate.bindService(mContext);
-            mKeyguardDelegate.onBootCompleted();
-        }
+        bindKeyguard();
         synchronized (mLock) {
             mSystemBooted = true;
+            if (mSystemReady) {
+                mKeyguardDelegate.onBootCompleted();
+            }
         }
         startedWakingUp();
         screenTurningOn(null);
         screenTurnedOn();
+    }
+
+    @Override
+    public boolean canDismissBootAnimation() {
+        synchronized (mLock) {
+            return mKeyguardDrawComplete;
+        }
     }
 
     ProgressDialog mBootMsgDialog = null;
@@ -7670,7 +7707,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             default:
                 return null;
         }
-        if (pattern.length == 1) {
+        if (pattern.length == 0) {
+            // No vibration
+            return null;
+        } else if (pattern.length == 1) {
             // One-shot vibration
             return VibrationEffect.createOneShot(pattern[0], VibrationEffect.DEFAULT_AMPLITUDE);
         } else {

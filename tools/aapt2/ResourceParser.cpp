@@ -92,14 +92,14 @@ struct ParsedResource {
   Source source;
   ResourceId id;
   Maybe<SymbolState> symbol_state;
+  bool allow_new = false;
   std::string comment;
   std::unique_ptr<Value> value;
   std::list<ParsedResource> child_resources;
 };
 
 // Recursively adds resources to the ResourceTable.
-static bool AddResourcesToTable(ResourceTable* table, IDiagnostics* diag,
-                                ParsedResource* res) {
+static bool AddResourcesToTable(ResourceTable* table, IDiagnostics* diag, ParsedResource* res) {
   StringPiece trimmed_comment = util::TrimWhitespace(res->comment);
   if (trimmed_comment.size() != res->comment.size()) {
     // Only if there was a change do we re-assign.
@@ -111,6 +111,7 @@ static bool AddResourcesToTable(ResourceTable* table, IDiagnostics* diag,
     symbol.state = res->symbol_state.value();
     symbol.source = res->source;
     symbol.comment = res->comment;
+    symbol.allow_new = res->allow_new;
     if (!table->SetSymbolState(res->name, res->id, symbol, diag)) {
       return false;
     }
@@ -121,8 +122,8 @@ static bool AddResourcesToTable(ResourceTable* table, IDiagnostics* diag,
     res->value->SetComment(std::move(res->comment));
     res->value->SetSource(std::move(res->source));
 
-    if (!table->AddResource(res->name, res->id, res->config, res->product,
-                            std::move(res->value), diag)) {
+    if (!table->AddResource(res->name, res->id, res->config, res->product, std::move(res->value),
+                            diag)) {
       return false;
     }
   }
@@ -414,6 +415,10 @@ bool ResourceParser::ParseResource(xml::XmlPullParser* parser,
   if (resource_type == "item") {
     can_be_bag = false;
 
+    // The default format for <item> is any. If a format attribute is present, that one will
+    // override the default.
+    resource_format = android::ResTable_map::TYPE_ANY;
+
     // Items have their type encoded in the type attribute.
     if (Maybe<StringPiece> maybe_type = xml::FindNonEmptyAttribute(parser, "type")) {
       resource_type = maybe_type.value().to_string();
@@ -480,8 +485,8 @@ bool ResourceParser::ParseResource(xml::XmlPullParser* parser,
       out_resource->name.type = item_iter->second.type;
       out_resource->name.entry = maybe_name.value().to_string();
 
-      // Only use the implicit format for this type if it wasn't overridden.
-      if (!resource_format) {
+      // Only use the implied format of the type when there is no explicit format.
+      if (resource_format == 0u) {
         resource_format = item_iter->second.format;
       }
 
@@ -616,6 +621,11 @@ std::unique_ptr<Item> ResourceParser::ParseXml(xml::XmlPullParser* parser,
         table_->string_pool.MakeRef(style_string.str, StringPool::Context(config_)));
     string->untranslatable_sections = std::move(untranslatable_sections);
     return std::move(string);
+  }
+
+  // If the text is empty, and the value is not allowed to be a string, encode it as a @null.
+  if (util::TrimWhitespace(raw_value).empty()) {
+    return ResourceUtils::MakeNull();
   }
 
   if (allow_raw_value) {
@@ -849,6 +859,7 @@ bool ResourceParser::ParseAddResource(xml::XmlPullParser* parser,
                                       ParsedResource* out_resource) {
   if (ParseSymbolImpl(parser, out_resource)) {
     out_resource->symbol_state = SymbolState::kUndefined;
+    out_resource->allow_new = true;
     return true;
   }
   return false;

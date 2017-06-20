@@ -17,6 +17,7 @@
 package com.android.server.wm;
 
 import static android.app.ActivityManager.StackId;
+import static android.app.ActivityManager.StackId.PINNED_STACK_ID;
 import static android.content.pm.ActivityInfo.CONFIG_ORIENTATION;
 import static android.content.pm.ActivityInfo.CONFIG_SCREEN_SIZE;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_BEHIND;
@@ -341,7 +342,9 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
 
         boolean delayed = false;
         inPendingTransaction = false;
-
+        // Reset the state of mHiddenSetFromTransferredStartingWindow since visibility is actually
+        // been set by the app now.
+        mHiddenSetFromTransferredStartingWindow = false;
         setClientHidden(!visible);
 
         // Allow for state changes and animation to be applied if:
@@ -522,7 +525,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         boolean delayed = setVisibility(null, false, TRANSIT_UNSET, true, mVoiceInteraction);
 
         mService.mOpeningApps.remove(this);
-        mService.mUnknownAppVisibilityController.appRemoved(this);
+        mService.mUnknownAppVisibilityController.appRemovedOrHidden(this);
         mService.mTaskSnapshotController.onAppRemoved(this);
         waitingToShow = false;
         if (mService.mClosingApps.contains(this)) {
@@ -911,7 +914,11 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
         }
         if (mPendingRelaunchCount > 0) {
             mPendingRelaunchCount--;
+        } else {
+            // Update keyguard flags upon finishing relaunch.
+            checkKeyguardFlagsChanged();
         }
+
         updateAllDrawn();
     }
 
@@ -1100,7 +1107,7 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                 mAppAnimator.lastFreezeDuration = 0;
                 mService.mAppsFreezingScreen++;
                 if (mService.mAppsFreezingScreen == 1) {
-                    mService.startFreezingDisplayLocked(false, 0, 0);
+                    mService.startFreezingDisplayLocked(false, 0, 0, getDisplayContent());
                     mService.mH.removeMessages(H.APP_FREEZE_TIMEOUT);
                     mService.mH.sendEmptyMessageDelayed(H.APP_FREEZE_TIMEOUT, 2000);
                 }
@@ -1343,9 +1350,11 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                 }
                 mService.mH.obtainMessage(NOTIFY_ACTIVITY_DRAWN, token).sendToTarget();
 
-                final TaskStack s = getStack();
-                if (s != null) {
-                    s.onAllWindowsDrawn();
+                // Notify the pinned stack upon all windows drawn. If there was an animation in
+                // progress then this signal will resume that animation.
+                final TaskStack pinnedStack = mDisplayContent.getStackById(PINNED_STACK_ID);
+                if (pinnedStack != null) {
+                    pinnedStack.onAllWindowsDrawn();
                 }
             }
         }
@@ -1499,6 +1508,12 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     }
 
     boolean containsDismissKeyguardWindow() {
+        // Window state is transient during relaunch. We are not guaranteed to be frozen during the
+        // entirety of the relaunch.
+        if (isRelaunching()) {
+            return mLastContainsDismissKeyguardWindow;
+        }
+
         for (int i = mChildren.size() - 1; i >= 0; i--) {
             if ((mChildren.get(i).mAttrs.flags & FLAG_DISMISS_KEYGUARD) != 0) {
                 return true;
@@ -1508,11 +1523,19 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
     }
 
     boolean containsShowWhenLockedWindow() {
+        // When we are relaunching, it is possible for us to be unfrozen before our previous
+        // windows have been added back. Using the cached value ensures that our previous
+        // showWhenLocked preference is honored until relaunching is complete.
+        if (isRelaunching()) {
+            return mLastContainsShowWhenLockedWindow;
+        }
+
         for (int i = mChildren.size() - 1; i >= 0; i--) {
             if ((mChildren.get(i).mAttrs.flags & FLAG_SHOW_WHEN_LOCKED) != 0) {
                 return true;
             }
         }
+
         return false;
     }
 

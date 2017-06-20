@@ -328,8 +328,16 @@ public abstract class Connection extends Conferenceable {
      */
     public static final int CAPABILITY_CAN_PULL_CALL = 0x01000000;
 
+    /**
+     * Add participant in an active or conference call option
+     *
+     * @hide
+     */
+    public static final int CAPABILITY_ADD_PARTICIPANT = 0x02000000;
+
+
     //**********************************************************************************************
-    // Next CAPABILITY value: 0x02000000
+    // Next CAPABILITY value: 0x04000000
     //**********************************************************************************************
 
     /**
@@ -521,6 +529,26 @@ public abstract class Connection extends Conferenceable {
      * expected to be null when this connection event is used.
      */
     public static final String EVENT_CALL_MERGE_FAILED = "android.telecom.event.CALL_MERGE_FAILED";
+
+    /**
+     * Connection event used to inform {@link InCallService}s when the process of merging a
+     * Connection into a conference has begun.
+     * <p>
+     * Sent via {@link #sendConnectionEvent(String, Bundle)}.  The {@link Bundle} parameter is
+     * expected to be null when this connection event is used.
+     * @hide
+     */
+    public static final String EVENT_MERGE_START = "android.telecom.event.MERGE_START";
+
+    /**
+     * Connection event used to inform {@link InCallService}s when the process of merging a
+     * Connection into a conference has completed.
+     * <p>
+     * Sent via {@link #sendConnectionEvent(String, Bundle)}.  The {@link Bundle} parameter is
+     * expected to be null when this connection event is used.
+     * @hide
+     */
+    public static final String EVENT_MERGE_COMPLETE = "android.telecom.event.MERGE_COMPLETE";
 
     /**
      * Connection event used to inform {@link InCallService}s when a call has been put on hold by

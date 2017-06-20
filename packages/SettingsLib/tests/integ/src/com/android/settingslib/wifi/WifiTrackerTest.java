@@ -410,6 +410,7 @@ public class WifiTrackerTest {
         validConfig.BSSID = BSSID_1;
 
         WifiConfiguration selfAddedNoAssociation = new WifiConfiguration();
+        selfAddedNoAssociation.ephemeral = true;
         selfAddedNoAssociation.selfAdded = true;
         selfAddedNoAssociation.numAssociation = 0;
         selfAddedNoAssociation.SSID = SSID_2;
@@ -472,7 +473,7 @@ public class WifiTrackerTest {
     }
 
     @Test
-    public void scoreCacheUpdateScoresShouldChangeSortOrder() throws InterruptedException {
+    public void scoreCacheUpdateScoresShouldNotChangeSortOrder() throws InterruptedException {
         WifiTracker tracker =  createTrackerWithImmediateBroadcastsAndInjectInitialScanResults();
         List<AccessPoint> aps = tracker.getAccessPoints();
         assertTrue(aps.size() == 2);
@@ -483,8 +484,8 @@ public class WifiTrackerTest {
 
         aps = tracker.getAccessPoints();
         assertTrue(aps.size() == 2);
-        assertEquals(aps.get(0).getSsidStr(), SSID_2);
-        assertEquals(aps.get(1).getSsidStr(), SSID_1);
+        assertEquals(aps.get(0).getSsidStr(), SSID_1);
+        assertEquals(aps.get(1).getSsidStr(), SSID_2);
     }
 
     @Test
@@ -510,7 +511,8 @@ public class WifiTrackerTest {
     }
 
     @Test
-    public void scoreCacheUpdateScoresShouldInsertBadgeIntoAccessPoint() throws InterruptedException {
+    public void scoreCacheUpdateScoresShouldNotInsertBadgeIntoAccessPoint()
+            throws InterruptedException {
         WifiTracker tracker = createTrackerWithImmediateBroadcastsAndInjectInitialScanResults();
         updateScoresAndWaitForAccessPointsChangedCallback();
 
@@ -518,9 +520,9 @@ public class WifiTrackerTest {
 
         for (AccessPoint ap : aps) {
             if (ap.getSsidStr().equals(SSID_1)) {
-                assertEquals(BADGE_1, ap.getBadge());
+                assertEquals(NetworkBadging.BADGING_NONE, ap.getBadge());
             } else if (ap.getSsidStr().equals(SSID_2)) {
-                assertEquals(BADGE_2, ap.getBadge());
+                assertEquals(NetworkBadging.BADGING_NONE, ap.getBadge());
             }
         }
     }

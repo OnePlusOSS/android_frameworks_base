@@ -987,7 +987,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
         }
 
         if (!rotateSeamlessly) {
-            mService.startFreezingDisplayLocked(inTransaction, anim[0], anim[1]);
+            mService.startFreezingDisplayLocked(inTransaction, anim[0], anim[1], this);
             // startFreezingDisplayLocked can reset the ScreenRotationAnimation.
             screenRotationAnimation = mService.mAnimator.getScreenRotationAnimationLocked(
                     mDisplayId);
@@ -2903,6 +2903,11 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                 * TYPE_LAYER_MULTIPLIER + TYPE_LAYER_OFFSET;
         final MutableBoolean mutableIncludeFullDisplay = new MutableBoolean(includeFullDisplay);
         synchronized(mService.mWindowMap) {
+            if (!mService.mPolicy.isScreenOn()) {
+                if (DEBUG_SCREENSHOT) Slog.i(TAG_WM, "Attempted to take screenshot while display"
+                        + " was off.");
+                return null;
+            }
             // Figure out the part of the screen that is actually the app.
             mScreenshotApplicationState.appWin = null;
             forAllWindows(w -> {
@@ -3487,10 +3492,15 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
             if (win != null) {
                 final int req = win.mAttrs.screenOrientation;
-                if (DEBUG_ORIENTATION) Slog.v(TAG_WM, win + " forcing orientation to " + req);
                 if (policy.isKeyguardHostWindow(win.mAttrs)) {
                     mLastKeyguardForcedOrientation = req;
+                    if (mService.mKeyguardGoingAway) {
+                        // Keyguard can't affect the orientation if it is going away...
+                        mLastWindowForcedOrientation = SCREEN_ORIENTATION_UNSPECIFIED;
+                        return SCREEN_ORIENTATION_UNSET;
+                    }
                 }
+                if (DEBUG_ORIENTATION) Slog.v(TAG_WM, win + " forcing orientation to " + req);
                 return (mLastWindowForcedOrientation = req);
             }
 

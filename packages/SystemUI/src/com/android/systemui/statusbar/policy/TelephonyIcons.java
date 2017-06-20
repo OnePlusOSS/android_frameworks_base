@@ -44,16 +44,6 @@ class TelephonyIcons {
 
     //***** Data connection icons
 
-    static final int QS_DATA_G = R.drawable.ic_qs_signal_g;
-    static final int QS_DATA_3G = R.drawable.ic_qs_signal_3g;
-    static final int QS_DATA_E = R.drawable.ic_qs_signal_e;
-    static final int QS_DATA_H = R.drawable.ic_qs_signal_h;
-    static final int QS_DATA_1X = R.drawable.ic_qs_signal_1x;
-    static final int QS_DATA_4G = R.drawable.ic_qs_signal_4g;
-    static final int QS_DATA_4G_PLUS = R.drawable.ic_qs_signal_4g_plus;
-    static final int QS_DATA_LTE = R.drawable.ic_qs_signal_lte;
-    static final int QS_DATA_LTE_PLUS = R.drawable.ic_qs_signal_lte_plus;
-
     static final int FLIGHT_MODE_ICON = R.drawable.stat_sys_airplane_mode;
 
     static final int ICON_LTE = R.drawable.stat_sys_data_fully_connected_lte;
@@ -219,7 +209,7 @@ class TelephonyIcons {
                 if (!showAtLeast3G) {
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             dataTypeArray[type], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_E;
+                    mSelectedQSDataTypeIcon[slot] = ICON_E;
                     mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_E;
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_E;
@@ -232,7 +222,7 @@ class TelephonyIcons {
                 mSelectedDataActivityIndex[slot] = DATA_TYPE_3G;
                 mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                         dataTypeArray[type], null, NS);
-                mSelectedQSDataTypeIcon[slot] = QS_DATA_3G;
+                mSelectedQSDataTypeIcon[slot] = ICON_3G;
                 mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                 mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_UMTS;
                 break;
@@ -243,14 +233,14 @@ class TelephonyIcons {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_H;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             dataTypeArray[type], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_H;
+                    mSelectedQSDataTypeIcon[slot] = ICON_H;
                     mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_H;
                 } else {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_3G;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             mDataTypeGenerationArray[0], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_3G;
+                    mSelectedQSDataTypeIcon[slot] = ICON_3G;
                     mSelectedDataTypeDesc[slot] = mDataTypeGenerationDescArray[0];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_3G;
                 }
@@ -260,14 +250,14 @@ class TelephonyIcons {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_HP;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             dataTypeArray[type], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_H;
+                    mSelectedQSDataTypeIcon[slot] = ICON_H;
                     mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_HP;
                 } else {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_3G;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             mDataTypeGenerationArray[0], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_3G;
+                    mSelectedQSDataTypeIcon[slot] = ICON_3G;
                     mSelectedDataTypeDesc[slot] = mDataTypeGenerationDescArray[0];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_3G;
                 }
@@ -277,7 +267,7 @@ class TelephonyIcons {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_1X;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             dataTypeArray[type], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_1X;
+                    mSelectedQSDataTypeIcon[slot] = ICON_1X;
                     mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_CDMA;
                     break;
@@ -289,7 +279,7 @@ class TelephonyIcons {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_1X;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             dataTypeArray[type], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_1X;
+                    mSelectedQSDataTypeIcon[slot] = ICON_1X;
                     mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_1X;
                     break;
@@ -303,7 +293,7 @@ class TelephonyIcons {
                  mSelectedDataActivityIndex[slot] = DATA_TYPE_3G;
                  mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                          dataTypeArray[type], null, NS);
-                 mSelectedQSDataTypeIcon[slot] = QS_DATA_3G;
+                 mSelectedQSDataTypeIcon[slot] = ICON_3G;
                  mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                  mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_3G;
                 break;
@@ -318,14 +308,14 @@ class TelephonyIcons {
                         mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                                 mDataTypeGenerationArray[2], null, NS);
                     }
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_4G;
+                    mSelectedQSDataTypeIcon[slot] = ICON_4G;
                     mSelectedDataTypeDesc[slot] = mDataTypeGenerationDescArray[1];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_4G;
                 } else {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_LTE;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             dataTypeArray[type], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_LTE;
+                    mSelectedQSDataTypeIcon[slot] = ICON_LTE;
                     mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_4G;
                 }
@@ -336,14 +326,14 @@ class TelephonyIcons {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_G;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             dataTypeArray[type], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_G;
+                    mSelectedQSDataTypeIcon[slot] = ICON_G;
                     mSelectedDataTypeDesc[slot] = mDataTypeDescriptionArray[type];
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_G;
                 } else {
                     mSelectedDataActivityIndex[slot] = DATA_TYPE_3G;
                     mSelectedDataTypeIcon[slot] = mRes.getIdentifier(
                             mDataTypeGenerationArray[0], null, NS);
-                    mSelectedQSDataTypeIcon[slot] = QS_DATA_3G;
+                    mSelectedQSDataTypeIcon[slot] = ICON_3G;
                     mSelectedDataTypeDesc[slot] = mDataTypeGenerationDescArray[0];;
                     mSelectedSignalStreagthIndex[slot] = SIGNAL_STRENGTH_TYPE_3G;
                 }
@@ -464,9 +454,6 @@ class TelephonyIcons {
 
     static final int ICON_DATA_DISABLED = R.drawable.stat_sys_data_disabled;
 
-    static final int QS_ICON_DATA_DISABLED = R.drawable.ic_qs_data_disabled;
-
-
     static final MobileIconGroup CARRIER_NETWORK_CHANGE = new MobileIconGroup(
             "CARRIER_NETWORK_CHANGE",
             null,
@@ -494,7 +481,7 @@ class TelephonyIcons {
             R.string.accessibility_data_connection_3g,
             TelephonyIcons.ICON_3G,
             true,
-            TelephonyIcons.QS_DATA_3G
+            TelephonyIcons.ICON_3G
             );
 
     static final MobileIconGroup WFC = new MobileIconGroup(
@@ -533,7 +520,7 @@ class TelephonyIcons {
             R.string.accessibility_data_connection_edge,
             TelephonyIcons.ICON_E,
             false,
-            TelephonyIcons.QS_DATA_E
+            TelephonyIcons.ICON_E
             );
 
     static final MobileIconGroup ONE_X = new MobileIconGroup(
@@ -548,7 +535,7 @@ class TelephonyIcons {
             R.string.accessibility_data_connection_cdma,
             TelephonyIcons.ICON_1X,
             true,
-            TelephonyIcons.QS_DATA_1X
+            TelephonyIcons.ICON_1X
             );
 
     static final MobileIconGroup G = new MobileIconGroup(
@@ -563,7 +550,7 @@ class TelephonyIcons {
             R.string.accessibility_data_connection_gprs,
             TelephonyIcons.ICON_G,
             false,
-            TelephonyIcons.QS_DATA_G
+            TelephonyIcons.ICON_G
             );
 
     static final MobileIconGroup H = new MobileIconGroup(
@@ -578,7 +565,7 @@ class TelephonyIcons {
             R.string.accessibility_data_connection_3_5g,
             TelephonyIcons.ICON_H,
             false,
-            TelephonyIcons.QS_DATA_H
+            TelephonyIcons.ICON_H
             );
 
     static final MobileIconGroup FOUR_G = new MobileIconGroup(
@@ -593,7 +580,7 @@ class TelephonyIcons {
             R.string.accessibility_data_connection_4g,
             TelephonyIcons.ICON_4G,
             true,
-            TelephonyIcons.QS_DATA_4G
+            TelephonyIcons.ICON_4G
             );
 
     static final MobileIconGroup FOUR_G_PLUS = new MobileIconGroup(
@@ -608,7 +595,7 @@ class TelephonyIcons {
             R.string.accessibility_data_connection_4g_plus,
             TelephonyIcons.ICON_4G_PLUS,
             true,
-            TelephonyIcons.QS_DATA_4G_PLUS
+            TelephonyIcons.ICON_4G_PLUS
             );
 
     static final MobileIconGroup LTE = new MobileIconGroup(
@@ -623,7 +610,7 @@ class TelephonyIcons {
             R.string.accessibility_data_connection_lte,
             TelephonyIcons.ICON_LTE,
             true,
-            TelephonyIcons.QS_DATA_LTE
+            TelephonyIcons.ICON_LTE
             );
 
     static final MobileIconGroup LTE_PLUS = new MobileIconGroup(
@@ -638,7 +625,7 @@ class TelephonyIcons {
             R.string.accessibility_data_connection_lte_plus,
             TelephonyIcons.ICON_LTE_PLUS,
             true,
-            TelephonyIcons.QS_DATA_LTE_PLUS
+            TelephonyIcons.ICON_LTE_PLUS
             );
 
     static final MobileIconGroup DATA_DISABLED = new MobileIconGroup(
@@ -653,7 +640,7 @@ class TelephonyIcons {
             R.string.accessibility_cell_data_off,
             TelephonyIcons.ICON_DATA_DISABLED,
             false,
-            TelephonyIcons.QS_ICON_DATA_DISABLED
+            TelephonyIcons.ICON_DATA_DISABLED
             );
 }
 

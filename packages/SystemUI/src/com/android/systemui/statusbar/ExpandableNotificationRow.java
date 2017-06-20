@@ -91,6 +91,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     }
 
     private LayoutListener mLayoutListener;
+    private boolean mLowPriorityStateUpdated;
     private final NotificationInflater mNotificationInflater;
     private int mIconTransformContentShift;
     private int mIconTransformContentShiftNoIcon;
@@ -356,15 +357,21 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         updateShelfIconColor();
     }
 
-    private void updateShelfIconColor() {
+    @VisibleForTesting
+    void updateShelfIconColor() {
         StatusBarIconView expandedIcon = mEntry.expandedIcon;
         boolean isPreL = Boolean.TRUE.equals(expandedIcon.getTag(R.id.icon_is_pre_L));
         boolean colorize = !isPreL || NotificationUtils.isGrayscale(expandedIcon,
                 NotificationColorUtil.getInstance(mContext));
         int color = StatusBarIconView.NO_COLOR;
         if (colorize) {
-            color = mEntry.getContrastedColor(mContext, mIsLowPriority && !isExpanded(),
-                    getBackgroundColorWithoutTint());
+            NotificationHeaderView header = getVisibleNotificationHeader();
+            if (header != null) {
+                color = header.getOriginalIconColor();
+            } else {
+                color = mEntry.getContrastedColor(mContext, mIsLowPriority && !isExpanded(),
+                        getBackgroundColorWithoutTint());
+            }
         }
         expandedIcon.setStaticDrawableColor(color);
     }
@@ -813,10 +820,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     public void onDensityOrFontScaleChanged() {
         initDimens();
-        if (mIsSummaryWithChildren) {
-            if (mChildrenContainer != null) {
-                mChildrenContainer.reInflateViews(mExpandClickListener, mEntry.notification);
-            }
+        // Let's update our childrencontainer. This is intentionally not guarded with
+        // mIsSummaryWithChildren since we might have had children but not anymore.
+        if (mChildrenContainer != null) {
+            mChildrenContainer.reInflateViews(mExpandClickListener, mEntry.notification);
         }
         if (mGuts != null) {
             View oldGuts = mGuts;
@@ -1121,6 +1128,15 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
     }
 
+
+    public void setLowPriorityStateUpdated(boolean lowPriorityStateUpdated) {
+        mLowPriorityStateUpdated = lowPriorityStateUpdated;
+    }
+
+    public boolean hasLowPriorityStateUpdated() {
+        return mLowPriorityStateUpdated;
+    }
+
     public boolean isLowPriority() {
         return mIsLowPriority;
     }
@@ -1379,6 +1395,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         if (mIsSummaryWithChildren) {
             mChildrenContainer.setDark(dark, fade, delay);
         }
+        updateShelfIconColor();
     }
 
     public boolean isExpandable() {
@@ -1458,9 +1475,11 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     public void setUserLocked(boolean userLocked) {
         mUserLocked = userLocked;
         mPrivateLayout.setUserExpanding(userLocked);
-        if (mIsSummaryWithChildren) {
+        // This is intentionally not guarded with mIsSummaryWithChildren since we might have had
+        // children but not anymore.
+        if (mChildrenContainer != null) {
             mChildrenContainer.setUserLocked(userLocked);
-            if (userLocked || !isGroupExpanded()) {
+            if (mIsSummaryWithChildren && (userLocked || !isGroupExpanded())) {
                 updateBackgroundForGroupState();
             }
         }
@@ -1716,6 +1735,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         NotificationContentView showingLayout = getShowingLayout();
         showingLayout.updateBackgroundColor(animated);
         mPrivateLayout.updateExpandButtons(isExpandable());
+        updateShelfIconColor();
         showingLayout.setDark(isDark(), false /* animate */, 0 /* delay */);
         mShowingPublicInitialized = true;
     }
@@ -2188,5 +2208,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 row.startChildAnimation(mOverallState, properties);
             }
         }
+    }
+
+    @VisibleForTesting
+    protected void setChildrenContainer(NotificationChildrenContainer childrenContainer) {
+        mChildrenContainer = childrenContainer;
     }
 }

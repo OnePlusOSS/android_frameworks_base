@@ -20,6 +20,7 @@ import android.support.test.runner.AndroidJUnit4;
 import android.telephony.SubscriptionInfo;
 import android.test.suitebuilder.annotation.SmallTest;
 import com.android.systemui.R;
+import com.android.systemui.SysuiTestCase;
 import com.android.systemui.statusbar.policy.NetworkController.EmergencyListener;
 import com.android.systemui.statusbar.policy.NetworkController.IconState;
 import com.android.systemui.statusbar.policy.NetworkController.SignalCallback;
@@ -40,7 +41,7 @@ import static org.mockito.Matchers.eq;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
-public class CallbackHandlerTest {
+public class CallbackHandlerTest extends SysuiTestCase {
 
     private CallbackHandler mHandler;
     private HandlerThread mHandlerThread;
@@ -110,7 +111,7 @@ public class CallbackHandlerTest {
         String typeDescription = "Test 1";
         String description = "Test 2";
         int type = R.drawable.stat_sys_data_fully_connected_1x;
-        int qsType = R.drawable.ic_qs_signal_1x;
+        int qsType = type;
         boolean wide = true;
         int subId = 5;
         boolean roaming = true;

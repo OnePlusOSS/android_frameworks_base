@@ -18,6 +18,7 @@ package android.view;
 
 import android.annotation.LayoutRes;
 import android.annotation.Nullable;
+import android.annotation.SystemService;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
@@ -47,10 +48,7 @@ import java.util.HashMap;
  * {@link android.app.Activity#getLayoutInflater()} or
  * {@link Context#getSystemService} to retrieve a standard LayoutInflater instance
  * that is already hooked up to the current context and correctly configured
- * for the device you are running on.  For example:
- *
- * <pre>LayoutInflater inflater = (LayoutInflater)context.getSystemService
- *      (Context.LAYOUT_INFLATER_SERVICE);</pre>
+ * for the device you are running on.
  *
  * <p>
  * To create a new LayoutInflater with an additional {@link Factory} for your
@@ -64,9 +62,8 @@ import java.util.HashMap;
  * to use LayoutInflater with an XmlPullParser over a plain XML file at runtime;
  * it only works with an XmlPullParser returned from a compiled resource
  * (R.<em>something</em> file.)
- *
- * @see Context#getSystemService
  */
+@SystemService(Context.LAYOUT_INFLATER_SERVICE)
 public abstract class LayoutInflater {
 
     private static final String TAG = LayoutInflater.class.getSimpleName();
@@ -923,8 +920,11 @@ public abstract class LayoutInflater {
                             + " include tag: <include layout=\"@layout/layoutID\" />");
                 }
 
-                // Attempt to resolve the "?attr/name" string to an identifier.
-                layout = context.getResources().getIdentifier(value.substring(1), null, null);
+                // Attempt to resolve the "?attr/name" string to an attribute
+                // within the default (e.g. application) package.
+                layout = context.getResources().getIdentifier(
+                        value.substring(1), "attr", context.getPackageName());
+
             }
 
             // The layout might be referencing a theme attribute.

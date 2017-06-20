@@ -128,6 +128,7 @@ import com.android.server.am.ActivityStackSupervisor.ActivityContainer;
 import com.android.server.wm.StackWindowController;
 import com.android.server.wm.StackWindowListener;
 import com.android.server.wm.WindowManagerService;
+import android.util.BoostFramework;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -244,7 +245,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
     static final int REMOVE_TASK_MODE_MOVING = 1;
     // Similar to {@link #REMOVE_TASK_MODE_MOVING} and the task will be added to the top of its new
     // stack and the new stack will be on top of all stacks.
-    private static final int REMOVE_TASK_MODE_MOVING_TO_TOP = 2;
+    static final int REMOVE_TASK_MODE_MOVING_TO_TOP = 2;
 
     // The height/width divide used when fitting a task within a bounds with method
     // {@link #fitWithinBounds}.
@@ -258,6 +259,7 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
     T mWindowContainerController;
     private final RecentTasks mRecentTasks;
 
+    public BoostFramework mPerf = null;
     /**
      * The back history of all previous (and possibly still
      * running) activities.  It contains #TaskRecord objects.
@@ -1152,11 +1154,15 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
 
     void updateActivityApplicationInfoLocked(ApplicationInfo aInfo) {
         final String packageName = aInfo.packageName;
+        final int userId = UserHandle.getUserId(aInfo.uid);
+
         for (int taskNdx = mTaskHistory.size() - 1; taskNdx >= 0; --taskNdx) {
             final List<ActivityRecord> activities = mTaskHistory.get(taskNdx).mActivities;
             for (int activityNdx = activities.size() - 1; activityNdx >= 0; --activityNdx) {
-                if (packageName.equals(activities.get(activityNdx).packageName)) {
-                    activities.get(activityNdx).info.applicationInfo = aInfo;
+                final ActivityRecord ar = activities.get(activityNdx);
+
+                if ((userId == ar.userId) && packageName.equals(ar.packageName)) {
+                    ar.info.applicationInfo = aInfo;
                 }
             }
         }
@@ -2452,6 +2458,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
         // that the previous one will be hidden soon.  This way it can know
         // to ignore it when computing the desired screen orientation.
         boolean anim = true;
+        if (mPerf == null) {
+            mPerf = new BoostFramework();
+        }
         if (prev != null) {
             if (prev.finishing) {
                 if (DEBUG_TRANSITION) Slog.v(TAG_TRANSITION,
@@ -2463,6 +2472,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                     mWindowManager.prepareAppTransition(prev.getTask() == next.getTask()
                             ? TRANSIT_ACTIVITY_CLOSE
                             : TRANSIT_TASK_CLOSE, false);
+                    if(prev.getTask() != next.getTask() && mPerf != null) {
+                       mPerf.perfHint(BoostFramework.VENDOR_HINT_ANIM_BOOST, next.packageName);
+                    }
                 }
                 prev.setVisibility(false);
             } else {
@@ -2477,6 +2489,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                             : next.mLaunchTaskBehind
                                     ? TRANSIT_TASK_OPEN_BEHIND
                                     : TRANSIT_TASK_OPEN, false);
+                    if(prev.getTask() != next.getTask() && mPerf != null) {
+                       mPerf.perfHint(BoostFramework.VENDOR_HINT_ANIM_BOOST, next.packageName);
+                    }
                 }
             }
         } else {
@@ -4038,6 +4053,9 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                 mStackSupervisor.moveHomeStackTaskToTop(reason);
             }
 
+            // The following block can be executed multiple times if there is more than one overlay.
+            // {@link ActivityStackSupervisor#removeTaskByIdLocked} handles this by reverse lookup
+            // of the task by id and exiting early if not found.
             if (onlyHasTaskOverlays) {
                 // When destroying a task, tell the supervisor to remove it so that any activity it
                 // has can be cleaned up correctly. This is currently the only place where we remove
@@ -4049,7 +4067,12 @@ class ActivityStack<T extends StackWindowController> extends ConfigurationContai
                 mStackSupervisor.removeTaskByIdLocked(task.taskId, false /* killProcess */,
                         !REMOVE_FROM_RECENTS, PAUSE_IMMEDIATELY);
             }
-            removeTask(task, reason, REMOVE_TASK_MODE_DESTROYING);
+
+            // We must keep the task around until all activities are destroyed. The following
+            // statement will only execute once since overlays are also considered activities.
+            if (lastActivity) {
+                removeTask(task, reason, REMOVE_TASK_MODE_DESTROYING);
+            }
         }
         cleanUpActivityServicesLocked(r);
         r.removeUriPermissionsLocked();

@@ -19,6 +19,7 @@ package android.hardware.fingerprint;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
+import android.annotation.SystemService;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.os.Binder;
@@ -47,12 +48,8 @@ import static android.Manifest.permission.USE_FINGERPRINT;
 
 /**
  * A class that coordinates access to the fingerprint hardware.
- * <p>
- * Use {@link android.content.Context#getSystemService(java.lang.String)}
- * with argument {@link android.content.Context#FINGERPRINT_SERVICE} to get
- * an instance of this class.
  */
-
+@SystemService(Context.FINGERPRINT_SERVICE)
 public class FingerprintManager {
     private static final String TAG = "FingerprintManager";
     private static final boolean DEBUG = true;
@@ -932,7 +929,6 @@ public class FingerprintManager {
             } else if (mAuthenticationCallback != null) {
                 mAuthenticationCallback.onAuthenticationError(clientErrMsgId,
                         getErrorString(errMsgId, vendorCode));
-                mAuthenticationCallback = null;
             } else if (mRemovalCallback != null) {
                 mRemovalCallback.onRemovalError(mRemovalFingerprint, clientErrMsgId,
                         getErrorString(errMsgId, vendorCode));
@@ -953,7 +949,6 @@ public class FingerprintManager {
                 final AuthenticationResult result =
                         new AuthenticationResult(mCryptoObject, fp, userId);
                 mAuthenticationCallback.onAuthenticationSucceeded(result);
-                mAuthenticationCallback = null;
             }
         }
 

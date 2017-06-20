@@ -99,6 +99,7 @@ cc_library_host_static {
         "link/PrivateAttributeMover.cpp",
         "link/ReferenceLinker.cpp",
         "link/TableMerger.cpp",
+        "link/XmlCompatVersioner.cpp",
         "link/XmlNamespaceRemover.cpp",
         "link/XmlReferenceLinker.cpp",
         "optimize/ResourceDeduper.cpp",
@@ -158,8 +159,8 @@ cc_library_host_shared {
 // ==========================================================
 cc_test_host {
     name: "aapt2_tests",
-    srcs: ["**/*_test.cpp"],
-    static_libs: ["libaapt2"],
+    srcs: ["test/Common.cpp", "**/*_test.cpp"],
+    static_libs: ["libaapt2", "libgmock"],
     defaults: ["aapt_defaults"],
 }
 

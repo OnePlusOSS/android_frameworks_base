@@ -113,6 +113,10 @@ public final class ActiveServices {
     // at the same time.
     final int mMaxStartingBackground;
 
+    // Flag to reschedule the services during app launch. Disable by default.
+    private static final boolean SERVICE_RESCHEDULE
+            = SystemProperties.getBoolean("ro.vendor.qti.am.reschedule_service", false);
+
     final SparseArray<ServiceMap> mServiceMap = new SparseArray<>();
 
     /**
@@ -162,7 +166,7 @@ public final class ActiveServices {
 
     /**
      * Information about an app that is currently running one or more foreground services.
-     * (This mapps directly to the running apps we show in the notification.)
+     * (This maps directly to the running apps we show in the notification.)
      */
     static final class ActiveForegroundApp {
         String mPackageName;
@@ -813,6 +817,8 @@ public final class ActiveServices {
             String title;
             String msg;
             String[] pkgs;
+            final long nowElapsed = SystemClock.elapsedRealtime();
+            long oldestStartTime = nowElapsed;
             if (active.size() == 1) {
                 intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
                 intent.setData(Uri.fromParts("package", active.get(0).mPackageName, null));
@@ -820,11 +826,13 @@ public final class ActiveServices {
                         R.string.foreground_service_app_in_background, active.get(0).mLabel);
                 msg = context.getString(R.string.foreground_service_tap_for_details);
                 pkgs = new String[] { active.get(0).mPackageName };
+                oldestStartTime = active.get(0).mStartTime;
             } else {
                 intent = new Intent(Settings.ACTION_FOREGROUND_SERVICES_SETTINGS);
                 pkgs = new String[active.size()];
                 for (int i = 0; i < active.size(); i++) {
                     pkgs[i] = active.get(i).mPackageName;
+                    oldestStartTime = Math.min(oldestStartTime, active.get(i).mStartTime);
                 }
                 intent.putExtra("packages", pkgs);
                 title = context.getString(
@@ -841,9 +849,10 @@ public final class ActiveServices {
                     new Notification.Builder(context,
                             SystemNotificationChannels.FOREGROUND_SERVICE)
                             .addExtras(notificationBundle)
-                            .setSmallIcon(R.drawable.ic_check_circle_24px)
+                            .setSmallIcon(R.drawable.stat_sys_vitals)
                             .setOngoing(true)
-                            .setShowWhen(false)
+                            .setShowWhen(oldestStartTime < nowElapsed)
+                            .setWhen(System.currentTimeMillis() - (nowElapsed - oldestStartTime))
                             .setColor(context.getColor(
                                     com.android.internal.R.color.system_notification_accent_color))
                             .setContentTitle(title)
@@ -1845,6 +1854,14 @@ public final class ActiveServices {
                         r.pendingStarts.add(0, si);
                         long dur = SystemClock.uptimeMillis() - si.deliveredTime;
                         dur *= 2;
+                        if (SERVICE_RESCHEDULE && DEBUG_DELAYED_SERVICE) {
+                            Slog.w(TAG,"Can add more delay !!!"
+                               +" si.deliveredTime "+si.deliveredTime
+                               +" dur "+dur
+                               +" si.deliveryCount "+si.deliveryCount
+                               +" si.doneExecutingCount "+si.doneExecutingCount
+                               +" allowCancel "+allowCancel);
+                        }
                         if (minDuration < dur) minDuration = dur;
                         if (resetTime < dur) resetTime = dur;
                     } else {
@@ -1857,6 +1874,13 @@ public final class ActiveServices {
             }
 
             r.totalRestartCount++;
+            if (SERVICE_RESCHEDULE && DEBUG_DELAYED_SERVICE) {
+                Slog.w(TAG,"r.name "+r.name+" N "+N+" minDuration "+minDuration
+                       +" resetTime "+resetTime+" now "+now
+                       +" r.restartDelay "+r.restartDelay
+                       +" r.restartTime+resetTime "+(r.restartTime+resetTime)
+                       +" allowCancel "+allowCancel);
+            }
             if (r.restartDelay == 0) {
                 r.restartCount++;
                 r.restartDelay = minDuration;
@@ -1878,6 +1902,14 @@ public final class ActiveServices {
             }
 
             r.nextRestartTime = now + r.restartDelay;
+            if (SERVICE_RESCHEDULE && DEBUG_DELAYED_SERVICE) {
+                Slog.w(TAG,"r.name "+r.name+" N "+N+" minDuration "+minDuration
+                       +" resetTime "+resetTime+" now "+now
+                       +" r.restartDelay "+r.restartDelay
+                       +" r.restartTime+resetTime "+(r.restartTime+resetTime)
+                       +" r.nextRestartTime "+r.nextRestartTime
+                       +" allowCancel "+allowCancel);
+            }
 
             // Make sure that we don't end up restarting a bunch of services
             // all at the same time.
@@ -1919,6 +1951,15 @@ public final class ActiveServices {
         r.nextRestartTime = SystemClock.uptimeMillis() + r.restartDelay;
         Slog.w(TAG, "Scheduling restart of crashed service "
                 + r.shortName + " in " + r.restartDelay + "ms");
+
+        if (SERVICE_RESCHEDULE && DEBUG_DELAYED_SERVICE) {
+            for (int i=mRestartingServices.size()-1; i>=0; i--) {
+                ServiceRecord r2 = mRestartingServices.get(i);
+                Slog.w(TAG,"Restarting list - i "+i+" r2.nextRestartTime "
+                           +r2.nextRestartTime+" r2.name "+r2.name);
+            }
+        }
+
         EventLog.writeEvent(EventLogTags.AM_SCHEDULE_SERVICE_RESTART,
                 r.userId, r.shortName, r.restartDelay);
 
@@ -1939,7 +1980,31 @@ public final class ActiveServices {
             return;
         }
         try {
-            bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true, false);
+            if(SERVICE_RESCHEDULE) {
+                boolean shouldDelay = false;
+                ActivityRecord top_rc = null;
+                ActivityStack stack = mAm.getFocusedStack();
+                if(stack != null) {
+                    top_rc = stack.topRunningActivityLocked();
+                }
+                if(top_rc != null) {
+                    if(!top_rc.nowVisible && !r.shortName.contains(top_rc.packageName)) {
+                        shouldDelay = true;
+                    }
+                }
+                if(!shouldDelay) {
+                    bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true, false);
+                } else {
+                    if (DEBUG_DELAYED_SERVICE) {
+                        Slog.v(TAG, "Reschedule service restart due to app launch"
+                              +" r.shortName "+r.shortName+" r.app = "+r.app);
+                    }
+                    r.resetRestartCounter();
+                    scheduleServiceRestartLocked(r, true);
+                }
+            } else {
+                bringUpServiceLocked(r, r.intent.getIntent().getFlags(), r.createdFromFg, true, false);
+            }
         } catch (TransactionTooLargeException e) {
             // Ignore, it's been logged and nothing upstack cares.
         }
@@ -2171,6 +2236,11 @@ public final class ActiveServices {
                 if (newService) {
                     app.services.remove(r);
                     r.app = null;
+                    if (SERVICE_RESCHEDULE && DEBUG_DELAYED_SERVICE) {
+                    Slog.w(TAG, " Failed to create Service !!!! ."
+                           +"This will introduce huge delay...  "
+                           +r.shortName + " in " + r.restartDelay + "ms");
+                    }
                 }
 
                 // Retry.

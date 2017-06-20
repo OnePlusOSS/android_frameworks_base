@@ -219,6 +219,7 @@
   <java-symbol type="id" name="insertion_handle" />
   <java-symbol type="id" name="accessibilityActionClickOnClickableSpan" />
 
+  <java-symbol type="id" name="permission_text" />
   <java-symbol type="attr" name="actionModeShareDrawable" />
   <java-symbol type="attr" name="alertDialogCenterButtons" />
   <java-symbol type="attr" name="fragmentBreadCrumbsStyle" />
@@ -521,10 +522,7 @@
   <java-symbol type="string" name="RestrictedOnDataTitle" />
   <java-symbol type="string" name="RestrictedOnEmergencyTitle" />
   <java-symbol type="string" name="RestrictedOnNormalTitle" />
-  <java-symbol type="string" name="RestrictedOnAllVoiceContent" />
-  <java-symbol type="string" name="RestrictedOnDataContent" />
-  <java-symbol type="string" name="RestrictedOnEmergencyContent" />
-  <java-symbol type="string" name="RestrictedOnNormalContent" />
+  <java-symbol type="string" name="RestrictedStateContent" />
   <java-symbol type="string" name="notification_channel_network_alert" />
   <java-symbol type="string" name="notification_channel_call_forward" />
   <java-symbol type="string" name="notification_channel_emergency_callback" />
@@ -1168,6 +1166,8 @@
   <java-symbol type="string" name="conference_call" />
   <java-symbol type="string" name="tooltip_popup_title" />
 
+  <java-symbol type="string" name="allow_button" />
+  <java-symbol type="string" name="deny_button" />
   <java-symbol type="plurals" name="bugreport_countdown" />
   <java-symbol type="plurals" name="last_num_days" />
   <java-symbol type="plurals" name="matches_found" />
@@ -1459,6 +1459,7 @@
   <java-symbol type="layout" name="user_switching_dialog" />
   <java-symbol type="layout" name="common_tab_settings" />
 
+  <java-symbol type="layout" name="permission_confirmation_dialog" />
   <java-symbol type="anim" name="slide_in_child_bottom" />
   <java-symbol type="anim" name="slide_in_right" />
   <java-symbol type="anim" name="slide_out_left" />
@@ -1557,6 +1558,7 @@
   <java-symbol type="attr" name="dialogCustomTitleDecorLayout" />
   <java-symbol type="attr" name="dialogTitleDecorLayout" />
   <java-symbol type="attr" name="dialogTitleIconsDecorLayout" />
+  <java-symbol type="array" name="app_ops_labels" />
   <java-symbol type="bool" name="config_allowAllRotations" />
   <java-symbol type="bool" name="config_annoy_dianne" />
   <java-symbol type="bool" name="config_carDockEnablesAccelerometer" />
@@ -1755,6 +1757,7 @@
   <java-symbol type="bool" name="config_sf_limitedAlpha" />
   <java-symbol type="bool" name="config_unplugTurnsOnScreen" />
   <java-symbol type="bool" name="config_usbChargingMessage" />
+  <java-symbol type="bool" name="config_skipScreenOnBrightnessRamp" />
   <java-symbol type="bool" name="config_allowAutoBrightnessWhileDozing" />
   <java-symbol type="bool" name="config_allowTheaterModeWakeFromUnplug" />
   <java-symbol type="bool" name="config_allowTheaterModeWakeFromGesture" />
@@ -1808,6 +1811,7 @@
   <java-symbol type="dimen" name="default_minimal_size_pip_resizable_task" />
   <java-symbol type="dimen" name="task_height_of_minimized_mode" />
   <java-symbol type="fraction" name="config_screenAutoBrightnessDozeScaleFactor" />
+  <java-symbol type="bool" name="config_allowPriorityVibrationsInLowPowerMode" />
   <java-symbol type="fraction" name="config_autoBrightnessAdjustmentMaxGamma" />
   <java-symbol type="integer" name="config_autoBrightnessAmbientLightHorizon"/>
   <java-symbol type="integer" name="config_autoBrightnessBrighteningLightDebounce"/>
@@ -2948,6 +2952,7 @@
   <java-symbol type="drawable" name="resolver_icon_placeholder" />
 
   <!-- Alert windows notification -->
+  <java-symbol type="string" name="alert_windows_notification_channel_group_name" />
   <java-symbol type="string" name="alert_windows_notification_channel_name" />
   <java-symbol type="string" name="alert_windows_notification_title" />
   <java-symbol type="string" name="alert_windows_notification_message" />
@@ -3028,6 +3033,7 @@
   <java-symbol type="bool" name="config_handleVolumeKeysInWindowManager" />
 
   <java-symbol type="integer" name="config_inCallNotificationVolumeRelative" />
+  <java-symbol type="drawable" name="stat_sys_vitals" />
 
   <!-- SIM contact batch operation -->
   <java-symbol type="bool" name="config_sim_phonebook_batch_operation" />

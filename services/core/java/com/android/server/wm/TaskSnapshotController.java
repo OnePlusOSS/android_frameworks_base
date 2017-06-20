@@ -17,21 +17,23 @@
 package com.android.server.wm;
 
 import static android.app.ActivityManager.ENABLE_TASK_SNAPSHOTS;
-import static android.graphics.GraphicBuffer.USAGE_HW_TEXTURE;
-import static android.graphics.GraphicBuffer.USAGE_SW_READ_NEVER;
-import static android.graphics.GraphicBuffer.USAGE_SW_WRITE_RARELY;
-import static android.graphics.PixelFormat.RGBA_8888;
 
 import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.ActivityManager.StackId;
 import android.app.ActivityManager.TaskSnapshot;
-import android.graphics.Canvas;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.GraphicBuffer;
 import android.graphics.Rect;
 import android.os.Environment;
+import android.os.Handler;
 import android.util.ArraySet;
+import android.view.DisplayListCanvas;
+import android.view.RenderNode;
+import android.view.ThreadedRenderer;
 import android.view.WindowManager.LayoutParams;
+import android.view.WindowManagerPolicy.ScreenOffListener;
 import android.view.WindowManagerPolicy.StartingSurface;
 
 import com.google.android.collect.Sets;
@@ -83,10 +85,18 @@ class TaskSnapshotController {
             Environment::getDataSystemCeDirectory);
     private final TaskSnapshotLoader mLoader = new TaskSnapshotLoader(mPersister);
     private final ArraySet<Task> mTmpTasks = new ArraySet<>();
+    private final Handler mHandler = new Handler();
+
+    /**
+     * Flag indicating whether we are running on an Android TV device.
+     */
+    private final boolean mIsRunningOnTv;
 
     TaskSnapshotController(WindowManagerService service) {
         mService = service;
         mCache = new TaskSnapshotCache(mService, mLoader);
+        mIsRunningOnTv = mService.mContext.getPackageManager().hasSystemFeature(
+                PackageManager.FEATURE_LEANBACK);
     }
 
     void systemReady() {
@@ -107,15 +117,20 @@ class TaskSnapshotController {
     }
 
     private void handleClosingApps(ArraySet<AppWindowToken> closingApps) {
-        if (!ENABLE_TASK_SNAPSHOTS || ActivityManager.isLowRamDeviceStatic()) {
+        if (shouldDisableSnapshots()) {
             return;
         }
 
         // We need to take a snapshot of the task if and only if all activities of the task are
         // either closing or hidden.
         getClosingTasks(closingApps, mTmpTasks);
-        for (int i = mTmpTasks.size() - 1; i >= 0; i--) {
-            final Task task = mTmpTasks.valueAt(i);
+        snapshotTasks(mTmpTasks);
+
+    }
+
+    private void snapshotTasks(ArraySet<Task> tasks) {
+        for (int i = tasks.size() - 1; i >= 0; i--) {
+            final Task task = tasks.valueAt(i);
             final int mode = getSnapshotMode(task);
             final TaskSnapshot snapshot;
             switch (mode) {
@@ -178,6 +193,10 @@ class TaskSnapshotController {
                 1f /* scale */);
     }
 
+    private boolean shouldDisableSnapshots() {
+        return !ENABLE_TASK_SNAPSHOTS || ActivityManager.isLowRamDeviceStatic() || mIsRunningOnTv;
+    }
+
     private Rect minRect(Rect rect1, Rect rect2) {
         return new Rect(Math.min(rect1.left, rect2.left),
                 Math.min(rect1.top, rect2.top),
@@ -231,22 +250,25 @@ class TaskSnapshotController {
         final int color = task.getTaskDescription().getBackgroundColor();
         final int statusBarColor = task.getTaskDescription().getStatusBarColor();
         final int navigationBarColor = task.getTaskDescription().getNavigationBarColor();
-        final GraphicBuffer buffer = GraphicBuffer.create(mainWindow.getFrameLw().width(),
-                mainWindow.getFrameLw().height(),
-                RGBA_8888, USAGE_HW_TEXTURE | USAGE_SW_WRITE_RARELY | USAGE_SW_READ_NEVER);
-        if (buffer == null) {
-            return null;
-        }
-        final Canvas c = buffer.lockCanvas();
-        c.drawColor(color);
         final LayoutParams attrs = mainWindow.getAttrs();
         final SystemBarBackgroundPainter decorPainter = new SystemBarBackgroundPainter(attrs.flags,
                 attrs.privateFlags, attrs.systemUiVisibility, statusBarColor, navigationBarColor);
+        final int width = mainWindow.getFrameLw().width();
+        final int height = mainWindow.getFrameLw().height();
+
+        final RenderNode node = RenderNode.create("TaskSnapshotController", null);
+        node.setLeftTopRightBottom(0, 0, width, height);
+        node.setClipToBounds(false);
+        final DisplayListCanvas c = node.start(width, height);
+        c.drawColor(color);
         decorPainter.setInsets(mainWindow.mContentInsets, mainWindow.mStableInsets);
         decorPainter.drawDecors(c, null /* statusBarExcludeFrame */);
-        buffer.unlockCanvasAndPost(c);
-        return new TaskSnapshot(buffer, topChild.getConfiguration().orientation,
-                mainWindow.mStableInsets, false /* reduced */, 1.0f /* scale */);
+        node.end(c);
+        final Bitmap hwBitmap = ThreadedRenderer.createHardwareBitmap(node, width, height);
+
+        return new TaskSnapshot(hwBitmap.createGraphicBufferHandle(),
+                topChild.getConfiguration().orientation, mainWindow.mStableInsets,
+                false /* reduced */, 1.0f /* scale */);
     }
 
     /**
@@ -282,6 +304,33 @@ class TaskSnapshotController {
      */
     void setPersisterPaused(boolean paused) {
         mPersister.setPaused(paused);
+    }
+
+    /**
+     * Called when screen is being turned off.
+     */
+    void screenTurningOff(ScreenOffListener listener) {
+        if (shouldDisableSnapshots()) {
+            listener.onScreenOff();
+            return;
+        }
+
+        // We can't take a snapshot when screen is off, so take a snapshot now!
+        mHandler.post(() -> {
+            try {
+                synchronized (mService.mWindowMap) {
+                    mTmpTasks.clear();
+                    mService.mRoot.forAllTasks(task -> {
+                        if (task.isVisible()) {
+                            mTmpTasks.add(task);
+                        }
+                    });
+                    snapshotTasks(mTmpTasks);
+                }
+            } finally {
+                listener.onScreenOff();
+            }
+        });
     }
 
     void dump(PrintWriter pw, String prefix) {

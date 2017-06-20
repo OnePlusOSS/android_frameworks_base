@@ -533,11 +533,12 @@ class ActivityStarter {
                     auxiliaryResponse, originalIntent, resolvedType, callingPackage,
                     verificationBundle, userId);
         }
-        return InstantAppResolver.buildEphemeralInstallerIntent(originalIntent,
-            auxiliaryResponse.failureIntent, callingPackage, verificationBundle,
-            resolvedType, userId, auxiliaryResponse.packageName,
-            auxiliaryResponse.splitName, auxiliaryResponse.versionCode,
-            auxiliaryResponse.token, auxiliaryResponse.needsPhaseTwo);
+        return InstantAppResolver.buildEphemeralInstallerIntent(
+                Intent.ACTION_INSTALL_INSTANT_APP_PACKAGE, originalIntent,
+                auxiliaryResponse.failureIntent, callingPackage, verificationBundle,
+                resolvedType, userId, auxiliaryResponse.packageName, auxiliaryResponse.splitName,
+                auxiliaryResponse.versionCode, auxiliaryResponse.token,
+                auxiliaryResponse.needsPhaseTwo);
     }
 
     void postStartActivityProcessing(
@@ -956,7 +957,7 @@ class ActivityStarter {
             // If we are not able to proceed, disassociate the activity from the task. Leaving an
             // activity in an incomplete state can lead to issues, such as performing operations
             // without a window container.
-            if (ActivityManager.isStartResultFatalError(result)
+            if (!ActivityManager.isStartResultSuccessful(result)
                     && mStartActivity.getTask() != null) {
                 mStartActivity.getTask().removeActivity(mStartActivity);
             }
@@ -1049,6 +1050,15 @@ class ActivityStarter {
             sendPowerHintForLaunchStartIfNeeded(false /* forceSend */);
 
             reusedActivity = setTargetStackAndMoveToFrontIfNeeded(reusedActivity);
+
+            final ActivityRecord outResult =
+                    outActivity != null && outActivity.length > 0 ? outActivity[0] : null;
+
+            // When there is a reused activity and the current result is a trampoline activity,
+            // set the reused activity as the result.
+            if (outResult != null && (outResult.finishing || outResult.noDisplay)) {
+                outActivity[0] = reusedActivity;
+            }
 
             if ((mStartFlags & START_FLAG_ONLY_IF_NEEDED) != 0) {
                 // We don't need to start a new activity, and the client said not to do anything
@@ -1422,7 +1432,13 @@ class ActivityStarter {
                     + "; forcing " + "Intent.FLAG_ACTIVITY_NEW_TASK for: " + mIntent);
             mLaunchFlags |= FLAG_ACTIVITY_NEW_TASK;
             mNewTaskInfo = mSourceRecord.info;
-            mNewTaskIntent = mSourceRecord.getTask().intent;
+
+            // It is not guaranteed that the source record will have a task associated with it. For,
+            // example, if this method is being called for processing a pending activity launch, it
+            // is possible that the activity has been removed from the task after the launch was
+            // enqueued.
+            final TaskRecord sourceTask = mSourceRecord.getTask();
+            mNewTaskIntent = sourceTask != null ? sourceTask.intent : null;
         }
         mSourceRecord = null;
         mSourceStack = null;

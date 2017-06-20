@@ -274,7 +274,7 @@ Maybe<xml::AaptAttribute> ReferenceLinker::CompileXmlAttribute(const Reference& 
     if (out_error) *out_error = "is not an attribute";
     return {};
   }
-  return xml::AaptAttribute{symbol->id, *symbol->attribute};
+  return xml::AaptAttribute(*symbol->attribute, symbol->id);
 }
 
 void ReferenceLinker::WriteResourceName(DiagMessage* out_msg,
@@ -296,7 +296,10 @@ bool ReferenceLinker::LinkReference(const CallSite& callsite, Reference* referen
                                     IAaptContext* context, SymbolTable* symbols,
                                     xml::IPackageDeclStack* decls) {
   CHECK(reference != nullptr);
-  CHECK(reference->name || reference->id);
+  if (!reference->name && !reference->id) {
+    // This is @null.
+    return true;
+  }
 
   Reference transformed_reference = *reference;
   TransformReferenceFromNamespace(decls, context->GetCompilationPackage(), &transformed_reference);

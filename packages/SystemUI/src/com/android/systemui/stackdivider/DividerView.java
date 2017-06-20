@@ -160,7 +160,10 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     private boolean mHomeStackResizable;
     private boolean mAdjustedForIme;
     private DividerState mState;
-    private SurfaceFlingerVsyncChoreographer mSfChoreographer;
+    private final SurfaceFlingerVsyncChoreographer mSfChoreographer;
+
+    // The view is removed or in the process of been removed from the system.
+    private boolean mRemoved;
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -250,20 +253,22 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     };
 
     public DividerView(Context context) {
-        super(context);
+        this(context, null);
     }
 
     public DividerView(Context context, @Nullable AttributeSet attrs) {
-        super(context, attrs);
+        this(context, attrs, 0);
     }
 
     public DividerView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
+        this(context, attrs, defStyleAttr, 0);
     }
 
     public DividerView(Context context, @Nullable AttributeSet attrs, int defStyleAttr,
             int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
+        mSfChoreographer = new SurfaceFlingerVsyncChoreographer(mHandler, context.getDisplay(),
+                Choreographer.getInstance());
     }
 
     @Override
@@ -313,14 +318,17 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         EventBus.getDefault().register(this);
-        mSfChoreographer = new SurfaceFlingerVsyncChoreographer(mHandler, getDisplay(),
-                Choreographer.getInstance());
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         EventBus.getDefault().unregister(this);
+    }
+
+    void onDividerRemoved() {
+        mRemoved = true;
+        mHandler.removeMessages(MSG_RESIZE_STACK);
     }
 
     @Override
@@ -725,14 +733,21 @@ public class DividerView extends FrameLayout implements OnTouchListener,
             mMinimizedSnapAlgorithm = null;
             mDockedStackMinimized = minimized;
             initializeSnapAlgorithm();
-            if (!mIsInMinimizeInteraction && minimized) {
-                mIsInMinimizeInteraction = true;
-                mDividerPositionBeforeMinimized = DockedDividerUtils.calculateMiddlePosition(
-                        isHorizontalDivision(), mStableInsets, mDisplayWidth, mDisplayHeight,
-                        mDividerSize);
+            if (mIsInMinimizeInteraction != minimized) {
+                if (minimized) {
+                    mIsInMinimizeInteraction = true;
+                    mDividerPositionBeforeMinimized = DockedDividerUtils.calculateMiddlePosition(
+                            isHorizontalDivision(), mStableInsets, mDisplayWidth, mDisplayHeight,
+                            mDividerSize);
 
-                int position = mMinimizedSnapAlgorithm.getMiddleTarget().position;
-                resizeStack(position, position, mMinimizedSnapAlgorithm.getMiddleTarget());
+                    int position = mMinimizedSnapAlgorithm.getMiddleTarget().position;
+                    resizeStack(position, position, mMinimizedSnapAlgorithm.getMiddleTarget());
+                } else {
+                    resizeStack(mDividerPositionBeforeMinimized, mDividerPositionBeforeMinimized,
+                            mSnapAlgorithm.calculateNonDismissingSnapTarget(
+                                    mDividerPositionBeforeMinimized));
+                    mIsInMinimizeInteraction = false;
+                }
             }
         }
     }
@@ -825,7 +840,10 @@ public class DividerView extends FrameLayout implements OnTouchListener,
                 .setDuration(animDuration)
                 .start();
         mAdjustedForIme = adjustedForIme;
-        if (mHomeStackResizable && adjustedForIme) {
+
+        // Only get new position if home stack is resizable, ime is open and not minimized
+        // (including the animation)
+        if (mHomeStackResizable && adjustedForIme && !mIsInMinimizeInteraction) {
             mDividerPositionBeforeMinimized = getCurrentPosition();
         }
     }
@@ -907,6 +925,10 @@ public class DividerView extends FrameLayout implements OnTouchListener,
     }
 
     public void resizeStack(int position, int taskPosition, SnapTarget taskSnapTarget) {
+        if (mRemoved) {
+            // This divider view has been removed so shouldn't have any additional influence.
+            return;
+        }
         calculateBoundsForPosition(position, mDockSide, mDockedRect);
 
         if (mDockedRect.equals(mLastResizeRect) && !mEntranceAnimationRunning) {

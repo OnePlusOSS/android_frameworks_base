@@ -25,7 +25,9 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
+import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
 import android.annotation.WorkerThread;
 import android.app.ActivityThread;
 import android.content.ContentResolver;
@@ -98,11 +100,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * guarantee the security of the OBB file itself: if any program modifies the
  * OBB, there is no guarantee that a read from that OBB will produce the
  * expected output.
- * <p>
- * Get an instance of this class by calling
- * {@link android.content.Context#getSystemService(java.lang.String)} with an
- * argument of {@link android.content.Context#STORAGE_SERVICE}.
  */
+@SystemService(Context.STORAGE_SERVICE)
 public class StorageManager {
     private static final String TAG = "StorageManager";
 
@@ -1404,23 +1403,7 @@ public class StorageManager {
 
     /** {@hide} */
     public static File maybeTranslateEmulatedPathToInternal(File path) {
-        final IStorageManager storageManager = IStorageManager.Stub.asInterface(
-                ServiceManager.getService("mount"));
-        try {
-            final VolumeInfo[] vols = storageManager.getVolumes(0);
-            for (VolumeInfo vol : vols) {
-                if ((vol.getType() == VolumeInfo.TYPE_EMULATED
-                        || vol.getType() == VolumeInfo.TYPE_PUBLIC) && vol.isMountedReadable()) {
-                    final File internalPath = FileUtils.rewriteAfterRename(vol.getPath(),
-                            vol.getInternalPath(), path);
-                    if (internalPath != null && internalPath.exists()) {
-                        return internalPath;
-                    }
-                }
-            }
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        // Disabled now that FUSE has been replaced by sdcardfs
         return path;
     }
 
@@ -1642,11 +1625,20 @@ public class StorageManager {
      */
     @RequiresPermission(android.Manifest.permission.ALLOCATE_AGGRESSIVE)
     @SystemApi
-    public static final int FLAG_ALLOCATE_AGGRESSIVE = 1;
+    public static final int FLAG_ALLOCATE_AGGRESSIVE = 1 << 0;
+
+    /**
+     * Flag indicating that a disk space allocation request should defy any
+     * reserved disk space.
+     *
+     * @hide
+     */
+    public static final int FLAG_ALLOCATE_DEFY_RESERVED = 1 << 1;
 
     /** @hide */
     @IntDef(flag = true, value = {
             FLAG_ALLOCATE_AGGRESSIVE,
+            FLAG_ALLOCATE_DEFY_RESERVED,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface AllocateFlags {}
@@ -1692,8 +1684,9 @@ public class StorageManager {
 
     /** @hide */
     @SystemApi
-    public long getAllocatableBytes(@NonNull UUID storageUuid, @AllocateFlags int flags)
-            throws IOException {
+    @SuppressLint("Doclava125")
+    public long getAllocatableBytes(@NonNull UUID storageUuid,
+            @RequiresPermission @AllocateFlags int flags) throws IOException {
         try {
             return mStorageManager.getAllocatableBytes(convert(storageUuid), flags);
         } catch (ParcelableException e) {
@@ -1706,8 +1699,9 @@ public class StorageManager {
 
     /** @removed */
     @Deprecated
-    public long getAllocatableBytes(@NonNull File path, @AllocateFlags int flags)
-            throws IOException {
+    @SuppressLint("Doclava125")
+    public long getAllocatableBytes(@NonNull File path,
+            @RequiresPermission @AllocateFlags int flags) throws IOException {
         return getAllocatableBytes(getUuidForPath(path), flags);
     }
 
@@ -1740,8 +1734,9 @@ public class StorageManager {
 
     /** @hide */
     @SystemApi
+    @SuppressLint("Doclava125")
     public void allocateBytes(@NonNull UUID storageUuid, @BytesLong long bytes,
-            @AllocateFlags int flags) throws IOException {
+            @RequiresPermission @AllocateFlags int flags) throws IOException {
         try {
             mStorageManager.allocateBytes(convert(storageUuid), bytes, flags);
         } catch (ParcelableException e) {
@@ -1753,8 +1748,9 @@ public class StorageManager {
 
     /** @removed */
     @Deprecated
-    public void allocateBytes(@NonNull File path, @BytesLong long bytes, @AllocateFlags int flags)
-            throws IOException {
+    @SuppressLint("Doclava125")
+    public void allocateBytes(@NonNull File path, @BytesLong long bytes,
+            @RequiresPermission @AllocateFlags int flags) throws IOException {
         allocateBytes(getUuidForPath(path), bytes, flags);
     }
 
@@ -1789,8 +1785,9 @@ public class StorageManager {
 
     /** @hide */
     @SystemApi
-    public void allocateBytes(FileDescriptor fd, @BytesLong long bytes, @AllocateFlags int flags)
-            throws IOException {
+    @SuppressLint("Doclava125")
+    public void allocateBytes(FileDescriptor fd, @BytesLong long bytes,
+            @RequiresPermission @AllocateFlags int flags) throws IOException {
         final File file = ParcelFileDescriptor.getFile(fd);
         for (int i = 0; i < 3; i++) {
             try {

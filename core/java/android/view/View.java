@@ -593,12 +593,12 @@ import java.util.function.Predicate;
  * a single tag using the {@link android.R.styleable#View_tag android:tag}
  * attribute or multiple tags using the {@code <tag>} child element:
  * <pre>
- *     &ltView ...
+ *     &lt;View ...
  *           android:tag="@string/mytag_value" /&gt;
- *     &ltView ...&gt;
- *         &lttag android:id="@+id/mytag"
+ *     &lt;View ...&gt;
+ *         &lt;tag android:id="@+id/mytag"
  *              android:value="@string/mytag_value" /&gt;
- *     &lt/View>
+ *     &lt;/View>
  * </pre>
  * </p>
  * <p>
@@ -628,11 +628,11 @@ import java.util.function.Predicate;
  * {@link android.R.styleable#Theme_colorAccent android:colorAccent} defined on
  * the inflation context's theme (e.g. the Activity theme) will be preserved.
  * <pre>
- *     &ltLinearLayout
+ *     &lt;LinearLayout
  *             ...
  *             android:theme="@android:theme/ThemeOverlay.Material.Dark"&gt;
- *         &ltView ...&gt;
- *     &lt/LinearLayout&gt;
+ *         &lt;View ...&gt;
+ *     &lt;/LinearLayout&gt;
  * </pre>
  * </p>
  *
@@ -964,115 +964,155 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     private static final int[] VISIBILITY_FLAGS = {VISIBLE, INVISIBLE, GONE};
 
     /**
-     * This view contains an email address.
+     * Hint indicating that this view can be autofilled with an email address.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value #AUTOFILL_HINT_EMAIL_ADDRESS}"
-     * to <a href="#attr_android:autofillHint"> {@code android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_EMAIL_ADDRESS}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_EMAIL_ADDRESS = "emailAddress";
 
     /**
-     * The view contains a real name.
+     * Hint indicating that this view can be autofilled with a user's real name.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value #AUTOFILL_HINT_NAME}" to
-     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_NAME}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_NAME = "name";
 
     /**
-     * The view contains a user name.
+     * Hint indicating that this view can be autofilled with a username.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value #AUTOFILL_HINT_USERNAME}" to
-     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_USERNAME}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_USERNAME = "username";
 
     /**
-     * The view contains a password.
+     * Hint indicating that this view can be autofilled with a password.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value #AUTOFILL_HINT_PASSWORD}" to
-     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_PASSWORD}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_PASSWORD = "password";
 
     /**
-     * The view contains a phone number.
+     * Hint indicating that this view can be autofilled with a phone number.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value #AUTOFILL_HINT_PHONE}" to
-     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_PHONE}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_PHONE = "phone";
 
     /**
-     * The view contains a postal address.
+     * Hint indicating that this view can be autofilled with a postal address.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value #AUTOFILL_HINT_POSTAL_ADDRESS}"
-     * to <a href="#attr_android:autofillHint"> {@code android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_POSTAL_ADDRESS}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_POSTAL_ADDRESS = "postalAddress";
 
     /**
-     * The view contains a postal code.
+     * Hint indicating that this view can be autofilled with a postal code.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value #AUTOFILL_HINT_POSTAL_CODE}" to
-     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_POSTAL_CODE}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_POSTAL_CODE = "postalCode";
 
     /**
-     * The view contains a credit card number.
+     * Hint indicating that this view can be autofilled with a credit card number.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value
-     * #AUTOFILL_HINT_CREDIT_CARD_NUMBER}" to <a href="#attr_android:autofillHint"> {@code
-     * android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_CREDIT_CARD_NUMBER}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_CREDIT_CARD_NUMBER = "creditCardNumber";
 
     /**
-     * The view contains a credit card security code.
+     * Hint indicating that this view can be autofilled with a credit card security code.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value
-     * #AUTOFILL_HINT_CREDIT_CARD_SECURITY_CODE}" to <a href="#attr_android:autofillHint"> {@code
-     * android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_CREDIT_CARD_SECURITY_CODE}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_CREDIT_CARD_SECURITY_CODE = "creditCardSecurityCode";
 
     /**
-     * The view contains a credit card expiration date.
+     * Hint indicating that this view can be autofilled with a credit card expiration date.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value
-     * #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DATE}" to <a href="#attr_android:autofillHint"> {@code
-     * android:autofillHint}.
+     * <p>It should be used when the credit card expiration date is represented by just one view;
+     * if it is represented by more than one (for example, one view for the month and another view
+     * for the year), then each of these views should use the hint specific for the unit
+     * ({@link #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DAY},
+     * {@link #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_MONTH},
+     * or {@link #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_YEAR}).
+     *
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DATE}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DATE =
             "creditCardExpirationDate";
 
     /**
-     * The view contains the month a credit card expires.
+     * Hint indicating that this view can be autofilled with a credit card expiration month.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value
-     * #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_MONTH}" to <a href="#attr_android:autofillHint"> {@code
-     * android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_MONTH}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_MONTH =
             "creditCardExpirationMonth";
 
     /**
-     * The view contains the year a credit card expires.
+     * Hint indicating that this view can be autofilled with a credit card expiration year.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value
-     * #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_YEAR}" to <a href="#attr_android:autofillHint"> {@code
-     * android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_YEAR}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_YEAR =
             "creditCardExpirationYear";
 
     /**
-     * The view contains the day a credit card expires.
+     * Hint indicating that this view can be autofilled with a credit card expiration day.
      *
-     * Use with {@link #setAutofillHints(String[])}, or set "{@value
-     * #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DAY}" to <a href="#attr_android:autofillHint"> {@code
-     * android:autofillHint}.
+     * <p>Can be used with either {@link #setAutofillHints(String[])} or
+     * <a href="#attr_android:autofillHint"> {@code android:autofillHint}</a> (in which case the
+     * value should be <code>{@value #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DAY}</code>).
+     *
+     * <p>See {@link #setAutofillHints(String...)} for more info about autofill hints.
      */
     public static final String AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DAY = "creditCardExpirationDay";
 
@@ -1099,6 +1139,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     /**
      * Autofill type for views that cannot be autofilled.
+     *
+     * <p>Typically used when the view is read-only; for example, a text label.
+     *
+     * @see #getAutofillType()
      */
     public static final int AUTOFILL_TYPE_NONE = 0;
 
@@ -1108,6 +1152,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * <p>{@link AutofillValue} instances for autofilling a {@link View} can be obtained through
      * {@link AutofillValue#forText(CharSequence)}, and the value passed to autofill a
      * {@link View} can be fetched through {@link AutofillValue#getTextValue()}.
+     *
+     * @see #getAutofillType()
      */
     public static final int AUTOFILL_TYPE_TEXT = 1;
 
@@ -1117,6 +1163,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * <p>{@link AutofillValue} instances for autofilling a {@link View} can be obtained through
      * {@link AutofillValue#forToggle(boolean)}, and the value passed to autofill a
      * {@link View} can be fetched through {@link AutofillValue#getToggleValue()}.
+     *
+     * @see #getAutofillType()
      */
     public static final int AUTOFILL_TYPE_TOGGLE = 2;
 
@@ -1130,6 +1178,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * <p>The available options in the selection list are typically provided by
      * {@link android.app.assist.AssistStructure.ViewNode#getAutofillOptions()}.
+     *
+     * @see #getAutofillType()
      */
     public static final int AUTOFILL_TYPE_LIST = 3;
 
@@ -1142,6 +1192,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * <p>{@link AutofillValue} instances for autofilling a {@link View} can be obtained through
      * {@link AutofillValue#forDate(long)}, and the values passed to
      * autofill a {@link View} can be fetched through {@link AutofillValue#getDateValue()}.
+     *
+     * @see #getAutofillType()
      */
     public static final int AUTOFILL_TYPE_DATE = 4;
 
@@ -1158,26 +1210,41 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     /**
      * Automatically determine whether a view is important for autofill.
+     *
+     * @see #isImportantForAutofill()
+     * @see #setImportantForAutofill(int)
      */
     public static final int IMPORTANT_FOR_AUTOFILL_AUTO = 0x0;
 
     /**
      * The view is important for autofill, and its children (if any) will be traversed.
+     *
+     * @see #isImportantForAutofill()
+     * @see #setImportantForAutofill(int)
      */
     public static final int IMPORTANT_FOR_AUTOFILL_YES = 0x1;
 
     /**
      * The view is not important for autofill, but its children (if any) will be traversed.
+     *
+     * @see #isImportantForAutofill()
+     * @see #setImportantForAutofill(int)
      */
     public static final int IMPORTANT_FOR_AUTOFILL_NO = 0x2;
 
     /**
      * The view is important for autofill, but its children (if any) will not be traversed.
+     *
+     * @see #isImportantForAutofill()
+     * @see #setImportantForAutofill(int)
      */
     public static final int IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS = 0x4;
 
     /**
      * The view is not important for autofill, and its children (if any) will not be traversed.
+     *
+     * @see #isImportantForAutofill()
+     * @see #setImportantForAutofill(int)
      */
     public static final int IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS = 0x8;
 
@@ -1189,7 +1256,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public @interface AutofillFlags {}
 
     /**
-     * Flag requesting you to add views not-important for autofill to the assist data.
+     * Flag requesting you to add views that are marked as not important for autofill
+     * (see {@link #setImportantForAutofill(int)}) to a {@link ViewStructure}.
      */
     public static final int AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS = 0x1;
 
@@ -7325,23 +7393,70 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Called when assist structure is being retrieved from a view as part of an autofill request.
+     * Populates a {@link ViewStructure} to fullfil an autofill request.
      *
-     * <p>This method already provides most of what's needed for autofill, but should be overridden
-     * when:
+     * <p>The structure should contain at least the following properties:
      * <ul>
-     *   <li>The view contents does not include PII (Personally Identifiable Information), so it
-     * can call {@link ViewStructure#setDataIsSensitive(boolean)} passing {@code false}.
-     *   <li>It must set fields such {@link ViewStructure#setText(CharSequence)},
-     * {@link ViewStructure#setAutofillOptions(CharSequence[])},
-     * or {@link ViewStructure#setWebDomain(String)}.
-     *   <li> The {@code left} and {@code top} values set in
-     * {@link ViewStructure#setDimens(int, int, int, int, int, int)} need to be relative to the next
-     * {@link ViewGroup#isImportantForAutofill() included} parent in the structure.
+     *   <li>Autofill id ({@link ViewStructure#setAutofillId(AutofillId, int)}).
+     *   <li>Autofill type ({@link ViewStructure#setAutofillType(int)}).
+     *   <li>Autofill value ({@link ViewStructure#setAutofillValue(AutofillValue)}).
+     *   <li>Whether the data is sensitive ({@link ViewStructure#setDataIsSensitive(boolean)}).
      * </ul>
      *
-     * @param structure Fill in with structured view data. The default implementation
-     * fills in all data that can be inferred from the view itself.
+     * <p>It's also recommended to set the following properties - the more properties the structure
+     * has, the higher the changes of an {@link android.service.autofill.AutofillService} properly
+     * using the structure:
+     *
+     * <ul>
+     *   <li>Autofill hints ({@link ViewStructure#setAutofillHints(String[])}).
+     *   <li>Autofill options ({@link ViewStructure#setAutofillOptions(CharSequence[])}) when the
+     *       view can only be filled with predefined values (typically used when the autofill type
+     *       is {@link #AUTOFILL_TYPE_LIST}).
+     *   <li>Resource id ({@link ViewStructure#setId(int, String, String, String)}).
+     *   <li>Class name ({@link ViewStructure#setClassName(String)}).
+     *   <li>Content description ({@link ViewStructure#setContentDescription(CharSequence)}).
+     *   <li>Visual properties such as visibility ({@link ViewStructure#setVisibility(int)}),
+     *       dimensions ({@link ViewStructure#setDimens(int, int, int, int, int, int)}), and
+     *       opacity ({@link ViewStructure#setOpaque(boolean)}).
+     *   <li>For views representing text fields, text properties such as the text itself
+     *       ({@link ViewStructure#setText(CharSequence)}), text hints
+     *       ({@link ViewStructure#setHint(CharSequence)}, input type
+     *       ({@link ViewStructure#setInputType(int)}),
+     *   <li>For views representing HTML nodes, its web domain
+     *       ({@link ViewStructure#setWebDomain(String)}) and HTML properties
+     *       (({@link ViewStructure#setHtmlInfo(android.view.ViewStructure.HtmlInfo)}).
+     * </ul>
+     *
+     * <p>The default implementation of this method already sets most of these properties based on
+     * related {@link View} methods (for example, the autofill id is set using
+     * {@link #getAutofillId()}, the autofill type set using {@link #getAutofillType()}, etc.),
+     * and views in the standard Android widgets library also override it to set their
+     * relevant properties (for example, {@link android.widget.TextView} already sets the text
+     * properties), so it's recommended to only override this method
+     * (and call {@code super.onProvideAutofillStructure()}) when:
+     *
+     * <ul>
+     *   <li>The view contents does not include PII (Personally Identifiable Information), so it
+     *       can call {@link ViewStructure#setDataIsSensitive(boolean)} passing {@code false}.
+     *   <li>The view can only be autofilled with predefined options, so it can call
+     *       {@link ViewStructure#setAutofillOptions(CharSequence[])}.
+     * </ul>
+     *
+     * <p><b>NOTE:</b> the {@code left} and {@code top} values set in
+     * {@link ViewStructure#setDimens(int, int, int, int, int, int)} must be relative to the next
+     * {@link ViewGroup#isImportantForAutofill()} predecessor view included in the structure.
+     *
+     * <p>Views support the Autofill Framework mainly by:
+     * <ul>
+     *   <li>Providing the metadata defining what the view means and how it can be autofilled.
+     *   <li>Notifying the Android System when the view value changed by calling
+     *       {@link AutofillManager#notifyValueChanged(View)}.
+     *   <li>Implementing the methods that autofill the view.
+     * </ul>
+     * <p>This method is responsible for the former; {@link #autofill(AutofillValue)} is responsible
+     * for the latter.
+     *
+     * @param structure fill in with structured view data for autofill purposes.
      * @param flags optional flags.
      *
      * @see #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
@@ -7469,32 +7584,56 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Called when assist structure is being retrieved from a view as part of an autofill request
-     * to generate additional virtual structure under this view.
+     * Populates a {@link ViewStructure} containing virtual children to fullfil an autofill
+     * request.
+     *
+     * <p>This method should be used when the view manages a virtual structure under this view. For
+     * example, a view that draws input fields using {@link #draw(Canvas)}.
      *
      * <p>When implementing this method, subclasses must follow the rules below:
      *
-     * <ol>
-     * <li>Also implement {@link #autofill(SparseArray)} to autofill the virtual
-     * children.
-     * <li>Call
-     * {@link android.view.autofill.AutofillManager#notifyViewEntered} and
-     * {@link android.view.autofill.AutofillManager#notifyViewExited(View, int)}
-     * when the focus inside the view changed.
-     * <li>Call {@link android.view.autofill.AutofillManager#notifyValueChanged(View, int,
-     * AutofillValue)} when the value of a child changed.
-     * <li>Call {@link AutofillManager#commit()} when the autofill context
-     * of the view structure changed and you want the current autofill interaction if such
-     * to be commited.
-     * <li>Call {@link AutofillManager#cancel()} ()} when the autofill context
-     * of the view structure changed and you want the current autofill interaction if such
-     * to be cancelled.
-     * <li> The {@code left} and {@code top} values set in
-     * {@link ViewStructure#setDimens(int, int, int, int, int, int)} need to be relative to the next
-     * {@link ViewGroup#isImportantForAutofill() included} parent in the structure.
-     * </ol>
+     * <ul>
+     *   <li>Add virtual children by calling the {@link ViewStructure#newChild(int)} or
+     *       {@link ViewStructure#asyncNewChild(int)} methods, where the {@code id} is an unique id
+     *       identifying the children in the virtual structure.
+     *   <li>The children hierarchy can have multiple levels if necessary, but ideally it should
+     *       exclude intermediate levels that are irrelevant for autofill; that would improve the
+     *       autofill performance.
+     *   <li>Also implement {@link #autofill(SparseArray)} to autofill the virtual
+     *       children.
+     *   <li>Set the autofill properties of the child structure as defined by
+     *       {@link #onProvideAutofillStructure(ViewStructure, int)}, using
+     *       {@link ViewStructure#setAutofillId(AutofillId, int)} to set its autofill id.
+     *   <li>Call {@link android.view.autofill.AutofillManager#notifyViewEntered(View, int, Rect)}
+     *       and/or {@link android.view.autofill.AutofillManager#notifyViewExited(View, int)}
+     *       when the focused virtual child changed.
+     *   <li>Call
+     *    {@link android.view.autofill.AutofillManager#notifyValueChanged(View, int, AutofillValue)}
+     *       when the value of a virtual child changed.
+     *   <li>Call {@link AutofillManager#commit()} when the autofill context of the view structure
+     *       changed and the current context should be committed (for example, when the user tapped
+     *       a {@code SUBMIT} button in an HTML page).
+     *   <li>Call {@link AutofillManager#cancel()} when the autofill context of the view structure
+     *       changed and the current context should be canceled (for example, when the user tapped
+     *       a {@code CANCEL} button in an HTML page).
+     *   <li>Provide ways for users to manually request autofill by calling
+     *       {@link AutofillManager#requestAutofill(View, int, Rect)}.
+     *   <li>The {@code left} and {@code top} values set in
+     *       {@link ViewStructure#setDimens(int, int, int, int, int, int)} must be relative to the
+     *       next {@link ViewGroup#isImportantForAutofill()} predecessor view included in the
+     *       structure.
+     * </ul>
      *
-     * @param structure Fill in with structured view data.
+     * <p>Views with virtual children support the Autofill Framework mainly by:
+     * <ul>
+     *   <li>Providing the metadata defining what the virtual children mean and how they can be
+     *       autofilled.
+     *   <li>Implementing the methods that autofill the virtual children.
+     * </ul>
+     * <p>This method is responsible for the former; {@link #autofill(SparseArray)} is responsible
+     * for the latter.
+     *
+     * @param structure fill in with virtual children data for autofill purposes.
      * @param flags optional flags.
      *
      * @see #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
@@ -7505,27 +7644,40 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     /**
      * Automatically fills the content of this view with the {@code value}.
      *
-     * <p>By default does nothing, but views should override it (and {@link #getAutofillType()},
-     * {@link #getAutofillValue()}, and {@link #onProvideAutofillStructure(ViewStructure, int)}
-     * to support the Autofill Framework.
+     * <p>Views support the Autofill Framework mainly by:
+     * <ul>
+     *   <li>Providing the metadata defining what the view means and how it can be autofilled.
+     *   <li>Implementing the methods that autofill the view.
+     * </ul>
+     * <p>{@link #onProvideAutofillStructure(ViewStructure, int)} is responsible for the former,
+     * this method is responsible for latter.
      *
-     * <p>Typically, it is implemented by:
-     *
+     * <p>This method does nothing by default, but when overridden it typically:
      * <ol>
-     * <li>Calling the proper getter method on {@link AutofillValue} to fetch the actual value.
-     * <li>Passing the actual value to the equivalent setter in the view.
+     *   <li>Checks if the provided value matches the expected type (which is defined by
+     *       {@link #getAutofillType()}).
+     *   <li>Checks if the view is editable - if it isn't, it should return right away.
+     *   <li>Call the proper getter method on {@link AutofillValue} to fetch the actual value.
+     *   <li>Pass the actual value to the equivalent setter in the view.
      * </ol>
      *
-     * <p>For example, a text-field view would call:
+     * <p>For example, a text-field view could implement the method this way:
+     *
      * <pre class="prettyprint">
-     * CharSequence text = value.getTextValue();
-     * if (text != null) {
-     *     setText(text);
+     * &#64;Override
+     * public void autofill(AutofillValue value) {
+     *   if (!value.isText() || !this.isEditable()) {
+     *      return;
+     *   }
+     *   CharSequence text = value.getTextValue();
+     *   if (text != null) {
+     *     this.setText(text);
+     *   }
      * }
      * </pre>
      *
-     * <p>If the value is updated asyncronously the next call to
-     * {@link AutofillManager#notifyValueChanged(View)} must happen <u>after</u> the value was
+     * <p>If the value is updated asynchronously the next call to
+     * {@link AutofillManager#notifyValueChanged(View)} must happen <b>after</b> the value was
      * changed to the autofilled value. If not, the view will not be considered autofilled.
      *
      * @param value value to be autofilled.
@@ -7534,11 +7686,19 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Automatically fills the content of a virtual views.
+     * Automatically fills the content of the virtual children within this view.
      *
-     * <p>See {@link #autofill(AutofillValue)} and
-     * {@link #onProvideAutofillVirtualStructure(ViewStructure, int)} for more info.
-     * <p>To indicate that a virtual view was autofilled
+     * <p>Views with virtual children support the Autofill Framework mainly by:
+     * <ul>
+     *   <li>Providing the metadata defining what the virtual children mean and how they can be
+     *       autofilled.
+     *   <li>Implementing the methods that autofill the virtual children.
+     * </ul>
+     * <p>{@link #onProvideAutofillVirtualStructure(ViewStructure, int)} is responsible for the
+     * former, this method is responsible for the latter - see {@link #autofill(AutofillValue)} and
+     * {@link #onProvideAutofillVirtualStructure(ViewStructure, int)} for more info about autofill.
+     *
+     * <p><b>NOTE:</b> to indicate that a virtual view was autofilled,
      * <code>?android:attr/autofilledHighlight</code> should be drawn over it until the data
      * changes.
      *
@@ -7550,9 +7710,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Gets the unique identifier of this view on the screen for Autofill purposes.
+     * Gets the unique identifier of this view in the screen, for autofill purposes.
      *
-     * @return The View's Autofill id.
+     * @return The View's autofill id.
      */
     public final AutofillId getAutofillId() {
         if (mAutofillId == null) {
@@ -7564,20 +7724,31 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Describes the autofill type that should be used on calls to
-     * {@link #autofill(AutofillValue)} and {@link #autofill(SparseArray)}.
+     * Describes the autofill type of this view, so an
+     * {@link android.service.autofill.AutofillService} can create the proper {@link AutofillValue}
+     * when autofilling the view.
      *
-     * <p>By default returns {@link #AUTOFILL_TYPE_NONE}, but views should override it (and
-     * {@link #autofill(AutofillValue)} to support the Autofill Framework.
+     * <p>By default returns {@link #AUTOFILL_TYPE_NONE}, but views should override it to properly
+     * support the Autofill Framework.
+     *
+     * @return either {@link #AUTOFILL_TYPE_NONE}, {@link #AUTOFILL_TYPE_TEXT},
+     * {@link #AUTOFILL_TYPE_LIST}, {@link #AUTOFILL_TYPE_DATE}, or {@link #AUTOFILL_TYPE_TOGGLE}.
+     *
+     * @see #onProvideAutofillStructure(ViewStructure, int)
+     * @see #autofill(AutofillValue)
      */
     public @AutofillType int getAutofillType() {
         return AUTOFILL_TYPE_NONE;
     }
 
     /**
-     * Describes the content of a view so that a autofill service can fill in the appropriate data.
+     * Gets the hints that help an {@link android.service.autofill.AutofillService} determine how
+     * to autofill the view with the user's data.
      *
-     * @return The hints set via the attribute or {@code null} if no hint it set.
+     * <p>See {@link #setAutofillHints(String...)} for more info about these hints.
+     *
+     * @return The hints set via the attribute or {@link #setAutofillHints(String...)}, or
+     * {@code null} if no hints were set.
      *
      * @attr ref android.R.styleable#View_autofillHints
      */
@@ -7596,9 +7767,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     /**
      * Gets the {@link View}'s current autofill value.
      *
-     * <p>By default returns {@code null}, but views should override it (and
-     * {@link #autofill(AutofillValue)}, and {@link #getAutofillType()} to support the Autofill
-     * Framework.
+     * <p>By default returns {@code null}, but views should override it to properly support the
+     * Autofill Framework.
+     *
+     * @see #onProvideAutofillStructure(ViewStructure, int)
+     * @see #autofill(AutofillValue)
      */
     @Nullable
     public AutofillValue getAutofillValue() {
@@ -7606,9 +7779,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Gets the mode for determining whether this View is important for autofill.
+     * Gets the mode for determining whether this view is important for autofill.
      *
-     * <p>See {@link #setImportantForAutofill(int)} for more info about this mode.
+     * <p>See {@link #setImportantForAutofill(int)} and {@link #isImportantForAutofill()} for more
+     * info about this mode.
      *
      * @return {@link #IMPORTANT_FOR_AUTOFILL_AUTO} by default, or value passed to
      * {@link #setImportantForAutofill(int)}.
@@ -7629,20 +7803,29 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Sets the mode for determining whether this View is important for autofill.
-     *
-     * <p>This property controls how this view is presented to the autofill components
-     * which help users to fill credentials, addresses, etc. For example, views
-     * that contain labels and input fields are useful for autofill components to
-     * determine the user context and provide values for the inputs. Note that the
-     * user can always override this by manually triggering autotill which would
-     * expose the view to the autofill provider.
+     * Sets the mode for determining whether this view is considered important for autofill.
      *
      * <p>The platform determines the importance for autofill automatically but you
-     * can use this method to customize the behavior. See the autofill modes below
-     * for more details.
+     * can use this method to customize the behavior. For example:
      *
-     * <p>See {@link #setImportantForAutofill(int)} for more info about this mode.
+     * <ol>
+     *   <li>When the view contents is irrelevant for autofill (for example, a text field used in a
+     *       "Captcha" challenge), it should be {@link #IMPORTANT_FOR_AUTOFILL_NO}.
+     *   <li>When both the view and its children are irrelevant for autofill (for example, the root
+     *       view of an activity containing a spreadhseet editor), it should be
+     *       {@link #IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS}.
+     *   <li>When the view content is relevant for autofill but its children aren't (for example,
+     *       a credit card expiration date represented by a custom view that overrides the proper
+     *       autofill methods and has 2 children representing the month and year), it should
+     *       be {@link #IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS}.
+     * </ol>
+     *
+     * <p><b>NOTE:</strong> setting the mode as does {@link #IMPORTANT_FOR_AUTOFILL_NO} or
+     * {@link #IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS} does not guarantee the view (and its
+     * children) will be always be considered not important; for example, when the user explicitly
+     * makes an autofill request, all views are considered important. See
+     * {@link #isImportantForAutofill()} for more details about how the View's importance for
+     * autofill is used.
      *
      * @param mode {@link #IMPORTANT_FOR_AUTOFILL_AUTO}, {@link #IMPORTANT_FOR_AUTOFILL_YES},
      * {@link #IMPORTANT_FOR_AUTOFILL_NO}, {@link #IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS},
@@ -7658,40 +7841,51 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
     /**
      * Hints the Android System whether the {@link android.app.assist.AssistStructure.ViewNode}
-     * associated with this View should be included in a {@link ViewStructure} used for
-     * autofill purposes.
+     * associated with this view is considered important for autofill purposes.
      *
      * <p>Generally speaking, a view is important for autofill if:
      * <ol>
-     * <li>The view can-be autofilled by an {@link android.service.autofill.AutofillService}.
-     * <li>The view contents can help an {@link android.service.autofill.AutofillService} to
-     * autofill other views.
+     * <li>The view can be autofilled by an {@link android.service.autofill.AutofillService}.
+     * <li>The view contents can help an {@link android.service.autofill.AutofillService}
+     *     determine how other views can be autofilled.
      * <ol>
      *
      * <p>For example, view containers should typically return {@code false} for performance reasons
-     * (since the important info is provided by their children), but if the container is actually
-     * whose children are part of a compound view, it should return {@code true} (and then override
-     * {@link #dispatchProvideAutofillStructure(ViewStructure, int)} to simply call
-     * {@link #onProvideAutofillStructure(ViewStructure, int)} so its children are not included in
-     * the structure). On the other hand, views representing labels or editable fields should
-     * typically return {@code true}, but in some cases they could return {@code false} (for
-     * example, if they're part of a "Captcha" mechanism).
+     * (since the important info is provided by their children), but if its properties have relevant
+     * information (for example, a resource id called {@code credentials}, it should return
+     * {@code true}. On the other hand, views representing labels or editable fields should
+     * typically return {@code true}, but in some cases they could return {@code false}
+     * (for example, if they're part of a "Captcha" mechanism).
      *
-     * <p>By default, this method returns {@code true} if {@link #getImportantForAutofill()} returns
-     * {@link #IMPORTANT_FOR_AUTOFILL_YES}, {@code false } if it returns
-     * {@link #IMPORTANT_FOR_AUTOFILL_NO}, and use some heuristics to define the importance when it
-     * returns {@link #IMPORTANT_FOR_AUTOFILL_AUTO}. Hence, it should rarely be overridden - Views
-     * should use {@link #setImportantForAutofill(int)} instead.
+     * <p>The value returned by this method depends on the value returned by
+     * {@link #getImportantForAutofill()}:
      *
-     * <p><strong>Note:</strong> returning {@code false} does not guarantee the view will be
-     * excluded from the structure; for example, if the user explicitly requested autofill, the
-     * View might be always included.
+     * <ol>
+     *   <li>if it returns {@link #IMPORTANT_FOR_AUTOFILL_YES} or
+     *       {@link #IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS}, then it returns {@code true}
+     *   <li>if it returns {@link #IMPORTANT_FOR_AUTOFILL_NO} or
+     *       {@link #IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS}, then it returns {@code false}
+     *   <li>if it returns {@link #IMPORTANT_FOR_AUTOFILL_AUTO}, then it uses some simple heuristics
+     *       that can return {@code true} in some cases (like a container with a resource id),
+     *       but {@code false} in most.
+     *   <li>otherwise, it returns {@code false}.
+     * </ol>
      *
-     * <p>This decision applies just for the view, not its children - if the view children are not
-     * important for autofill, the view should override
-     * {@link #dispatchProvideAutofillStructure(ViewStructure, int)} to simply call
-     * {@link #onProvideAutofillStructure(ViewStructure, int)} (instead of calling
-     * {@link #dispatchProvideAutofillStructure(ViewStructure, int)} for each child).
+     * <p>When a view is considered important for autofill:
+     * <ul>
+     *   <li>The view might automatically trigger an autofill request when focused on.
+     *   <li>The contents of the view are included in the {@link ViewStructure} used in an autofill
+     *       request.
+     * </ul>
+     *
+     * <p>On the other hand, when a view is considered not important for autofill:
+     * <ul>
+     *   <li>The view never automatically triggers autofill requests, but it can trigger a manual
+     *       request through {@link AutofillManager#requestAutofill(View)}.
+     *   <li>The contents of the view are not included in the {@link ViewStructure} used in an
+     *       autofill request, unless the request has the
+     *       {@link #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS} flag.
+     * </ul>
      *
      * @return whether the view is considered important for autofill.
      *
@@ -7701,6 +7895,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @see #IMPORTANT_FOR_AUTOFILL_NO
      * @see #IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS
      * @see #IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+     * @see AutofillManager#requestAutofill(View)
      */
     public final boolean isImportantForAutofill() {
         // Check parent mode to ensure we're not hidden.
@@ -7825,29 +8020,38 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Dispatch creation of {@link ViewStructure} down the hierarchy.
+     * Dispatches creation of a {@link ViewStructure}s for autofill purposes down the hierarchy,
+     * when an Assist structure is being created as part of an autofill request.
      *
      * <p>The default implementation does the following:
-     *
      * <ul>
      *   <li>Sets the {@link AutofillId} in the structure.
      *   <li>Calls {@link #onProvideAutofillStructure(ViewStructure, int)}.
      *   <li>Calls {@link #onProvideAutofillVirtualStructure(ViewStructure, int)}.
      * </ul>
      *
-     * <p>When overridden, it must either call
-     * {@code super.dispatchProvideAutofillStructure(structure, flags)} or explicitly
-     * set the {@link AutofillId} in the structure (for example, by calling
-     * {@code structure.setAutofillId(getAutofillId())}).
+     * <p>Typically, this method should only be overridden by subclasses that provide a view
+     * hierarchy (such as {@link ViewGroup}) - other classes should override
+     * {@link #onProvideAutofillStructure(ViewStructure, int)} or
+     * {@link #onProvideAutofillVirtualStructure(ViewStructure, int)} instead.
      *
-     * <p>When providing your implementation you need to decide how to handle
-     * the {@link #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS} flag which instructs you
-     * to report all views to the structure regardless if {@link #isImportantForAutofill()}
-     * returns true. We encourage you respect the importance property for a better
-     * user experience in your app. If the flag is not set then you should filter out
-     * not important views to optimize autofill performance in your app.
+     * <p>When overridden, it must:
      *
-     * @param structure Fill in with structured view data.
+     * <ul>
+     *   <li>Either call
+     *       {@code super.dispatchProvideAutofillStructure(structure, flags)} or explicitly
+     *       set the {@link AutofillId} in the structure (for example, by calling
+     *       {@code structure.setAutofillId(getAutofillId())}).
+     *   <li>Decide how to handle the {@link #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS} flag - when
+     *       set, all views in the structure should be considered important for autofill,
+     *       regardless of what {@link #isImportantForAutofill()} returns. We encourage you to
+     *       respect this flag to provide a better user experience - this flag is typically used
+     *       when an user explicitly requested autofill. If the flag is not set,
+     *       then only views marked as important for autofill should be included in the
+     *       structure - skipping non-important views optimizes the overall autofill performance.
+     * </ul>
+     *
+     * @param structure fill in with structured view data for autofill purposes.
      * @param flags optional flags.
      *
      * @see #AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
@@ -9242,8 +9446,26 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Sets the hints that helps the autofill service to select the appropriate data to fill the
-     * view.
+     * Sets the hints that help an {@link android.service.autofill.AutofillService} determine how
+     * to autofill the view with the user's data.
+     *
+     * <p>Typically, there is only one way to autofill a view, but there could be more than one.
+     * For example, if the application accepts either an username or email address to identify
+     * an user.
+     *
+     * <p>These hints are not validated by the Android System, but passed "as is" to the service.
+     * Hence, they can have any value, but it's recommended to use the {@code AUTOFILL_HINT_}
+     * constants such as:
+     * {@link #AUTOFILL_HINT_USERNAME}, {@link #AUTOFILL_HINT_PASSWORD},
+     * {@link #AUTOFILL_HINT_EMAIL_ADDRESS},
+     * {@link #AUTOFILL_HINT_NAME},
+     * {@link #AUTOFILL_HINT_PHONE},
+     * {@link #AUTOFILL_HINT_POSTAL_ADDRESS}, {@link #AUTOFILL_HINT_POSTAL_CODE},
+     * {@link #AUTOFILL_HINT_CREDIT_CARD_NUMBER}, {@link #AUTOFILL_HINT_CREDIT_CARD_SECURITY_CODE},
+     * {@link #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DATE},
+     * {@link #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DAY},
+     * {@link #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_MONTH} or
+     * {@link #AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_YEAR}.
      *
      * @param autofillHints The autofill hints to set. If the array is emtpy, {@code null} is set.
      * @attr ref android.R.styleable#View_autofillHints
@@ -9958,12 +10180,20 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 // Going from one cluster to another, so save last-focused.
                 // This covers cluster jumps because they are always FOCUS_DOWN
                 oldFocus.setFocusedInCluster(oldCluster);
+                if (!(oldFocus.mParent instanceof ViewGroup)) {
+                    return;
+                }
                 if (direction == FOCUS_FORWARD || direction == FOCUS_BACKWARD) {
                     // This is a result of ordered navigation so consider navigation through
                     // the previous cluster "complete" and clear its last-focused memory.
-                    if (oldFocus.mParent instanceof ViewGroup) {
-                        ((ViewGroup) oldFocus.mParent).clearFocusedInCluster(oldFocus);
-                    }
+                    ((ViewGroup) oldFocus.mParent).clearFocusedInCluster(oldFocus);
+                } else if (oldFocus instanceof ViewGroup
+                        && ((ViewGroup) oldFocus).getDescendantFocusability()
+                                == ViewGroup.FOCUS_AFTER_DESCENDANTS
+                        && ViewRootImpl.isViewDescendantOf(this, oldFocus)) {
+                    // This means oldFocus is not focusable since it obviously has a focusable
+                    // child (this). Don't restore focus to it in the future.
+                    ((ViewGroup) oldFocus.mParent).clearFocusedInCluster(oldFocus);
                 }
             }
         }
@@ -13014,7 +13244,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 // about in case nothing has focus.  even if this specific view
                 // isn't focusable, it may contain something that is, so let
                 // the root view try to give this focus if nothing else does.
-                if ((mParent != null) && (mBottom > mTop) && (mRight > mLeft)) {
+                if ((mParent != null)) {
                     mParent.focusableViewAvailable(this);
                 }
             }
@@ -19798,7 +20028,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 && (mForegroundInfo == null || mForegroundInfo.mDrawable == null)) {
             mPrivateFlags |= PFLAG_SKIP_DRAW;
         }
-        requestLayout();
         invalidate();
     }
 
@@ -19806,18 +20035,23 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * Check whether we need to draw a default focus highlight when this view gets focused,
      * which requires:
      * <ul>
-     *     <li>In the background, {@link android.R.attr#state_focused} is not defined.</li>
+     *     <li>In both background and foreground, {@link android.R.attr#state_focused}
+     *         is not defined.</li>
      *     <li>This view is not in touch mode.</li>
      *     <li>This view doesn't opt out for a default focus highlight, via
      *         {@link #setDefaultFocusHighlightEnabled(boolean)}.</li>
      *     <li>This view is attached to window.</li>
      * </ul>
      * @return {@code true} if a default focus highlight is needed.
+     * @hide
      */
-    private boolean isDefaultFocusHighlightNeeded(Drawable background) {
-        final boolean hasFocusStateSpecified = background == null || !background.isStateful()
-                || !background.hasFocusStateSpecified();
-        return !isInTouchMode() && getDefaultFocusHighlightEnabled() && hasFocusStateSpecified
+    @TestApi
+    public boolean isDefaultFocusHighlightNeeded(Drawable background, Drawable foreground) {
+        final boolean lackFocusState = (background == null || !background.isStateful()
+                || !background.hasFocusStateSpecified())
+                && (foreground == null || !foreground.isStateful()
+                || !foreground.hasFocusStateSpecified());
+        return !isInTouchMode() && getDefaultFocusHighlightEnabled() && lackFocusState
                 && isAttachedToWindow() && sUseDefaultFocusHighlight;
     }
 
@@ -19829,7 +20063,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     private void switchDefaultFocusHighlight() {
         if (isFocused()) {
-            final boolean needed = isDefaultFocusHighlightNeeded(mBackground);
+            final boolean needed = isDefaultFocusHighlightNeeded(mBackground,
+                    mForegroundInfo == null ? null : mForegroundInfo.mDrawable);
             final boolean active = mDefaultFocusHighlight != null;
             if (needed && !active) {
                 setDefaultFocusHighlight(getDefaultFocusHighlightDrawable());

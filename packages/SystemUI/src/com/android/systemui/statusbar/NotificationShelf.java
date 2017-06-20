@@ -165,7 +165,7 @@ public class NotificationShelf extends ActivatableNotificationView implements
             openedAmount = Math.min(1.0f, openedAmount);
             mShelfState.openedAmount = openedAmount;
             mShelfState.clipTopAmount = 0;
-            mShelfState.alpha = mAmbientState.isPulsing() ? 0 : 1;
+            mShelfState.alpha = mAmbientState.hasPulsingNotifications() ? 0 : 1;
             mShelfState.belowSpeedBump = mAmbientState.getSpeedBumpIndex() == 0;
             mShelfState.shadowAlpha = 1.0f;
             mShelfState.hideSensitive = false;
@@ -227,7 +227,7 @@ public class NotificationShelf extends ActivatableNotificationView implements
             }
             ExpandableNotificationRow row = (ExpandableNotificationRow) child;
             float notificationClipEnd;
-            boolean aboveShelf = row.getTranslationZ() > baseZHeight;
+            boolean aboveShelf = ViewState.getFinalTranslationZ(row) > baseZHeight;
             boolean isLastChild = child == lastChild;
             float rowTranslationY = row.getTranslationY();
             if (isLastChild || aboveShelf || backgroundForceHidden) {
@@ -284,10 +284,15 @@ public class NotificationShelf extends ActivatableNotificationView implements
     private void updateNotificationClipHeight(ExpandableNotificationRow row,
             float notificationClipEnd) {
         float viewEnd = row.getTranslationY() + row.getActualHeight();
+        boolean isPinned = row.isPinned() || row.isHeadsUpAnimatingAway();
         if (viewEnd > notificationClipEnd
-                && (mAmbientState.isShadeExpanded()
-                        || (!row.isPinned() && !row.isHeadsUpAnimatingAway()))) {
-            row.setClipBottomAmount((int) (viewEnd - notificationClipEnd));
+                && (mAmbientState.isShadeExpanded() || !isPinned)) {
+            int clipBottomAmount = (int) (viewEnd - notificationClipEnd);
+            if (isPinned) {
+                clipBottomAmount = Math.min(row.getIntrinsicHeight() - row.getCollapsedHeight(),
+                        clipBottomAmount);
+            }
+            row.setClipBottomAmount(clipBottomAmount);
         } else {
             row.setClipBottomAmount(0);
         }
@@ -381,7 +386,8 @@ public class NotificationShelf extends ActivatableNotificationView implements
                 ? fullTransitionAmount
                 : transitionAmount;
         iconState.clampedAppearAmount = clampedAmount;
-        float contentTransformationAmount = isLastChild || iconState.translateContent
+        float contentTransformationAmount = !row.isAboveShelf()
+                    && (isLastChild || iconState.translateContent)
                 ? iconTransitionAmount
                 : 0.0f;
         row.setContentTransformationAmount(contentTransformationAmount, isLastChild);
@@ -450,9 +456,8 @@ public class NotificationShelf extends ActivatableNotificationView implements
             }
             int shelfColor = icon.getStaticDrawableColor();
             if (!noIcon && shelfColor != StatusBarIconView.NO_COLOR) {
-                int notificationColor
-                        = row.getVisibleNotificationHeader().getOriginalNotificationColor();
-                shelfColor = NotificationUtils.interpolateColors(notificationColor, shelfColor,
+                int iconColor = row.getVisibleNotificationHeader().getOriginalIconColor();
+                shelfColor = NotificationUtils.interpolateColors(iconColor, shelfColor,
                         iconState.iconAppearAmount);
             }
             iconState.iconColor = shelfColor;

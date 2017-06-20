@@ -18,13 +18,19 @@ package android.os;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import android.annotation.RequiresPermission;
+import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
+import android.annotation.SystemService;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.UserManager;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.Display;
+import android.view.WindowManager;
 
 import libcore.io.Streams;
 
@@ -64,6 +70,7 @@ import sun.security.pkcs.SignerInfo;
  * recovery system (the separate partition that can be used to install
  * system updates, wipe user data, etc.)
  */
+@SystemService(Context.RECOVERY_SERVICE)
 public class RecoverySystem {
     private static final String TAG = "RecoverySystem";
 
@@ -384,6 +391,7 @@ public class RecoverySystem {
      * {@hide}
      */
     @SystemApi
+    @SuppressLint("Doclava125")
     public static boolean verifyPackageCompatibility(File compatibilityFile) throws IOException {
         try (InputStream inputStream = new FileInputStream(compatibilityFile)) {
             return verifyPackageCompatibility(inputStream);
@@ -406,6 +414,7 @@ public class RecoverySystem {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.RECOVERY)
     public static void processPackage(Context context,
                                       File packageFile,
                                       final ProgressListener listener,
@@ -466,6 +475,7 @@ public class RecoverySystem {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.RECOVERY)
     public static void processPackage(Context context,
                                       File packageFile,
                                       final ProgressListener listener)
@@ -487,6 +497,7 @@ public class RecoverySystem {
      * @throws IOException  if writing the recovery command file
      * fails, or if the reboot itself fails.
      */
+    @RequiresPermission(android.Manifest.permission.RECOVERY)
     public static void installPackage(Context context, File packageFile)
             throws IOException {
         installPackage(context, packageFile, false);
@@ -508,6 +519,7 @@ public class RecoverySystem {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.RECOVERY)
     public static void installPackage(Context context, File packageFile, boolean processed)
             throws IOException {
         synchronized (sRequestLock) {
@@ -570,7 +582,16 @@ public class RecoverySystem {
 
             // Having set up the BCB (bootloader control block), go ahead and reboot
             PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-            pm.reboot(PowerManager.REBOOT_RECOVERY_UPDATE);
+            String reason = PowerManager.REBOOT_RECOVERY_UPDATE;
+
+            // On TV, reboot quiescently if the screen is off
+            if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
+                WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+                if (wm.getDefaultDisplay().getState() != Display.STATE_ON) {
+                    reason += ",quiescent";
+                }
+            }
+            pm.reboot(reason);
 
             throw new IOException("Reboot failed (no permissions?)");
         }
@@ -590,6 +611,7 @@ public class RecoverySystem {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.RECOVERY)
     public static void scheduleUpdateOnBoot(Context context, File packageFile)
             throws IOException {
         String filename = packageFile.getCanonicalPath();
@@ -627,6 +649,7 @@ public class RecoverySystem {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(android.Manifest.permission.RECOVERY)
     public static void cancelScheduledUpdate(Context context)
             throws IOException {
         RecoverySystem rs = (RecoverySystem) context.getSystemService(Context.RECOVERY_SERVICE);
@@ -765,6 +788,10 @@ public class RecoverySystem {
      * @hide
      */
     @SystemApi
+    @RequiresPermission(allOf = {
+            android.Manifest.permission.RECOVERY,
+            android.Manifest.permission.REBOOT
+    })
     public static void rebootWipeAb(Context context, File packageFile, String reason)
             throws IOException {
         String reasonArg = null;

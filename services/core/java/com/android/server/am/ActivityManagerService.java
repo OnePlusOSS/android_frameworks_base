@@ -357,6 +357,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.WindowManager;
+import android.util.BoostFramework;
 
 import com.android.server.job.JobSchedulerInternal;
 import com.google.android.collect.Lists;
@@ -452,6 +453,11 @@ import libcore.util.EmptyArray;
 
 public class ActivityManagerService extends IActivityManager.Stub
         implements Watchdog.Monitor, BatteryStatsImpl.BatteryCallback {
+
+    /**
+     * Priority we boost main thread and RT of top app to.
+     */
+    public static final int TOP_APP_PRIORITY_BOOST = -10;
 
     private static final String TAG = TAG_WITH_CLASS_NAME ? "ActivityManagerService" : TAG_AM;
     private static final String TAG_BACKUP = TAG + POSTFIX_BACKUP;
@@ -598,6 +604,10 @@ public class ActivityManagerService extends IActivityManager.Stub
     // Max character limit for a notification title. If the notification title is larger than this
     // the notification will not be legible to the user.
     private static final int MAX_BUGREPORT_TITLE_SIZE = 50;
+
+    /* Freq Aggr boost objects */
+    public static BoostFramework mPerf = null;
+    public static boolean mIsPerfLockAcquired = false;
 
     /** All system services */
     SystemServiceManager mSystemServiceManager;
@@ -1704,6 +1714,16 @@ public class ActivityManagerService extends IActivityManager.Stub
     CompatModeDialog mCompatModeDialog;
     UnsupportedDisplaySizeDialog mUnsupportedDisplaySizeDialog;
     long mLastMemUsageReportTime = 0;
+
+    // Min aging threshold in milliseconds to consider a B-service
+    int mMinBServiceAgingTime =
+            SystemProperties.getInt("ro.vendor.qti.sys.fw.bservice_age", 5000);
+    // Threshold for B-services when in memory pressure
+    int mBServiceAppThreshold =
+            SystemProperties.getInt("ro.vendor.qti.sys.fw.bservice_limit", 5);
+    // Enable B-service aging propagation on memory pressure.
+    boolean mEnableBServicePropagation =
+            SystemProperties.getBoolean("ro.vendor.qti.sys.fw.bservice_enable", false);
 
     /**
      * Flag whether the current user is a "monkey", i.e. whether
@@ -3956,6 +3976,17 @@ public class ActivityManagerService extends IActivityManager.Stub
                 buf.append(hostingNameStr);
             }
             Slog.i(TAG, buf.toString());
+
+            if(hostingType.equals("activity")) {
+                if (mPerf == null) {
+                    mPerf = new BoostFramework();
+                }
+
+                if (mPerf != null) {
+                    mPerf.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, app.processName, -1, BoostFramework.Launch.BOOST_V3);
+                }
+            }
+
             app.setPid(startResult.pid);
             app.usingWrapper = startResult.usingWrapper;
             app.removed = false;
@@ -4587,9 +4618,9 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     @Override
-    public int startActivityIntentSender(IApplicationThread caller, IntentSender intent,
-            Intent fillInIntent, String resolvedType, IBinder resultTo, String resultWho,
-            int requestCode, int flagsMask, int flagsValues, Bundle bOptions)
+    public int startActivityIntentSender(IApplicationThread caller, IIntentSender target,
+            IBinder whitelistToken, Intent fillInIntent, String resolvedType, IBinder resultTo,
+            String resultWho, int requestCode, int flagsMask, int flagsValues, Bundle bOptions)
             throws TransactionTooLargeException {
         enforceNotIsolatedCaller("startActivityIntentSender");
         // Refuse possible leaked file descriptors
@@ -4597,12 +4628,11 @@ public class ActivityManagerService extends IActivityManager.Stub
             throw new IllegalArgumentException("File descriptors passed in Intent");
         }
 
-        IIntentSender sender = intent.getTarget();
-        if (!(sender instanceof PendingIntentRecord)) {
+        if (!(target instanceof PendingIntentRecord)) {
             throw new IllegalArgumentException("Bad PendingIntent object");
         }
 
-        PendingIntentRecord pir = (PendingIntentRecord)sender;
+        PendingIntentRecord pir = (PendingIntentRecord)target;
 
         synchronized (this) {
             // If this is coming from the currently resumed activity, it is
@@ -4613,7 +4643,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mAppSwitchesAllowedTime = 0;
             }
         }
-        int ret = pir.sendInner(0, fillInIntent, resolvedType, null, null, null,
+        int ret = pir.sendInner(0, fillInIntent, resolvedType, whitelistToken, null, null,
                 resultTo, resultWho, requestCode, flagsMask, flagsValues, bOptions, null);
         return ret;
     }
@@ -8448,8 +8478,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                         synchronized (mPidsSelfLocked) {
                             proc = mPidsSelfLocked.get(callingPid);
                         }
-                        if (proc != null && proc.curProcState
-                                < ActivityManager.PROCESS_STATE_RECEIVER) {
+                        if (proc != null &&
+                                !ActivityManager.isProcStateBackground(proc.curProcState)) {
                             // Whoever is instigating this is in the foreground, so we will allow it
                             // to go through.
                             return ActivityManager.APP_START_MODE_NORMAL;
@@ -10590,8 +10620,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                                 mStackSupervisor.getStack(PINNED_STACK_ID);
                         if (pinnedStack != null) {
                             pinnedStack.animateResizePinnedStack(null /* sourceHintBounds */,
-                                    destBounds, animationDuration,
-                                    false /* schedulePipModeChangedOnAnimationEnd */);
+                                    destBounds, animationDuration, false /* fromFullscreen */);
                         }
                     } else {
                         throw new IllegalArgumentException("Stack: " + stackId
@@ -13428,7 +13457,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                             setThreadScheduler(proc.renderThreadTid,
                                 SCHED_FIFO | SCHED_RESET_ON_FORK, 1);
                         } else {
-                            setThreadPriority(proc.renderThreadTid, -10);
+                            setThreadPriority(proc.renderThreadTid, TOP_APP_PRIORITY_BOOST);
                         }
                     }
                 } else {
@@ -13547,7 +13576,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                         return;
                     }
                     if (pr.hasTopUi != hasTopUi) {
-                        Slog.i(TAG, "Setting hasTopUi=" + hasTopUi + " for pid=" + pid);
+                        if (DEBUG_OOM_ADJ) {
+                            Slog.d(TAG, "Setting hasTopUi=" + hasTopUi + " for pid=" + pid);
+                        }
                         pr.hasTopUi = hasTopUi;
                         changed = true;
                     }
@@ -13924,9 +13955,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         final boolean supportsPictureInPicture =
                 mContext.getPackageManager().hasSystemFeature(FEATURE_PICTURE_IN_PICTURE);
 
-        final boolean supportsMultiWindow = ActivityManager.supportsMultiWindow();
+        final boolean supportsMultiWindow = ActivityManager.supportsMultiWindow(mContext);
         final boolean supportsSplitScreenMultiWindow =
-                ActivityManager.supportsSplitScreenMultiWindow();
+                ActivityManager.supportsSplitScreenMultiWindow(mContext);
         final boolean supportsMultiDisplay = mContext.getPackageManager()
                 .hasSystemFeature(FEATURE_ACTIVITIES_ON_SECONDARY_DISPLAYS);
         final String debugApp = Settings.Global.getString(resolver, DEBUG_APP);
@@ -19158,10 +19189,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                     final Uri data = intent.getData();
                     final String ssp;
                     if (data != null && (ssp = data.getSchemeSpecificPart()) != null) {
-                        final ApplicationInfo aInfo =
-                                getPackageManagerInternalLocked().getApplicationInfo(
-                                        ssp,
-                                        userId);
+                        ApplicationInfo aInfo = null;
+                        try {
+                            aInfo = AppGlobals.getPackageManager()
+                                    .getApplicationInfo(ssp, 0 /*flags*/, userId);
+                        } catch (RemoteException ignore) {}
                         if (aInfo == null) {
                             Slog.w(TAG, "Dropping ACTION_PACKAGE_REPLACED for non-existent pkg:"
                                     + " ssp=" + ssp + " data=" + data);
@@ -20180,6 +20212,11 @@ public class ActivityManagerService extends IActivityManager.Stub
         mTempConfig.setTo(getGlobalConfiguration());
         final int changes = mTempConfig.updateFrom(values);
         if (changes == 0) {
+            // Since calling to Activity.setRequestedOrientation leads to freezing the window with
+            // setting WindowManagerService.mWaitingForConfig to true, it is important that we call
+            // performDisplayOverrideConfigUpdate in order to send the new display configuration
+            // (even if there are no actual changes) to unfreeze the window.
+            performDisplayOverrideConfigUpdate(values, deferResume, DEFAULT_DISPLAY);
             return 0;
         }
 
@@ -20368,20 +20405,19 @@ public class ActivityManagerService extends IActivityManager.Stub
             int displayId) {
         mTempConfig.setTo(mStackSupervisor.getDisplayOverrideConfiguration(displayId));
         final int changes = mTempConfig.updateFrom(values);
-        if (changes == 0) {
-            return 0;
-        }
+        if (changes != 0) {
+            Slog.i(TAG, "Override config changes=" + Integer.toHexString(changes) + " "
+                    + mTempConfig + " for displayId=" + displayId);
+            mStackSupervisor.setDisplayOverrideConfiguration(mTempConfig, displayId);
 
-        Slog.i(TAG, "Override config changes=" + Integer.toHexString(changes) + " " + mTempConfig
-                + " for displayId=" + displayId);
-        mStackSupervisor.setDisplayOverrideConfiguration(mTempConfig, displayId);
+            final boolean isDensityChange = (changes & ActivityInfo.CONFIG_DENSITY) != 0;
+            if (isDensityChange && displayId == DEFAULT_DISPLAY) {
+                // Reset the unsupported display size dialog.
+                mUiHandler.sendEmptyMessage(SHOW_UNSUPPORTED_DISPLAY_SIZE_DIALOG_MSG);
 
-        final boolean isDensityChange = (changes & ActivityInfo.CONFIG_DENSITY) != 0;
-        if (isDensityChange && displayId == DEFAULT_DISPLAY) {
-            // Reset the unsupported display size dialog.
-            mUiHandler.sendEmptyMessage(SHOW_UNSUPPORTED_DISPLAY_SIZE_DIALOG_MSG);
-
-            killAllBackgroundProcessesExcept(N, ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
+                killAllBackgroundProcessesExcept(N,
+                        ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE);
+            }
         }
 
         // Update the configuration with WM first and check if any of the stacks need to be resized
@@ -21893,10 +21929,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                                 }
                             } else {
                                 // Boost priority for top app UI and render threads
-                                setThreadPriority(app.pid, -10);
+                                setThreadPriority(app.pid, TOP_APP_PRIORITY_BOOST);
                                 if (app.renderThreadTid != 0) {
                                     try {
-                                        setThreadPriority(app.renderThreadTid, -10);
+                                        setThreadPriority(app.renderThreadTid,
+                                                TOP_APP_PRIORITY_BOOST);
                                     } catch (IllegalArgumentException e) {
                                         // thread died, ignore
                                     }
@@ -22392,8 +22429,39 @@ public class ActivityManagerService extends IActivityManager.Stub
         int nextCachedAdj = curCachedAdj+1;
         int curEmptyAdj = ProcessList.CACHED_APP_MIN_ADJ;
         int nextEmptyAdj = curEmptyAdj+2;
+        ProcessRecord selectedAppRecord = null;
+        long serviceLastActivity = 0;
+        int numBServices = 0;
         for (int i=N-1; i>=0; i--) {
             ProcessRecord app = mLruProcesses.get(i);
+            if (mEnableBServicePropagation && app.serviceb
+                    && (app.curAdj == ProcessList.SERVICE_B_ADJ)) {
+                numBServices++;
+                for (int s = app.services.size() - 1; s >= 0; s--) {
+                    ServiceRecord sr = app.services.valueAt(s);
+                    if (DEBUG_OOM_ADJ) Slog.d(TAG,"app.processName = " + app.processName
+                            + " serviceb = " + app.serviceb + " s = " + s + " sr.lastActivity = "
+                            + sr.lastActivity + " packageName = " + sr.packageName
+                            + " processName = " + sr.processName);
+                    if (SystemClock.uptimeMillis() - sr.lastActivity
+                            < mMinBServiceAgingTime) {
+                        if (DEBUG_OOM_ADJ) {
+                            Slog.d(TAG,"Not aged enough!!!");
+                        }
+                        continue;
+                    }
+                    if (serviceLastActivity == 0) {
+                        serviceLastActivity = sr.lastActivity;
+                        selectedAppRecord = app;
+                    } else if (sr.lastActivity < serviceLastActivity) {
+                        serviceLastActivity = sr.lastActivity;
+                        selectedAppRecord = app;
+                    }
+                }
+            }
+            if (DEBUG_OOM_ADJ && selectedAppRecord != null) Slog.d(TAG,
+                    "Identified app.processName = " + selectedAppRecord.processName
+                    + " app.pid = " + selectedAppRecord.pid);
             if (!app.killedByAm && app.thread != null) {
                 app.procStateChanged = false;
                 computeOomAdjLocked(app, ProcessList.UNKNOWN_ADJ, TOP_APP, true, now);
@@ -22507,6 +22575,14 @@ public class ActivityManagerService extends IActivityManager.Stub
                     numTrimming++;
                 }
             }
+        }
+        if ((numBServices > mBServiceAppThreshold) && (true == mAllowLowerMemLevel)
+                && (selectedAppRecord != null)) {
+            ProcessList.setOomAdj(selectedAppRecord.pid, selectedAppRecord.info.uid,
+                    ProcessList.CACHED_APP_MAX_ADJ);
+            selectedAppRecord.setAdj = selectedAppRecord.curAdj;
+            if (DEBUG_OOM_ADJ) Slog.d(TAG,"app.processName = " + selectedAppRecord.processName
+                        + " app.pid = " + selectedAppRecord.pid + " is moved to higher adj");
         }
 
         incrementProcStateSeqAndNotifyAppsLocked();
@@ -24289,7 +24365,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     void updateApplicationInfoLocked(@NonNull List<String> packagesToUpdate, int userId) {
-        final PackageManagerInternal packageManager = getPackageManagerInternalLocked();
         final boolean updateFrameworkRes = packagesToUpdate.contains("android");
         for (int i = mLruProcesses.size() - 1; i >= 0; i--) {
             final ProcessRecord app = mLruProcesses.get(i);
@@ -24306,8 +24381,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 final String packageName = app.pkgList.keyAt(j);
                 if (updateFrameworkRes || packagesToUpdate.contains(packageName)) {
                     try {
-                        final ApplicationInfo ai = packageManager.getApplicationInfo(
-                                packageName, app.userId);
+                        final ApplicationInfo ai = AppGlobals.getPackageManager()
+                                .getApplicationInfo(packageName, 0 /*flags*/, app.userId);
                         if (ai != null) {
                             app.thread.scheduleApplicationInfoChanged(ai);
                         }

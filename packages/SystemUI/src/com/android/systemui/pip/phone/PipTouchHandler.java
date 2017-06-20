@@ -484,14 +484,15 @@ public class PipTouchHandler {
             // Try and restore the PiP to the closest edge, using the saved snap fraction
             // if possible
             if (resize) {
-                // This is a very special case: when the menu is expanded and visible, navigating to
-                // another activity can trigger auto-enter PiP, and if the revealed activity has a
-                // forced rotation set, then the controller will get updated with the new rotation
-                // of the display. However, at the same time, SystemUI will try to hide the menu by
-                // creating an animation to the normal bounds which are now stale.  In such a case
-                // we defer the animation to the normal bounds until after the next
-                // onMovementBoundsChanged() call to get the bounds in the new orientation
                 if (mDeferResizeToNormalBoundsUntilRotation == -1) {
+                    // This is a very special case: when the menu is expanded and visible,
+                    // navigating to another activity can trigger auto-enter PiP, and if the
+                    // revealed activity has a forced rotation set, then the controller will get
+                    // updated with the new rotation of the display. However, at the same time,
+                    // SystemUI will try to hide the menu by creating an animation to the normal
+                    // bounds which are now stale.  In such a case we defer the animation to the
+                    // normal bounds until after the next onMovementBoundsChanged() call to get the
+                    // bounds in the new orientation
                     try {
                         int displayRotation = mPinnedStackController.getDisplayRotation();
                         if (mDisplayRotation != displayRotation) {
@@ -510,6 +511,9 @@ public class PipTouchHandler {
                     mSavedSnapFraction = -1f;
                 }
             } else {
+                // If resizing is not allowed, then the PiP should be frozen until the transition
+                // ends as well
+                setTouchEnabled(false);
                 mSavedSnapFraction = -1f;
             }
         }
@@ -712,9 +716,15 @@ public class PipTouchHandler {
      * Updates the current movement bounds based on whether the menu is currently visible.
      */
     private void updateMovementBounds(int menuState) {
-        mMovementBounds = menuState == MENU_STATE_FULL
+        boolean isMenuExpanded = menuState == MENU_STATE_FULL;
+        mMovementBounds = isMenuExpanded
                 ? mExpandedMovementBounds
                 : mNormalMovementBounds;
+        try {
+            mPinnedStackController.setMinEdgeSize(isMenuExpanded ? mExpandedShortestEdgeSize : 0);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Could not set minimized state", e);
+        }
     }
 
     /**

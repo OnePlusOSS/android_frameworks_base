@@ -19,6 +19,8 @@ package android.graphics;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 
+import libcore.util.NativeAllocationRegistry;
+
 /**
  * Shader is the based class for objects that return horizontal spans of colors
  * during drawing. A subclass of Shader is installed in a Paint calling
@@ -26,6 +28,12 @@ import android.annotation.Nullable;
  * drawn with that paint will get its color(s) from the shader.
  */
 public class Shader {
+
+    private static class NoImagePreloadHolder {
+        public static final NativeAllocationRegistry sRegistry = new NativeAllocationRegistry(
+                Shader.class.getClassLoader(), nativeGetFinalizer(), 50);
+    }
+
     /**
      * @deprecated Use subclass constructors directly instead.
      */
@@ -37,6 +45,8 @@ public class Shader {
      * is called - otherwise may be out of date with java setters/properties.
      */
     private long mNativeInstance;
+    // Runnable to do immediate destruction
+    private Runnable mCleaner;
 
     /**
      * Current matrix - always set to null if local matrix is identity.
@@ -80,7 +90,8 @@ public class Shader {
 
     /**
      * Set the shader's local matrix. Passing null will reset the shader's
-     * matrix to identity.
+     * matrix to identity. If the matrix has scale value as 0, the drawing
+     * result is undefined.
      *
      * @param localM The shader's new local matrix, or null to specify identity
      */
@@ -105,9 +116,11 @@ public class Shader {
         return 0;
     }
 
-    void discardNativeInstance() {
+    /** @hide */
+    protected final void discardNativeInstance() {
         if (mNativeInstance != 0) {
-            nativeSafeUnref(mNativeInstance);
+            mCleaner.run();
+            mCleaner = null;
             mNativeInstance = 0;
         }
     }
@@ -115,20 +128,9 @@ public class Shader {
     /**
      * Callback for subclasses to call {@link #discardNativeInstance()} if the most recently
      * constructed native instance is no longer valid.
+     * @hide
      */
-    void verifyNativeInstance() {
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        try {
-            if (mNativeInstance != 0) {
-                nativeSafeUnref(mNativeInstance);
-            }
-            mNativeInstance = -1;
-        } finally {
-            super.finalize();
-        }
+    protected void verifyNativeInstance() {
     }
 
     /**
@@ -150,20 +152,20 @@ public class Shader {
     /**
      * @hide
      */
-    public long getNativeInstance() {
-        if (mNativeInstance == -1) {
-            throw new IllegalStateException("attempting to use a finalized Shader");
-        }
-
+    public final long getNativeInstance() {
         // verify mNativeInstance is valid
         verifyNativeInstance();
 
         if (mNativeInstance == 0) {
             mNativeInstance = createNativeInstance(mLocalMatrix == null
                     ? 0 : mLocalMatrix.native_instance);
+            mCleaner = NoImagePreloadHolder.sRegistry.registerNativeAllocation(
+                    this, mNativeInstance);
         }
         return mNativeInstance;
     }
 
-    private static native void nativeSafeUnref(long nativeInstance);
+    private static native long nativeGetFinalizer();
+
 }
+

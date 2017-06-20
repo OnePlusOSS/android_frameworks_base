@@ -87,6 +87,7 @@ import com.android.server.LockGuard;
 import com.android.server.RescueParty;
 import com.android.server.ServiceThread;
 import com.android.server.SystemService;
+import com.android.server.UiThread;
 import com.android.server.Watchdog;
 import com.android.server.am.BatteryStatsService;
 import com.android.server.lights.Light;
@@ -131,7 +132,7 @@ public final class PowerManagerService extends SystemService
     private static final int MSG_CHECK_FOR_LONG_WAKELOCKS = 4;
 
     // Dirty bit: mWakeLocks changed
-    private static final int DIRTY_WAKE_LOCKS = 1 << 0;
+    protected static final int DIRTY_WAKE_LOCKS = 1 << 0;
     // Dirty bit: mWakefulness changed
     private static final int DIRTY_WAKEFULNESS = 1 << 1;
     // Dirty bit: user activity was poked or may have timed out
@@ -240,7 +241,7 @@ public final class PowerManagerService extends SystemService
 
     // A bitfield that indicates what parts of the power state have
     // changed and need to be recalculated.
-    private int mDirty;
+    protected int mDirty;
 
     // Indicates whether the device is awake or asleep or somewhere in between.
     // This is distinct from the screen power state, which is managed separately.
@@ -259,7 +260,7 @@ public final class PowerManagerService extends SystemService
     private final ArrayList<SuspendBlocker> mSuspendBlockers = new ArrayList<SuspendBlocker>();
 
     // Table of all wake locks acquired by applications.
-    private final ArrayList<WakeLock> mWakeLocks = new ArrayList<WakeLock>();
+    protected final ArrayList<WakeLock> mWakeLocks = new ArrayList<WakeLock>();
 
     // A bitfield that summarizes the state of all active wakelocks.
     private int mWakeLockSummary;
@@ -540,6 +541,8 @@ public final class PowerManagerService extends SystemService
 
     // Some uids have actually changed while mUidsChanging was true.
     private boolean mUidsChanged;
+    private QCNsrmPowerExtension qcNsrmPowExt;
+
 
     // True if theater mode is enabled
     private boolean mTheaterModeEnabled;
@@ -642,6 +645,7 @@ public final class PowerManagerService extends SystemService
         mAmbientDisplayConfiguration = new AmbientDisplayConfiguration(mContext);
         mBatterySaverPolicy = new BatterySaverPolicy(mHandler);
 
+        qcNsrmPowExt = new QCNsrmPowerExtension(this);
         synchronized (mLock) {
             mWakeLockSuspendBlocker = createSuspendBlockerLocked("PowerManagerService.WakeLocks");
             mDisplaySuspendBlocker = createSuspendBlockerLocked("PowerManagerService.Display");
@@ -1059,6 +1063,7 @@ public final class PowerManagerService extends SystemService
                 }
                 mWakeLocks.add(wakeLock);
                 setWakeLockDisabledStateLocked(wakeLock);
+                qcNsrmPowExt.checkPmsBlockedWakelocks(uid, pid, flags, tag, wakeLock);
                 notifyAcquire = true;
             }
 
@@ -1211,7 +1216,7 @@ public final class PowerManagerService extends SystemService
         return -1;
     }
 
-    private void notifyWakeLockAcquiredLocked(WakeLock wakeLock) {
+    protected void notifyWakeLockAcquiredLocked(WakeLock wakeLock) {
         if (mSystemReady && !wakeLock.mDisabled) {
             wakeLock.mNotifiedAcquired = true;
             mNotifier.onWakeLockAcquired(wakeLock.mFlags, wakeLock.mTag, wakeLock.mPackageName,
@@ -1267,7 +1272,7 @@ public final class PowerManagerService extends SystemService
         }
     }
 
-    private void notifyWakeLockReleasedLocked(WakeLock wakeLock) {
+    protected void notifyWakeLockReleasedLocked(WakeLock wakeLock) {
         if (mSystemReady && wakeLock.mNotifiedAcquired) {
             wakeLock.mNotifiedAcquired = false;
             wakeLock.mAcquireTime = 0;
@@ -1617,7 +1622,7 @@ public final class PowerManagerService extends SystemService
      * each time something important changes, and ensure that we do it the same
      * way each time.  The point is to gather all of the transition logic here.
      */
-    private void updatePowerStateLocked() {
+    protected void updatePowerStateLocked() {
         if (!mSystemReady || mDirty == 0) {
             return;
         }
@@ -1940,7 +1945,8 @@ public final class PowerManagerService extends SystemService
                         && mLastUserActivityTimeNoChangeLights >= mLastWakeTime) {
                     nextTimeout = mLastUserActivityTimeNoChangeLights + screenOffTimeout;
                     if (now < nextTimeout) {
-                        if (mDisplayPowerRequest.policy == DisplayPowerRequest.POLICY_BRIGHT) {
+                        if (mDisplayPowerRequest.policy == DisplayPowerRequest.POLICY_BRIGHT
+                                || mDisplayPowerRequest.policy == DisplayPowerRequest.POLICY_VR) {
                             mUserActivitySummary = USER_ACTIVITY_SCREEN_BRIGHT;
                         } else if (mDisplayPowerRequest.policy == DisplayPowerRequest.POLICY_DIM) {
                             mUserActivitySummary = USER_ACTIVITY_SCREEN_DIM;
@@ -2728,9 +2734,9 @@ public final class PowerManagerService extends SystemService
         };
 
         // ShutdownThread must run on a looper capable of displaying the UI.
-        Message msg = Message.obtain(mHandler, runnable);
+        Message msg = Message.obtain(UiThread.getHandler(), runnable);
         msg.setAsynchronous(true);
-        mHandler.sendMessage(msg);
+        UiThread.getHandler().sendMessage(msg);
 
         // PowerManager.reboot() is documented not to return so just wait for the inevitable.
         if (wait) {
@@ -3122,10 +3128,6 @@ public final class PowerManagerService extends SystemService
         if (reason == null) {
             reason = "";
         }
-        if (reason.equals(PowerManager.REBOOT_RECOVERY)
-                || reason.equals(PowerManager.REBOOT_RECOVERY_UPDATE)) {
-            reason = "recovery";
-        }
 
         // If the reason is "quiescent", it means that the boot process should proceed
         // without turning on the screen/lights.
@@ -3134,6 +3136,15 @@ public final class PowerManagerService extends SystemService
         if (reason.equals(PowerManager.REBOOT_QUIESCENT)) {
             sQuiescent = true;
             reason = "";
+        } else if (reason.endsWith("," + PowerManager.REBOOT_QUIESCENT)) {
+            sQuiescent = true;
+            reason = reason.substring(0,
+                    reason.length() - PowerManager.REBOOT_QUIESCENT.length() - 1);
+        }
+
+        if (reason.equals(PowerManager.REBOOT_RECOVERY)
+                || reason.equals(PowerManager.REBOOT_RECOVERY_UPDATE)) {
+            reason = "recovery";
         }
 
         if (sQuiescent) {
@@ -3824,7 +3835,7 @@ public final class PowerManagerService extends SystemService
     /**
      * Represents a wake lock that has been acquired by an application.
      */
-    private final class WakeLock implements IBinder.DeathRecipient {
+    protected final class WakeLock implements IBinder.DeathRecipient {
         public final IBinder mLock;
         public int mFlags;
         public String mTag;
@@ -4595,6 +4606,17 @@ public final class PowerManagerService extends SystemService
                 }
             } finally {
                 Binder.restoreCallingIdentity(ident);
+            }
+        }
+
+        @Override
+        /* updates the blocked uids, so if a wake lock is acquired for it
+         * can be released.
+         */
+        public void updateBlockedUids(int uid, boolean isBlocked) {
+            synchronized(mLock) {
+                qcNsrmPowExt.processPmsBlockedUid(uid, isBlocked,
+                                                             mWakeLocks);
             }
         }
     }

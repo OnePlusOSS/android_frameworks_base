@@ -21,8 +21,6 @@ import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto;
 import com.android.internal.util.Preconditions;
 
-import android.annotation.UserIdInt;
-import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationChannelGroup;
@@ -35,8 +33,6 @@ import android.content.pm.ParceledListSlice;
 import android.metrics.LogMaker;
 import android.os.Build;
 import android.os.UserHandle;
-import android.os.UserManager;
-import android.provider.Settings;
 import android.provider.Settings.Secure;
 import android.service.notification.NotificationListenerService.Ranking;
 import android.text.TextUtils;
@@ -189,6 +185,10 @@ public class RankingHelper implements RankingConfig {
                                 safeInt(parser, ATT_PRIORITY, DEFAULT_PRIORITY),
                                 safeInt(parser, ATT_VISIBILITY, DEFAULT_VISIBILITY),
                                 safeBool(parser, ATT_SHOW_BADGE, DEFAULT_SHOW_BADGE));
+                        r.importance = safeInt(parser, ATT_IMPORTANCE, DEFAULT_IMPORTANCE);
+                        r.priority = safeInt(parser, ATT_PRIORITY, DEFAULT_PRIORITY);
+                        r.visibility = safeInt(parser, ATT_VISIBILITY, DEFAULT_VISIBILITY);
+                        r.showBadge = safeBool(parser, ATT_SHOW_BADGE, DEFAULT_SHOW_BADGE);
 
                         final int innerDepth = parser.getDepth();
                         while ((type = parser.next()) != XmlPullParser.END_DOCUMENT
@@ -286,7 +286,7 @@ public class RankingHelper implements RankingConfig {
     private boolean shouldHaveDefaultChannel(Record r) throws NameNotFoundException {
         final int userId = UserHandle.getUserId(r.uid);
         final ApplicationInfo applicationInfo = mPm.getApplicationInfoAsUser(r.pkg, 0, userId);
-        if (applicationInfo.targetSdkVersion > Build.VERSION_CODES.N_MR1) {
+        if (applicationInfo.targetSdkVersion >= Build.VERSION_CODES.O) {
             // O apps should not have the default channel.
             return false;
         }
@@ -447,7 +447,9 @@ public class RankingHelper implements RankingConfig {
                 boolean isGroupSummary = record.getNotification().isGroupSummary();
                 record.setGlobalSortKey(
                         String.format("intrsv=%c:grnk=0x%04x:gsmry=%c:%s:rnk=0x%04x",
-                        record.isRecentlyIntrusive() ? '0' : '1',
+                        record.isRecentlyIntrusive()
+                                && record.getImportance() > NotificationManager.IMPORTANCE_MIN
+                                ? '0' : '1',
                         groupProxy.getAuthoritativeRank(),
                         isGroupSummary ? '0' : '1',
                         groupSortKeyPortion,
@@ -551,7 +553,7 @@ public class RankingHelper implements RankingConfig {
         }
 
         NotificationChannel existing = r.channels.get(channel.getId());
-        // Keep existing settings, except deleted status and name
+        // Keep most of the existing settings
         if (existing != null && fromTargetApp) {
             if (existing.isDeleted()) {
                 existing.setDeleted(false);
@@ -559,12 +561,13 @@ public class RankingHelper implements RankingConfig {
 
             existing.setName(channel.getName().toString());
             existing.setDescription(channel.getDescription());
+            existing.setBlockableSystem(channel.isBlockableSystem());
 
             MetricsLogger.action(getChannelLog(channel, pkg));
             updateConfig();
             return;
         }
-        if (channel.getImportance() < NotificationManager.IMPORTANCE_MIN
+        if (channel.getImportance() < NotificationManager.IMPORTANCE_NONE
                 || channel.getImportance() > NotificationManager.IMPORTANCE_MAX) {
             throw new IllegalArgumentException("Invalid importance level");
         }
@@ -1115,6 +1118,7 @@ public class RankingHelper implements RankingConfig {
                     Record fullRecord = getRecord(pkg,
                             mPm.getPackageUidAsUser(pkg, changeUserId));
                     if (fullRecord != null) {
+                        createDefaultChannelIfNeeded(fullRecord);
                         deleteDefaultChannelIfNeeded(fullRecord);
                     }
                 } catch (NameNotFoundException e) {}

@@ -335,6 +335,7 @@ public class AccessPoint implements Comparable<AccessPoint> {
         if (security != SECURITY_NONE) {
             builder.append(',').append(securityToString(security, pskType));
         }
+        builder.append(",mRssi=").append(mRssi);
         builder.append(",level=").append(getLevel());
         if (mRankingScore != Integer.MIN_VALUE) {
             builder.append(",rankingScore=").append(mRankingScore);
@@ -521,7 +522,8 @@ public class AccessPoint implements Comparable<AccessPoint> {
     public boolean isMetered() {
         return mIsScoredNetworkMetered
                 || (mConfig != null && mConfig.meteredHint)
-                || (mInfo != null && mInfo.getMeteredHint());
+                || (mInfo != null && mInfo.getMeteredHint()
+                || (mNetworkInfo != null && mNetworkInfo.isMetered()));
     }
 
     public NetworkInfo getNetworkInfo() {
@@ -744,8 +746,12 @@ public class AccessPoint implements Comparable<AccessPoint> {
             visibility.append(" rssi=").append(mInfo.getRssi());
             visibility.append(" ");
             visibility.append(" score=").append(mInfo.score);
-            visibility.append(" rankingScore=").append(getRankingScore());
-            visibility.append(" badge=").append(getBadge());
+            if (mRankingScore != Integer.MIN_VALUE) {
+              visibility.append(" rankingScore=").append(getRankingScore());
+            }
+            if (mBadge != NetworkBadging.BADGING_NONE) {
+              visibility.append(" badge=").append(getBadge());
+            }
             visibility.append(String.format(" tx=%.1f,", mInfo.txSuccessRate));
             visibility.append(String.format("%.1f,", mInfo.txRetriesRate));
             visibility.append(String.format("%.1f ", mInfo.txBadRate));
