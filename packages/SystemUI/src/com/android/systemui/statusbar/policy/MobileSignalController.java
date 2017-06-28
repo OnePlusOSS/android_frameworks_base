@@ -313,7 +313,7 @@ public class MobileSignalController extends SignalController<
         String description = null;
         // Only send data sim callbacks to QS.
         if (mCurrentState.dataSim) {
-            qsTypeIcon = showDataIcon ? icons.mDataType : 0;
+            qsTypeIcon = showDataIcon ? icons.mQsDataType : 0;
             qsIcon = new IconState(mCurrentState.enabled
                     && !mCurrentState.isEmergency, getQsCurrentIconId(), contentDescription);
             description = mCurrentState.isEmergency ? null : mCurrentState.networkName;

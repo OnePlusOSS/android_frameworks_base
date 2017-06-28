@@ -103,6 +103,7 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 
 import android.Manifest;
 import android.Manifest.permission;
+import android.animation.AnimationHandler;
 import android.animation.ValueAnimator;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -212,6 +213,7 @@ import android.view.inputmethod.InputMethodManagerInternal;
 import com.android.internal.R;
 import com.android.internal.app.ActivityTrigger;
 import com.android.internal.app.IAssistScreenshotReceiver;
+import com.android.internal.graphics.SfVsyncFrameCallbackProvider;
 import com.android.internal.os.IResultReceiver;
 import com.android.internal.policy.IKeyguardDismissCallback;
 import com.android.internal.policy.IShortcutService;
@@ -896,10 +898,26 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     void closeSurfaceTransaction() {
+        closeSurfaceTransaction(true /* withLockHeld */);
+    }
+
+    /**
+     * Closes a surface transaction.
+     *
+     * @param withLockHeld Whether to acquire the window manager while doing so. In some cases
+     *                     holding the lock my lead to starvation in WM in case closeTransaction
+     *                     blocks and we call it repeatedly, like we do for animations.
+     */
+    void closeSurfaceTransaction(boolean withLockHeld) {
         synchronized (mWindowMap) {
             if (mRoot.mSurfaceTraceEnabled) {
                 mRoot.mRemoteEventTrace.closeSurfaceTransaction();
             }
+            if (withLockHeld) {
+                SurfaceControl.closeTransaction();
+            }
+        }
+        if (!withLockHeld) {
             SurfaceControl.closeTransaction();
         }
     }
@@ -1051,8 +1069,10 @@ public class WindowManagerService extends IWindowManager.Stub
         mAppTransition = new AppTransition(context, this);
         mAppTransition.registerListenerLocked(mActivityManagerAppTransitionNotifier);
 
+        final AnimationHandler animationHandler = new AnimationHandler();
+        animationHandler.setProvider(new SfVsyncFrameCallbackProvider());
         mBoundsAnimationController = new BoundsAnimationController(context, mAppTransition,
-                UiThread.getHandler());
+                AnimationThread.getHandler(), animationHandler);
 
         mActivityManager = ActivityManager.getService();
         mAmInternal = LocalServices.getService(ActivityManagerInternal.class);
@@ -1272,14 +1292,6 @@ public class WindowManagerService extends IWindowManager.Stub
                     Slog.w(TAG_WM, "Attempted to add window with exiting application token "
                           + token + ".  Aborting.");
                     return WindowManagerGlobal.ADD_APP_EXITING;
-                }
-                if (rootType == TYPE_APPLICATION_STARTING
-                        && (attrs.privateFlags & PRIVATE_FLAG_TASK_SNAPSHOT) == 0
-                        && atoken.firstWindowDrawn) {
-                    // No need for this guy!
-                    if (DEBUG_STARTING_WINDOW || localLOGV) Slog.v(
-                            TAG_WM, "**** NO NEED TO START: " + attrs.getTitle());
-                    return WindowManagerGlobal.ADD_STARTING_NOT_NEEDED;
                 }
             } else if (rootType == TYPE_INPUT_METHOD) {
                 if (token.windowType != TYPE_INPUT_METHOD) {
@@ -5149,6 +5161,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     synchronized (mWindowMap) {
                         mLastANRState = null;
                     }
+                    mAmInternal.clearSavedANRState();
                 }
                 break;
                 case WALLPAPER_DRAW_PENDING_TIMEOUT: {
@@ -5178,7 +5191,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
                 break;
                 case NOTIFY_APP_TRANSITION_STARTING: {
-                    mAmInternal.notifyAppTransitionStarting((SparseIntArray) msg.obj);
+                    mAmInternal.notifyAppTransitionStarting((SparseIntArray) msg.obj,
+                            msg.getWhen());
                 }
                 break;
                 case NOTIFY_APP_TRANSITION_CANCELLED: {
@@ -5918,8 +5932,8 @@ public class WindowManagerService extends IWindowManager.Stub
             return;
         }
 
-        if (!mDisplayReady || !mPolicy.isScreenOn()) {
-            // No need to freeze the screen before the system is ready or if
+        if (!displayContent.isReady() || !mPolicy.isScreenOn()) {
+            // No need to freeze the screen before the display is ready, system is ready, or if
             // the screen is off.
             return;
         }
@@ -6605,7 +6619,7 @@ public class WindowManagerService extends IWindowManager.Stub
     void saveANRStateLocked(AppWindowToken appWindowToken, WindowState windowState, String reason) {
         StringWriter sw = new StringWriter();
         PrintWriter pw = new FastPrintWriter(sw, false, 1024);
-        pw.println("  ANR time: " + DateFormat.getInstance().format(new Date()));
+        pw.println("  ANR time: " + DateFormat.getDateTimeInstance().format(new Date()));
         if (appWindowToken != null) {
             pw.println("  Application at fault: " + appWindowToken.stringName);
         }

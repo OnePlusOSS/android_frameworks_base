@@ -221,6 +221,7 @@ import android.view.accessibility.AccessibilityManager;
 import android.view.animation.Animation;
 import android.view.animation.AnimationSet;
 import android.view.animation.AnimationUtils;
+import android.view.autofill.AutofillManagerInternal;
 import android.view.inputmethod.InputMethodManagerInternal;
 
 import com.android.internal.R;
@@ -407,6 +408,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     WindowManagerInternal mWindowManagerInternal;
     PowerManager mPowerManager;
     ActivityManagerInternal mActivityManagerInternal;
+    AutofillManagerInternal mAutofillManagerInternal;
     InputManagerInternal mInputManagerInternal;
     InputMethodManagerInternal mInputMethodManagerInternal;
     DreamManagerInternal mDreamManagerInternal;
@@ -831,6 +833,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private static final int MSG_ACCESSIBILITY_SHORTCUT = 21;
     private static final int MSG_BUGREPORT_TV = 22;
     private static final int MSG_ACCESSIBILITY_TV = 23;
+    private static final int MSG_DISPATCH_BACK_KEY_TO_AUTOFILL = 24;
 
     private static final int MSG_REQUEST_TRANSIENT_BARS_ARG_STATUS = 0;
     private static final int MSG_REQUEST_TRANSIENT_BARS_ARG_NAVIGATION = 1;
@@ -916,6 +919,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     if (mAccessibilityShortcutController.isAccessibilityShortcutAvailable(false)) {
                         accessibilityShortcutActivated();
                     }
+                    break;
+                case MSG_DISPATCH_BACK_KEY_TO_AUTOFILL:
+                    mAutofillManagerInternal.onBackKeyPressed();
                     break;
             }
         }
@@ -1039,7 +1045,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             new BarController.OnBarVisibilityChangedListener() {
         @Override
         public void onBarVisibilityChanged(boolean visible) {
-            mAccessibilityManager.notifyAccessibilityButtonAvailabilityChanged(visible);
+            mAccessibilityManager.notifyAccessibilityButtonVisibilityChanged(visible);
         }
     };
 
@@ -1222,6 +1228,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     return telecomManager.endCall();
                 }
             }
+        }
+
+        if (mAutofillManagerInternal != null && event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            mHandler.sendMessage(mHandler.obtainMessage(MSG_DISPATCH_BACK_KEY_TO_AUTOFILL));
         }
 
         return handled;
@@ -3027,7 +3037,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 mNavigationBar = win;
                 mNavigationBarController.setWindow(win);
                 mNavigationBarController.setOnBarVisibilityChangedListener(
-                        mNavBarVisibilityListener);
+                        mNavBarVisibilityListener, true);
                 if (DEBUG_LAYOUT) Slog.i(TAG, "NAVIGATION BAR: " + mNavigationBar);
                 break;
             case TYPE_NAVIGATION_BAR_PANEL:
@@ -3062,13 +3072,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (PRINT_ANIM) Log.i(TAG, "selectAnimation in " + win
               + ": transit=" + transit);
         if (win == mStatusBar) {
-            boolean isKeyguard = (win.getAttrs().privateFlags & PRIVATE_FLAG_KEYGUARD) != 0;
+            final boolean isKeyguard = (win.getAttrs().privateFlags & PRIVATE_FLAG_KEYGUARD) != 0;
+            final boolean expanded = win.getAttrs().height == MATCH_PARENT
+                    && win.getAttrs().width == MATCH_PARENT;
+            if (isKeyguard || expanded) {
+                return -1;
+            }
             if (transit == TRANSIT_EXIT
                     || transit == TRANSIT_HIDE) {
-                return isKeyguard ? -1 : R.anim.dock_top_exit;
+                return R.anim.dock_top_exit;
             } else if (transit == TRANSIT_ENTER
                     || transit == TRANSIT_SHOW) {
-                return isKeyguard ? -1 : R.anim.dock_top_enter;
+                return R.anim.dock_top_enter;
             }
         } else if (win == mNavigationBar) {
             if (win.getAttrs().windowAnimations != 0) {
@@ -6793,7 +6808,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     @Override
     public boolean isScreenOn() {
-        return mScreenOnFully;
+        synchronized (mLock) {
+            return mScreenOnEarly;
+        }
     }
 
     /** {@inheritDoc} */
@@ -7239,6 +7256,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         mSystemGestures.systemReady();
         mImmersiveModeConfirmation.systemReady();
+
+        mAutofillManagerInternal = LocalServices.getService(AutofillManagerInternal.class);
     }
 
     /** {@inheritDoc} */

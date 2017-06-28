@@ -3037,4 +3037,8 @@
 
   <!-- SIM contact batch operation -->
   <java-symbol type="bool" name="config_sim_phonebook_batch_operation" />
+
+  <java-symbol type="array" name="config_batteryPackageTypeSystem" />
+  <java-symbol type="array" name="config_batteryPackageTypeService" />
+
 </resources>

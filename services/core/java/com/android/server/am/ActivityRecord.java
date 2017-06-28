@@ -1928,18 +1928,19 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
     }
 
     @Override
-    public void onStartingWindowDrawn() {
+    public void onStartingWindowDrawn(long timestamp) {
         synchronized (service) {
-            mStackSupervisor.mActivityMetricsLogger.notifyStartingWindowDrawn(getStackId());
+            mStackSupervisor.mActivityMetricsLogger.notifyStartingWindowDrawn(
+                    getStackId(), timestamp);
         }
     }
 
     @Override
-    public void onWindowsDrawn() {
+    public void onWindowsDrawn(long timestamp) {
         synchronized (service) {
-            mStackSupervisor.mActivityMetricsLogger.notifyWindowsDrawn(getStackId());
+            mStackSupervisor.mActivityMetricsLogger.notifyWindowsDrawn(getStackId(), timestamp);
             if (displayStartTime != 0) {
-                reportLaunchTimeLocked(SystemClock.uptimeMillis());
+                reportLaunchTimeLocked(timestamp);
             }
             mStackSupervisor.sendWaitingVisibleReportLocked(this);
             startTime = 0;
@@ -2153,6 +2154,11 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
     }
 
     void showStartingWindow(ActivityRecord prev, boolean newTask, boolean taskSwitch) {
+        showStartingWindow(prev, newTask, taskSwitch, false /* fromRecents */);
+    }
+
+    void showStartingWindow(ActivityRecord prev, boolean newTask, boolean taskSwitch,
+            boolean fromRecents) {
         if (mWindowContainerController == null) {
             return;
         }
@@ -2167,7 +2173,8 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
                 compatInfo, nonLocalizedLabel, labelRes, icon, logo, windowFlags,
                 prev != null ? prev.appToken : null, newTask, taskSwitch, isProcessRunning(),
                 allowTaskSnapshot(),
-                state.ordinal() >= RESUMED.ordinal() && state.ordinal() <= STOPPED.ordinal());
+                state.ordinal() >= RESUMED.ordinal() && state.ordinal() <= STOPPED.ordinal(),
+                fromRecents);
         if (shown) {
             mStartingWindowState = STARTING_WINDOW_SHOWN;
         }

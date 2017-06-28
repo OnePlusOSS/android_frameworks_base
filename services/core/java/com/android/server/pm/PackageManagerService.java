@@ -48,6 +48,7 @@ import static android.content.pm.PackageManager.INSTALL_FAILED_INVALID_INSTALL_L
 import static android.content.pm.PackageManager.INSTALL_FAILED_MISSING_SHARED_LIBRARY;
 import static android.content.pm.PackageManager.INSTALL_FAILED_PACKAGE_CHANGED;
 import static android.content.pm.PackageManager.INSTALL_FAILED_REPLACE_COULDNT_DELETE;
+import static android.content.pm.PackageManager.INSTALL_FAILED_SANDBOX_VERSION_DOWNGRADE;
 import static android.content.pm.PackageManager.INSTALL_FAILED_SHARED_USER_INCOMPATIBLE;
 import static android.content.pm.PackageManager.INSTALL_FAILED_TEST_ONLY;
 import static android.content.pm.PackageManager.INSTALL_FAILED_UPDATE_INCOMPATIBLE;
@@ -678,13 +679,6 @@ public class PackageManagerService extends IPackageManager.Stub
     // that created the isolated proccess.
     @GuardedBy("mPackages")
     final SparseIntArray mIsolatedOwners = new SparseIntArray();
-
-    // List of APK paths to load for each user and package. This data is never
-    // persisted by the package manager. Instead, the overlay manager will
-    // ensure the data is up-to-date in runtime.
-    @GuardedBy("mPackages")
-    final SparseArray<ArrayMap<String, ArrayList<String>>> mEnabledOverlayPaths =
-        new SparseArray<ArrayMap<String, ArrayList<String>>>();
 
     /**
      * Tracks new system packages [received in an OTA] that we expect to
@@ -3666,8 +3660,6 @@ public class PackageManagerService extends IPackageManager.Stub
             return null;
         }
 
-        rebaseEnabledOverlays(packageInfo.applicationInfo, userId);
-
         packageInfo.packageName = packageInfo.applicationInfo.packageName =
                 resolveExternalPackageNameLPr(p);
 
@@ -4179,7 +4171,6 @@ public class PackageManagerService extends IPackageManager.Stub
             ApplicationInfo ai = PackageParser.generateApplicationInfo(ps.pkg, flags,
                     ps.readUserState(userId), userId);
             if (ai != null) {
-                rebaseEnabledOverlays(ai, userId);
                 ai.packageName = resolveExternalPackageNameLPr(ps.pkg);
             }
             return ai;
@@ -4228,7 +4219,6 @@ public class PackageManagerService extends IPackageManager.Stub
                 ApplicationInfo ai = PackageParser.generateApplicationInfo(
                         p, flags, ps.readUserState(userId), userId);
                 if (ai != null) {
-                    rebaseEnabledOverlays(ai, userId);
                     ai.packageName = resolveExternalPackageNameLPr(p);
                 }
                 return ai;
@@ -4243,26 +4233,6 @@ public class PackageManagerService extends IPackageManager.Stub
             }
         }
         return null;
-    }
-
-    private void rebaseEnabledOverlays(@NonNull ApplicationInfo ai, int userId) {
-        List<String> paths = new ArrayList<>();
-        ArrayMap<String, ArrayList<String>> userSpecificOverlays =
-            mEnabledOverlayPaths.get(userId);
-        if (userSpecificOverlays != null) {
-            if (!"android".equals(ai.packageName)) {
-                ArrayList<String> frameworkOverlays = userSpecificOverlays.get("android");
-                if (frameworkOverlays != null) {
-                    paths.addAll(frameworkOverlays);
-                }
-            }
-
-            ArrayList<String> appOverlays = userSpecificOverlays.get(ai.packageName);
-            if (appOverlays != null) {
-                paths.addAll(appOverlays);
-            }
-        }
-        ai.resourceDirs = paths.size() > 0 ? paths.toArray(new String[paths.size()]) : null;
     }
 
     private String normalizePackageNameLPr(String packageName) {
@@ -4649,24 +4619,6 @@ public class PackageManagerService extends IPackageManager.Stub
         return updateFlagsForComponent(flags, userId, intent /*cookie*/);
     }
 
-    private ActivityInfo generateActivityInfo(ActivityInfo ai, int flags, PackageUserState state,
-            int userId) {
-        ActivityInfo ret = PackageParser.generateActivityInfo(ai, flags, state, userId);
-        if (ret != null) {
-            rebaseEnabledOverlays(ret.applicationInfo, userId);
-        }
-        return ret;
-    }
-
-    private ActivityInfo generateActivityInfo(PackageParser.Activity a, int flags,
-            PackageUserState state, int userId) {
-        ActivityInfo ai = PackageParser.generateActivityInfo(a, flags, state, userId);
-        if (ai != null) {
-            rebaseEnabledOverlays(ai.applicationInfo, userId);
-        }
-        return ai;
-    }
-
     @Override
     public ActivityInfo getActivityInfo(ComponentName component, int flags, int userId) {
         return getActivityInfoInternal(component, flags, Binder.getCallingUid(), userId);
@@ -4694,11 +4646,12 @@ public class PackageManagerService extends IPackageManager.Stub
                 if (filterAppAccessLPr(ps, filterCallingUid, component, TYPE_ACTIVITY, userId)) {
                     return null;
                 }
-                return generateActivityInfo(a, flags, ps.readUserState(userId), userId);
+                return PackageParser.generateActivityInfo(
+                        a, flags, ps.readUserState(userId), userId);
             }
             if (mResolveComponentName.equals(component)) {
-                return generateActivityInfo(mResolveActivity, flags, new PackageUserState(),
-                        userId);
+                return PackageParser.generateActivityInfo(
+                        mResolveActivity, flags, new PackageUserState(), userId);
             }
         }
         return null;
@@ -4752,7 +4705,8 @@ public class PackageManagerService extends IPackageManager.Stub
                 if (filterAppAccessLPr(ps, callingUid, component, TYPE_RECEIVER, userId)) {
                     return null;
                 }
-                return generateActivityInfo(a, flags, ps.readUserState(userId), userId);
+                return PackageParser.generateActivityInfo(
+                        a, flags, ps.readUserState(userId), userId);
             }
         }
         return null;
@@ -4888,12 +4842,8 @@ public class PackageManagerService extends IPackageManager.Stub
                 if (filterAppAccessLPr(ps, callingUid, component, TYPE_SERVICE, userId)) {
                     return null;
                 }
-                ServiceInfo si = PackageParser.generateServiceInfo(s, flags,
-                        ps.readUserState(userId), userId);
-                if (si != null) {
-                    rebaseEnabledOverlays(si.applicationInfo, userId);
-                }
-                return si;
+                return PackageParser.generateServiceInfo(
+                        s, flags, ps.readUserState(userId), userId);
             }
         }
         return null;
@@ -4916,12 +4866,8 @@ public class PackageManagerService extends IPackageManager.Stub
                 if (filterAppAccessLPr(ps, callingUid, component, TYPE_PROVIDER, userId)) {
                     return null;
                 }
-                ProviderInfo pi = PackageParser.generateProviderInfo(p, flags,
-                        ps.readUserState(userId), userId);
-                if (pi != null) {
-                    rebaseEnabledOverlays(pi.applicationInfo, userId);
-                }
-                return pi;
+                return PackageParser.generateProviderInfo(
+                        p, flags, ps.readUserState(userId), userId);
             }
         }
         return null;
@@ -8347,7 +8293,6 @@ public class PackageManagerService extends IPackageManager.Stub
                         ai = PackageParser.generateApplicationInfo(ps.pkg, effectiveFlags,
                                 ps.readUserState(userId), userId);
                         if (ai != null) {
-                            rebaseEnabledOverlays(ai, userId);
                             ai.packageName = resolveExternalPackageNameLPr(ps.pkg);
                         }
                     } else {
@@ -8374,7 +8319,6 @@ public class PackageManagerService extends IPackageManager.Stub
                         ApplicationInfo ai = PackageParser.generateApplicationInfo(p, flags,
                                 ps.readUserState(userId), userId);
                         if (ai != null) {
-                            rebaseEnabledOverlays(ai, userId);
                             ai.packageName = resolveExternalPackageNameLPr(p);
                             list.add(ai);
                         }
@@ -8528,7 +8472,6 @@ public class PackageManagerService extends IPackageManager.Stub
                         ApplicationInfo ai = PackageParser.generateApplicationInfo(p, flags,
                                 ps.readUserState(userId), userId);
                         if (ai != null) {
-                            rebaseEnabledOverlays(ai, userId);
                             finalList.add(ai);
                         }
                     }
@@ -13397,7 +13340,8 @@ public class PackageManagerService extends IPackageManager.Stub
                 return null;
             }
             final PackageUserState userState = ps.readUserState(userId);
-            ActivityInfo ai = generateActivityInfo(activity, mFlags, userState, userId);
+            ActivityInfo ai =
+                    PackageParser.generateActivityInfo(activity, mFlags, userState, userId);
             if (ai == null) {
                 return null;
             }
@@ -17941,16 +17885,17 @@ public class PackageManagerService extends IPackageManager.Stub
 
         // Instant apps must have target SDK >= O and have targetSanboxVersion >= 2
         if (instantApp && pkg.applicationInfo.targetSdkVersion <= Build.VERSION_CODES.N_MR1) {
-            Slog.w(TAG, "Instant app package " + pkg.packageName
-                    + " does not target O, this will be a fatal error.");
-            // STOPSHIP: Make this a fatal error
-            pkg.applicationInfo.targetSdkVersion = Build.VERSION_CODES.O;
+            Slog.w(TAG, "Instant app package " + pkg.packageName + " does not target O");
+            res.setError(INSTALL_FAILED_SANDBOX_VERSION_DOWNGRADE,
+                    "Instant app package must target O");
+            return;
         }
         if (instantApp && pkg.applicationInfo.targetSandboxVersion != 2) {
             Slog.w(TAG, "Instant app package " + pkg.packageName
-                    + " does not target targetSandboxVersion 2, this will be a fatal error.");
-            // STOPSHIP: Make this a fatal error
-            pkg.applicationInfo.targetSandboxVersion = 2;
+                    + " does not target targetSandboxVersion 2");
+            res.setError(INSTALL_FAILED_SANDBOX_VERSION_DOWNGRADE,
+                    "Instant app package must use targetSanboxVersion 2");
+            return;
         }
 
         if (pkg.applicationInfo.isStaticSharedLibrary()) {
@@ -18264,8 +18209,10 @@ public class PackageManagerService extends IPackageManager.Stub
             // step during installation. Instead, we'll take extra time the first time the
             // instant app starts. It's preferred to do it this way to provide continuous
             // progress to the user instead of mysteriously blocking somewhere in the
-            // middle of running an instant app.
-            if (!instantApp) {
+            // middle of running an instant app. The default behaviour can be overridden
+            // via gservices.
+            if (!instantApp || Global.getInt(
+                        mContext.getContentResolver(), Global.INSTANT_APP_DEXOPT_ENABLED, 0) != 0) {
                 Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "dexopt");
                 // Do not run PackageDexOptimizer through the local performDexOpt
                 // method because `pkg` may not be in `mPackages` yet.
@@ -19468,7 +19415,7 @@ public class PackageManagerService extends IPackageManager.Stub
         synchronized (mPackages) {
             final PackageSetting ps = mSettings.mPackages.get(packageName);
             if (ps == null || filterAppAccessLPr(ps, Binder.getCallingUid(), userId)) {
-                return true;
+                return false;
             }
             return mSettings.getBlockUninstallLPr(userId, packageName);
         }
@@ -22381,11 +22328,6 @@ Slog.v(TAG, ":: stepped forward, applying functor at tag " + parser.getName());
                 dumpCompilerStatsLPr(pw, packageName);
             }
 
-            if (!checkin && dumpState.isDumping(DumpState.DUMP_ENABLED_OVERLAYS)) {
-                if (dumpState.onTitlePrinted()) pw.println();
-                dumpEnabledOverlaysLPr(pw);
-            }
-
             if (!checkin && dumpState.isDumping(DumpState.DUMP_MESSAGES) && packageName == null) {
                 if (dumpState.onTitlePrinted()) pw.println();
                 mSettings.dumpReadMessagesLPr(pw, dumpState);
@@ -22579,23 +22521,6 @@ Slog.v(TAG, ":: stepped forward, applying functor at tag " + parser.getName());
                 stats.dump(ipw);
             }
             ipw.decreaseIndent();
-        }
-    }
-
-    private void dumpEnabledOverlaysLPr(PrintWriter pw) {
-        pw.println("Enabled overlay paths:");
-        final int N = mEnabledOverlayPaths.size();
-        for (int i = 0; i < N; i++) {
-            final int userId = mEnabledOverlayPaths.keyAt(i);
-            pw.println(String.format("    User %d:", userId));
-            final ArrayMap<String, ArrayList<String>> userSpecificOverlays =
-                mEnabledOverlayPaths.valueAt(i);
-            final int M = userSpecificOverlays.size();
-            for (int j = 0; j < M; j++) {
-                final String targetPackageName = userSpecificOverlays.keyAt(j);
-                final ArrayList<String> overlayPackagePaths = userSpecificOverlays.valueAt(j);
-                pw.println(String.format("        %s: %s", targetPackageName, overlayPackagePaths));
-            }
         }
     }
 
@@ -24773,11 +24698,10 @@ Slog.v(TAG, ":: stepped forward, applying functor at tag " + parser.getName());
                     Slog.e(TAG, "failed to find package " + targetPackageName);
                     return false;
                 }
-
-                ArrayList<String> paths = null;
-                if (overlayPackageNames != null) {
+                ArrayList<String> overlayPaths = null;
+                if (overlayPackageNames != null && overlayPackageNames.size() > 0) {
                     final int N = overlayPackageNames.size();
-                    paths = new ArrayList<>(N);
+                    overlayPaths = new ArrayList<>(N);
                     for (int i = 0; i < N; i++) {
                         final String packageName = overlayPackageNames.get(i);
                         final PackageParser.Package pkg = mPackages.get(packageName);
@@ -24785,22 +24709,17 @@ Slog.v(TAG, ":: stepped forward, applying functor at tag " + parser.getName());
                             Slog.e(TAG, "failed to find package " + packageName);
                             return false;
                         }
-                        paths.add(pkg.baseCodePath);
+                        overlayPaths.add(pkg.baseCodePath);
                     }
                 }
 
-                ArrayMap<String, ArrayList<String>> userSpecificOverlays =
-                    mEnabledOverlayPaths.get(userId);
-                if (userSpecificOverlays == null) {
-                    userSpecificOverlays = new ArrayMap<>();
-                    mEnabledOverlayPaths.put(userId, userSpecificOverlays);
+                final PackageSetting ps = mSettings.mPackages.get(targetPackageName);
+                String[] frameworkOverlayPaths = null;
+                if (!"android".equals(targetPackageName)) {
+                    frameworkOverlayPaths =
+                            mSettings.mPackages.get("android").getOverlayPaths(userId);
                 }
-
-                if (paths != null && paths.size() > 0) {
-                    userSpecificOverlays.put(targetPackageName, paths);
-                } else {
-                    userSpecificOverlays.remove(targetPackageName);
-                }
+                ps.setOverlayPaths(overlayPaths, frameworkOverlayPaths, userId);
                 return true;
             }
         }

@@ -272,8 +272,8 @@
     <string name="app_process_limit_title" msgid="4280600650253107163">"Limite proc. em 2º plano"</string>
     <string name="show_all_anrs" msgid="28462979638729082">"Mostrar todos os ANR"</string>
     <string name="show_all_anrs_summary" msgid="641908614413544127">"Mostrar erro \"Aplic. não Resp.\" p/ aplic. 2º plano"</string>
-    <string name="show_notification_channel_warnings" msgid="1399948193466922683">"Mostrar avisos do canal de notif."</string>
-    <string name="show_notification_channel_warnings_summary" msgid="5536803251863694895">"Mostra um aviso no ecrã quando uma aplic. publica uma notific. sem um canal válido"</string>
+    <string name="show_notification_channel_warnings" msgid="1399948193466922683">"Mostrar avisos do canal de notificações"</string>
+    <string name="show_notification_channel_warnings_summary" msgid="5536803251863694895">"Mostra um aviso no ecrã quando uma aplicação publica uma notificação sem o canal ser válido"</string>
     <string name="force_allow_on_external" msgid="3215759785081916381">"Forçar perm. de aplicações no armazenamento ext."</string>
     <string name="force_allow_on_external_summary" msgid="3640752408258034689">"Torna qualquer aplicação elegível para ser gravada no armazenamento externo, independentemente dos valores do manifesto"</string>
     <string name="force_resizable_activities" msgid="8615764378147824985">"Forçar as atividades a serem redimensionáveis"</string>
@@ -337,6 +337,10 @@
     <string name="disabled_by_admin_summary_text" msgid="6750513964908334617">"Controlado pelo administrador"</string>
     <string name="enabled_by_admin" msgid="5302986023578399263">"Ativada pelo administrador"</string>
     <string name="disabled_by_admin" msgid="8505398946020816620">"Desativada pelo administrador"</string>
+    <string name="disabled" msgid="9206776641295849915">"Desativada"</string>
+    <string name="external_source_trusted" msgid="2707996266575928037">"Autorizada"</string>
+    <string name="external_source_untrusted" msgid="2677442511837596726">"Não autorizada"</string>
+    <string name="install_other_apps" msgid="6986686991775883017">"Instalar aplicações desconhecidas"</string>
     <string name="home" msgid="3256884684164448244">"Página inicial de definições"</string>
   <string-array name="battery_labels">
     <item msgid="8494684293649631252">"0%"</item>
