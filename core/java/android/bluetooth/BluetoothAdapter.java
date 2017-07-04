@@ -903,7 +903,13 @@ public final class BluetoothAdapter {
             return true;
         }
         try {
-            return mManagerService.enable();
+            boolean ret;
+            mManagerService.setBrEdrEnableStatus(true);
+            ret = mManagerService.enable();
+            if(!ret) {
+                mManagerService.setBrEdrEnableStatus(false);
+            }
+            return ret;
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
@@ -936,6 +942,7 @@ public final class BluetoothAdapter {
     public boolean disable() {
         android.util.SeempLog.record(57);
         try {
+            mManagerService.setBrEdrEnableStatus(false);
             return mManagerService.disable(true);
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
@@ -2112,7 +2119,13 @@ public final class BluetoothAdapter {
             return true;
         }
         try {
-            return mManagerService.enableNoAutoConnect();
+            boolean ret;
+            mManagerService.setBrEdrEnableStatus(true);
+            ret = mManagerService.enableNoAutoConnect();
+            if(!ret) {
+                mManagerService.setBrEdrEnableStatus(false);
+            }
+            return ret;
         } catch (RemoteException e) {Log.e(TAG, "", e);}
         return false;
     }
