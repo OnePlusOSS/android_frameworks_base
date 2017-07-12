@@ -57,6 +57,7 @@ import static android.content.pm.PackageManager.INSTALL_FAILED_VERSION_DOWNGRADE
 import static android.content.pm.PackageManager.INSTALL_FORWARD_LOCK;
 import static android.content.pm.PackageManager.INSTALL_INTERNAL;
 import static android.content.pm.PackageManager.INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES;
+import static android.content.pm.PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
 import static android.content.pm.PackageManager.INTENT_FILTER_DOMAIN_VERIFICATION_STATUS_ALWAYS;
 import static android.content.pm.PackageManager.INTENT_FILTER_DOMAIN_VERIFICATION_STATUS_ALWAYS_ASK;
 import static android.content.pm.PackageManager.INTENT_FILTER_DOMAIN_VERIFICATION_STATUS_ASK;
@@ -3192,21 +3193,19 @@ public class PackageManagerService extends IPackageManager.Stub
     }
 
     private @Nullable String getOptionalVerifierLPr() {
-        final Intent intent = new Intent(Intent.ACTION_PACKAGE_NEEDS_VERIFICATION);
+        final Intent intent = new Intent("android.intent.action.PACKAGE_NEEDS_OPTIONAL_VERIFICATION");
 
         final List<ResolveInfo> matches = queryIntentReceiversInternal(intent, PACKAGE_MIME_TYPE,
                 MATCH_SYSTEM_ONLY | MATCH_DIRECT_BOOT_AWARE | MATCH_DIRECT_BOOT_UNAWARE,
                 UserHandle.USER_SYSTEM);
-        if (matches.size() == 1) {
-            //if there's one verifier it will be used as the required verifier
-            return null;
-        } else if (matches.size() > 1) {
+        if (matches.size() >= 1) {
             String optionalVerifierName = mContext.getResources().getString(R.string.config_optionalPackageVerifierName);
             if (TextUtils.isEmpty(optionalVerifierName))
                 return null;
             for (int i = 0; i < matches.size(); i++) {
-                if (matches.get(i).getComponentInfo().packageName.contains(optionalVerifierName))
+                if (matches.get(i).getComponentInfo().packageName.contains(optionalVerifierName)) {
                     return matches.get(i).getComponentInfo().packageName;
+                }
             }
         }
         return null;
@@ -5145,9 +5144,6 @@ public class PackageManagerService extends IPackageManager.Stub
 
     @Override
     public String getPermissionControllerPackageName() {
-        if (getInstantAppPackageName(Binder.getCallingUid()) != null) {
-            throw new SecurityException("Instant applications don't have access to this method");
-        }
         synchronized (mPackages) {
             return mRequiredInstallerPackage;
         }
@@ -7264,16 +7260,13 @@ public class PackageManagerService extends IPackageManager.Stub
      */
     private List<ResolveInfo> applyPostResolutionFilter(List<ResolveInfo> resolveInfos,
             String ephemeralPkgName) {
-        // TODO: When adding on-demand split support for non-instant apps, remove this check
-        // and always apply post filtering
-        if (ephemeralPkgName == null) {
-            return resolveInfos;
-        }
         for (int i = resolveInfos.size() - 1; i >= 0; i--) {
             final ResolveInfo info = resolveInfos.get(i);
             final boolean isEphemeralApp = info.activityInfo.applicationInfo.isInstantApp();
+            // TODO: When adding on-demand split support for non-instant apps, remove this check
+            // and always apply post filtering
             // allow activities that are defined in the provided package
-            if (isEphemeralApp && ephemeralPkgName.equals(info.activityInfo.packageName)) {
+            if (isEphemeralApp) {
                 if (info.activityInfo.splitName != null
                         && !ArrayUtils.contains(info.activityInfo.applicationInfo.splitNames,
                                 info.activityInfo.splitName)) {
@@ -7295,7 +7288,14 @@ public class PackageManagerService extends IPackageManager.Stub
                     // load resources from the correct package
                     installerInfo.resolvePackageName = info.getComponentInfo().packageName;
                     resolveInfos.set(i, installerInfo);
+                    continue;
                 }
+            }
+            // caller is a full app, don't need to apply any other filtering
+            if (ephemeralPkgName == null) {
+                continue;
+            } else if (ephemeralPkgName.equals(info.activityInfo.packageName)) {
+                // caller is same app; don't need to apply any other filtering
                 continue;
             }
             // allow activities that have been explicitly exposed to ephemeral apps
@@ -10521,8 +10521,9 @@ public class PackageManagerService extends IPackageManager.Stub
         if ((scanFlags & SCAN_NEW_INSTALL) == 0) {
             if ((scanFlags & SCAN_FIRST_BOOT_OR_UPGRADE) != 0) {
                 Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "derivePackageAbi");
-                derivePackageAbi(
-                        pkg, scanFile, cpuAbiOverride, true /*extractLibs*/, mAppLib32InstallDir);
+                final boolean extractNativeLibs = !pkg.isLibrary();
+                derivePackageAbi(pkg, scanFile, cpuAbiOverride, extractNativeLibs,
+                        mAppLib32InstallDir);
                 Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
 
                 // Some system apps still use directory structure for native libraries
@@ -11550,6 +11551,12 @@ public class PackageManagerService extends IPackageManager.Stub
                     Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
                 }
 
+                // Shared library native code should be in the APK zip aligned
+                if (abi32 >= 0 && pkg.isLibrary() && extractLibs) {
+                    throw new PackageManagerException(INSTALL_FAILED_INTERNAL_ERROR,
+                            "Shared library native lib extraction not supported");
+                }
+
                 maybeThrowExceptionForMultiArchCopy(
                         "Error unpackaging 32 bit native libs for multiarch app.", abi32);
 
@@ -11570,6 +11577,11 @@ public class PackageManagerService extends IPackageManager.Stub
                         "Error unpackaging 64 bit native libs for multiarch app.", abi64);
 
                 if (abi64 >= 0) {
+                    // Shared library native libs should be in the APK zip aligned
+                    if (extractLibs && pkg.isLibrary()) {
+                        throw new PackageManagerException(INSTALL_FAILED_INTERNAL_ERROR,
+                                "Shared library native lib extraction not supported");
+                    }
                     pkg.applicationInfo.primaryCpuAbi = Build.SUPPORTED_64_BIT_ABIS[abi64];
                 }
 
@@ -11586,7 +11598,6 @@ public class PackageManagerService extends IPackageManager.Stub
                         pkg.applicationInfo.primaryCpuAbi = abi;
                     }
                 }
-
             } else {
                 String[] abiList = (cpuAbiOverride != null) ?
                         new String[] { cpuAbiOverride } : Build.SUPPORTED_ABIS;
@@ -11619,6 +11630,11 @@ public class PackageManagerService extends IPackageManager.Stub
                 }
 
                 if (copyRet >= 0) {
+                    // Shared libraries that have native libs must be multi-architecture
+                    if (pkg.isLibrary()) {
+                        throw new PackageManagerException(INSTALL_FAILED_INTERNAL_ERROR,
+                                "Shared library with native libs must be multiarch");
+                    }
                     pkg.applicationInfo.primaryCpuAbi = abiList[copyRet];
                 } else if (copyRet == PackageManager.NO_NATIVE_LIBRARIES && cpuAbiOverride != null) {
                     pkg.applicationInfo.primaryCpuAbi = cpuAbiOverride;
@@ -15947,8 +15963,11 @@ public class PackageManagerService extends IPackageManager.Stub
 
                     if (mOptionalVerifierPackage != null) {
                         final Intent optionalIntent = new Intent(verification);
+                        optionalIntent.setAction("android.intent.action.PACKAGE_NEEDS_OPTIONAL_VERIFICATION");
+                        final List<ResolveInfo> optional_receivers = queryIntentReceiversInternal(optionalIntent,
+                            PACKAGE_MIME_TYPE, 0, verifierUser.getIdentifier());
                         final ComponentName optionalVerifierComponent = matchComponentForVerifier(
-                            mOptionalVerifierPackage, receivers);
+                            mOptionalVerifierPackage, optional_receivers);
                         optionalIntent.setComponent(optionalVerifierComponent);
                         verificationState.addOptionalVerifier(optionalUid);
                         mContext.sendBroadcastAsUser(optionalIntent, verifierUser, android.Manifest.permission.PACKAGE_VERIFICATION_AGENT);
@@ -18188,8 +18207,9 @@ public class PackageManagerService extends IPackageManager.Stub
             try {
                 String abiOverride = (TextUtils.isEmpty(pkg.cpuAbiOverride) ?
                     args.abiOverride : pkg.cpuAbiOverride);
+                final boolean extractNativeLibs = !pkg.isLibrary();
                 derivePackageAbi(pkg, new File(pkg.codePath), abiOverride,
-                        true /*extractLibs*/, mAppLib32InstallDir);
+                        extractNativeLibs, mAppLib32InstallDir);
             } catch (PackageManagerException pme) {
                 Slog.e(TAG, "Error deriving application ABI", pme);
                 res.setError(INSTALL_FAILED_INTERNAL_ERROR, "Error deriving application ABI");
@@ -20048,7 +20068,7 @@ public class PackageManagerService extends IPackageManager.Stub
         // Queue up an async operation since the package deletion may take a little while.
         mHandler.post(new Runnable() {
             public void run() {
-                final PackageSetting ps = (PackageSetting) pkg.mExtras;
+                final PackageSetting ps = pkg == null ? null : (PackageSetting) pkg.mExtras;
                 boolean doClearData = true;
                 if (ps != null) {
                     final boolean targetIsInstantApp =
@@ -21691,8 +21711,7 @@ Slog.v(TAG, ":: stepped forward, applying functor at tag " + parser.getName());
         public static final int DUMP_FROZEN = 1 << 19;
         public static final int DUMP_DEXOPT = 1 << 20;
         public static final int DUMP_COMPILER_STATS = 1 << 21;
-        public static final int DUMP_ENABLED_OVERLAYS = 1 << 22;
-        public static final int DUMP_CHANGES = 1 << 23;
+        public static final int DUMP_CHANGES = 1 << 22;
 
         public static final int OPTION_SHOW_FILTERS = 1 << 0;
 
@@ -21936,8 +21955,6 @@ Slog.v(TAG, ":: stepped forward, applying functor at tag " + parser.getName());
                 dumpState.setDump(DumpState.DUMP_DEXOPT);
             } else if ("compiler-stats".equals(cmd)) {
                 dumpState.setDump(DumpState.DUMP_COMPILER_STATS);
-            } else if ("enabled-overlays".equals(cmd)) {
-                dumpState.setDump(DumpState.DUMP_ENABLED_OVERLAYS);
             } else if ("changes".equals(cmd)) {
                 dumpState.setDump(DumpState.DUMP_CHANGES);
             } else if ("write".equals(cmd)) {
@@ -24714,12 +24731,7 @@ Slog.v(TAG, ":: stepped forward, applying functor at tag " + parser.getName());
                 }
 
                 final PackageSetting ps = mSettings.mPackages.get(targetPackageName);
-                String[] frameworkOverlayPaths = null;
-                if (!"android".equals(targetPackageName)) {
-                    frameworkOverlayPaths =
-                            mSettings.mPackages.get("android").getOverlayPaths(userId);
-                }
-                ps.setOverlayPaths(overlayPaths, frameworkOverlayPaths, userId);
+                ps.setOverlayPaths(overlayPaths, userId);
                 return true;
             }
         }

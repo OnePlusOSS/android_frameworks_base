@@ -16,6 +16,7 @@
 
 package com.android.server.am;
 
+import static android.Manifest.permission.INTERNAL_SYSTEM_WINDOW;
 import static android.Manifest.permission.MANAGE_ACTIVITY_STACKS;
 import static android.Manifest.permission.START_ANY_ACTIVITY;
 import static android.Manifest.permission.START_TASKS_FROM_RECENTS;
@@ -38,11 +39,13 @@ import static android.app.ITaskStackListener.FORCED_RESIZEABLE_REASON_SPLIT_SCRE
 import static android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+import static android.os.Process.SYSTEM_UID;
 import static android.os.Trace.TRACE_TAG_ACTIVITY_MANAGER;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.FLAG_PRIVATE;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.Display.REMOVE_MODE_DESTROY_CONTENT;
+import static android.view.Display.TYPE_VIRTUAL;
 
 import static com.android.internal.logging.nano.MetricsProto.MetricsEvent.ACTION_PICTURE_IN_PICTURE_EXPANDED_TO_FULLSCREEN;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_ALL;
@@ -1683,6 +1686,24 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             return false;
         }
 
+        // Check if the caller can manage activity stacks.
+        final int startAnyPerm = mService.checkPermission(INTERNAL_SYSTEM_WINDOW, callingPid,
+                callingUid);
+        if (startAnyPerm == PERMISSION_GRANTED) {
+            if (DEBUG_TASKS) Slog.d(TAG, "Launch on display check:"
+                    + " allow launch any on display");
+            return true;
+        }
+
+        if (activityDisplay.mDisplay.getType() == TYPE_VIRTUAL
+                && activityDisplay.mDisplay.getOwnerUid() != SYSTEM_UID) {
+            // Limit launching on virtual displays, because their contents can be read from Surface
+            // by apps that created them.
+            if (DEBUG_TASKS) Slog.d(TAG, "Launch on display check:"
+                    + " disallow launch on virtual display for not-embedded activity");
+            return false;
+        }
+
         if (!activityDisplay.isPrivate()) {
             // Anyone can launch on a public display.
             if (DEBUG_TASKS) Slog.d(TAG, "Launch on display check:"
@@ -1701,15 +1722,6 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
         if (activityDisplay.isUidPresent(callingUid)) {
             if (DEBUG_TASKS) Slog.d(TAG, "Launch on display check:"
                     + " allow launch for caller present on the display");
-            return true;
-        }
-
-        // Check if the caller can manage activity stacks.
-        final int startAnyPerm = mService.checkPermission(MANAGE_ACTIVITY_STACKS, callingPid,
-                callingUid);
-        if (startAnyPerm == PERMISSION_GRANTED) {
-            if (DEBUG_TASKS) Slog.d(TAG, "Launch on display check:"
-                    + " allow launch any on display");
             return true;
         }
 
@@ -2269,6 +2281,31 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             }
         }
 
+        return null;
+    }
+
+    /**
+     * Get next valid stack for launching provided activity in the system. This will search across
+     * displays and stacks in last-focused order for a focusable and visible stack, except those
+     * that are on a currently focused display.
+     *
+     * @param r The activity that is being launched.
+     * @param currentFocus The display that previously had focus and thus needs to be ignored when
+     *                     searching for the next candidate.
+     * @return Next valid {@link ActivityStack}, null if not found.
+     */
+    ActivityStack getNextValidLaunchStackLocked(@NonNull ActivityRecord r, int currentFocus) {
+        mWindowManager.getDisplaysInFocusOrder(mTmpOrderedDisplayIds);
+        for (int i = mTmpOrderedDisplayIds.size() - 1; i >= 0; --i) {
+            final int displayId = mTmpOrderedDisplayIds.get(i);
+            if (displayId == currentFocus) {
+                continue;
+            }
+            final ActivityStack stack = getValidLaunchStackOnDisplay(displayId, r);
+            if (stack != null) {
+                return stack;
+            }
+        }
         return null;
     }
 
@@ -5196,7 +5233,7 @@ public class ActivityStackSupervisor extends ConfigurationContainer implements D
             intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY);
             userId = task.userId;
             int result = mService.startActivityInPackage(callingUid, callingPackage, intent, null,
-                    null, null, 0, 0, bOptions, userId, null, task);
+                    null, null, 0, 0, bOptions, userId, null, task, "startActivityFromRecents");
             if (launchStackId == DOCKED_STACK_ID) {
                 setResizingDuringAnimation(task);
             }

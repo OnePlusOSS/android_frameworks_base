@@ -413,4 +413,7 @@
     <bool name="kg_hide_emgcy_btn_when_oos">false</bool>
     <bool name="config_showEmergencyButton">true</bool>
 
+    <!-- config for showing AM/PM in 12hour format -->
+    <bool name="config_showAmpm">true</bool>
+
 </resources>

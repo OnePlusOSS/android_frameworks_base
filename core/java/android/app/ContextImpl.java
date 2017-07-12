@@ -256,28 +256,34 @@ class ContextImpl extends Context {
 
     @Override
     public void setTheme(int resId) {
-        if (mThemeResource != resId) {
-            mThemeResource = resId;
-            initializeTheme();
+        synchronized (mSync) {
+            if (mThemeResource != resId) {
+                mThemeResource = resId;
+                initializeTheme();
+            }
         }
     }
 
     @Override
     public int getThemeResId() {
-        return mThemeResource;
+        synchronized (mSync) {
+            return mThemeResource;
+        }
     }
 
     @Override
     public Resources.Theme getTheme() {
-        if (mTheme != null) {
+        synchronized (mSync) {
+            if (mTheme != null) {
+                return mTheme;
+            }
+
+            mThemeResource = Resources.selectDefaultTheme(mThemeResource,
+                    getOuterContext().getApplicationInfo().targetSdkVersion);
+            initializeTheme();
+
             return mTheme;
         }
-
-        mThemeResource = Resources.selectDefaultTheme(mThemeResource,
-                getOuterContext().getApplicationInfo().targetSdkVersion);
-        initializeTheme();
-
-        return mTheme;
     }
 
     private void initializeTheme() {
@@ -2129,6 +2135,14 @@ class ContextImpl extends Context {
     @Override
     public boolean isCredentialProtectedStorage() {
         return (mFlags & Context.CONTEXT_CREDENTIAL_PROTECTED_STORAGE) != 0;
+    }
+
+    @Override
+    public boolean canLoadUnsafeResources() {
+        if (getPackageName().equals(getOpPackageName())) {
+            return true;
+        }
+        return (mFlags & Context.CONTEXT_IGNORE_SECURITY) != 0;
     }
 
     @Override

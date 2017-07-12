@@ -724,6 +724,8 @@ import java.util.function.Predicate;
  * @attr ref android.R.styleable#View_nextFocusUp
  * @attr ref android.R.styleable#View_onClick
  * @attr ref android.R.styleable#View_padding
+ * @attr ref android.R.styleable#View_paddingHorizontal
+ * @attr ref android.R.styleable#View_paddingVertical
  * @attr ref android.R.styleable#View_paddingBottom
  * @attr ref android.R.styleable#View_paddingLeft
  * @attr ref android.R.styleable#View_paddingRight
@@ -26316,9 +26318,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 mTooltipInfo.mHideTooltipRunnable = this::hideTooltip;
             }
             mTooltipInfo.mTooltipText = tooltipText;
-            if (mTooltipInfo.mTooltipPopup != null && mTooltipInfo.mTooltipPopup.isShowing()) {
-                mTooltipInfo.mTooltipPopup.updateContent(mTooltipInfo.mTooltipText);
-            }
         }
     }
 

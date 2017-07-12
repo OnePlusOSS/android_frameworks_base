@@ -100,7 +100,11 @@ public class Clock extends TextView implements DemoMode, Tunable, CommandQueue.C
                 R.styleable.Clock,
                 0, 0);
         try {
-            mAmPmStyle = a.getInt(R.styleable.Clock_amPmStyle, AM_PM_STYLE_GONE);
+            if(!context.getResources().getBoolean(com.android.systemui.R.bool.config_showAmpm)) {
+                mAmPmStyle = a.getInt(R.styleable.Clock_amPmStyle, AM_PM_STYLE_GONE);
+            } else {
+                mAmPmStyle = a.getInt(R.styleable.Clock_amPmStyle, AM_PM_STYLE_NORMAL);
+            }
             mShowDark = a.getBoolean(R.styleable.Clock_showDark, true);
         } finally {
             a.recycle();

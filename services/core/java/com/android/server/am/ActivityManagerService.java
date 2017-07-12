@@ -20,6 +20,7 @@ import static android.Manifest.permission.CHANGE_CONFIGURATION;
 import static android.Manifest.permission.CHANGE_DEVICE_IDLE_TEMP_WHITELIST;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS_FULL;
+import static android.Manifest.permission.INTERNAL_SYSTEM_WINDOW;
 import static android.Manifest.permission.MANAGE_ACTIVITY_STACKS;
 import static android.Manifest.permission.READ_FRAME_BUFFER;
 import static android.Manifest.permission.START_TASKS_FROM_RECENTS;
@@ -4119,7 +4120,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                     aInfo.applicationInfo.uid, true);
             if (app == null || app.instr == null) {
                 intent.setFlags(intent.getFlags() | Intent.FLAG_ACTIVITY_NEW_TASK);
-                mActivityStarter.startHomeActivityLocked(intent, aInfo, reason);
+                final int resolvedUserId = UserHandle.getUserId(aInfo.applicationInfo.uid);
+                // For ANR debugging to verify if the user activity is the one that actually
+                // launched.
+                final String myReason = reason + ":" + userId + ":" + resolvedUserId;
+                mActivityStarter.startHomeActivityLocked(intent, aInfo, myReason);
             }
         } else {
             Slog.wtf(TAG, "No home screen found for " + intent, new Throwable());
@@ -4191,7 +4196,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                             ri.activityInfo.packageName, ri.activityInfo.name));
                     mActivityStarter.startActivityLocked(null, intent, null /*ephemeralIntent*/,
                             null, ri.activityInfo, null /*rInfo*/, null, null, null, null, 0, 0, 0,
-                            null, 0, 0, 0, null, false, false, null, null, null);
+                            null, 0, 0, 0, null, false, false, null, null, null,
+                            "startSetupActivity");
                 }
             }
         }
@@ -4530,8 +4536,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         container.checkEmbeddedAllowedInner(userId, intent, mimeType);
 
         intent.addFlags(FORCE_NEW_TASK_FLAGS);
-        return mActivityStarter.startActivityMayWait(null, -1, null, intent, mimeType, null, null, null,
-                null, 0, 0, null, null, null, null, false, userId, container, null);
+        return mActivityStarter.startActivityMayWait(null, -1, null, intent, mimeType, null, null,
+                null, null, 0, 0, null, null, null, null, false, userId, container, null,
+                "startActivity");
     }
 
     @Override
@@ -4544,7 +4551,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         // TODO: Switch to user app stacks here.
         return mActivityStarter.startActivityMayWait(caller, -1, callingPackage, intent,
                 resolvedType, null, null, resultTo, resultWho, requestCode, startFlags,
-                profilerInfo, null, null, bOptions, false, userId, null, null);
+                profilerInfo, null, null, bOptions, false, userId, null, null,
+                "startActivityAsUser");
     }
 
     @Override
@@ -4607,7 +4615,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         try {
             int ret = mActivityStarter.startActivityMayWait(null, targetUid, targetPackage, intent,
                     resolvedType, null, null, resultTo, resultWho, requestCode, startFlags, null,
-                    null, null, bOptions, ignoreTargetSecurity, userId, null, null);
+                    null, null, bOptions, ignoreTargetSecurity, userId, null, null,
+                    "startActivityAsCaller");
             return ret;
         } catch (SecurityException e) {
             // XXX need to figure out how to propagate to original app.
@@ -4636,7 +4645,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         // TODO: Switch to user app stacks here.
         mActivityStarter.startActivityMayWait(caller, -1, callingPackage, intent, resolvedType,
                 null, null, resultTo, resultWho, requestCode, startFlags, profilerInfo, res, null,
-                bOptions, false, userId, null, null);
+                bOptions, false, userId, null, null, "startActivityAndWait");
         return res;
     }
 
@@ -4650,7 +4659,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         // TODO: Switch to user app stacks here.
         int ret = mActivityStarter.startActivityMayWait(caller, -1, callingPackage, intent,
                 resolvedType, null, null, resultTo, resultWho, requestCode, startFlags,
-                null, null, config, bOptions, false, userId, null, null);
+                null, null, config, bOptions, false, userId, null, null, "startActivityWithConfig");
         return ret;
     }
 
@@ -4707,7 +4716,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         // TODO: Switch to user app stacks here.
         return mActivityStarter.startActivityMayWait(null, callingUid, callingPackage, intent,
                 resolvedType, session, interactor, null, null, 0, startFlags, profilerInfo, null,
-                null, bOptions, false, userId, null, null);
+                null, bOptions, false, userId, null, null, "startVoiceActivity");
     }
 
     @Override
@@ -4726,7 +4735,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 ALLOW_FULL_ONLY, "startAssistantActivity", null);
         return mActivityStarter.startActivityMayWait(null, callingUid, callingPackage, intent,
                 resolvedType, null, null, null, null, 0, 0, null, null, null, bOptions, false,
-                userId, null, null);
+                userId, null, null, "startAssistantActivity");
     }
 
     @Override
@@ -4899,7 +4908,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     null /*ephemeralIntent*/, r.resolvedType, aInfo, null /*rInfo*/, null,
                     null, resultTo != null ? resultTo.appToken : null, resultWho, requestCode, -1,
                     r.launchedFromUid, r.launchedFromPackage, -1, r.launchedFromUid, 0, options,
-                    false, false, null, null, null);
+                    false, false, null, null, null, "startNextMatchingActivity");
             Binder.restoreCallingIdentity(origId);
 
             r.finishing = wasFinishing;
@@ -4931,7 +4940,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     final int startActivityInPackage(int uid, String callingPackage,
             Intent intent, String resolvedType, IBinder resultTo,
             String resultWho, int requestCode, int startFlags, Bundle bOptions, int userId,
-            IActivityContainer container, TaskRecord inTask) {
+            IActivityContainer container, TaskRecord inTask, String reason) {
 
         userId = mUserController.handleIncomingUser(Binder.getCallingPid(), Binder.getCallingUid(),
                 userId, false, ALLOW_FULL_ONLY, "startActivityInPackage", null);
@@ -4939,7 +4948,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         // TODO: Switch to user app stacks here.
         int ret = mActivityStarter.startActivityMayWait(null, uid, callingPackage, intent,
                 resolvedType, null, null, resultTo, resultWho, requestCode, startFlags,
-                null, null, null, bOptions, false, userId, container, inTask);
+                null, null, null, bOptions, false, userId, container, inTask, reason);
         return ret;
     }
 
@@ -4947,12 +4956,13 @@ public class ActivityManagerService extends IActivityManager.Stub
     public final int startActivities(IApplicationThread caller, String callingPackage,
             Intent[] intents, String[] resolvedTypes, IBinder resultTo, Bundle bOptions,
             int userId) {
-        enforceNotIsolatedCaller("startActivities");
+        final String reason = "startActivities";
+        enforceNotIsolatedCaller(reason);
         userId = mUserController.handleIncomingUser(Binder.getCallingPid(), Binder.getCallingUid(),
-                userId, false, ALLOW_FULL_ONLY, "startActivity", null);
+                userId, false, ALLOW_FULL_ONLY, reason, null);
         // TODO: Switch to user app stacks here.
         int ret = mActivityStarter.startActivities(caller, -1, callingPackage, intents,
-                resolvedTypes, resultTo, bOptions, userId);
+                resolvedTypes, resultTo, bOptions, userId, reason);
         return ret;
     }
 
@@ -4960,11 +4970,12 @@ public class ActivityManagerService extends IActivityManager.Stub
             Intent[] intents, String[] resolvedTypes, IBinder resultTo,
             Bundle bOptions, int userId) {
 
+        final String reason = "startActivityInPackage";
         userId = mUserController.handleIncomingUser(Binder.getCallingPid(), Binder.getCallingUid(),
-                userId, false, ALLOW_FULL_ONLY, "startActivityInPackage", null);
+                userId, false, ALLOW_FULL_ONLY, reason, null);
         // TODO: Switch to user app stacks here.
         int ret = mActivityStarter.startActivities(null, uid, callingPackage, intents, resolvedTypes,
-                resultTo, bOptions, userId);
+                resultTo, bOptions, userId, reason);
         return ret;
     }
 
@@ -10297,7 +10308,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     @Override
     public void moveStackToDisplay(int stackId, int displayId) {
-        enforceCallingPermission(MANAGE_ACTIVITY_STACKS, "moveStackToDisplay()");
+        enforceCallingPermission(INTERNAL_SYSTEM_WINDOW, "moveStackToDisplay()");
 
         synchronized (this) {
             final long ident = Binder.clearCallingIdentity();
@@ -15020,6 +15031,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                 synchronized (this) {
                     dumpLastANRLocked(pw);
                 }
+            } else if ("starter".equals(cmd)) {
+                synchronized (this) {
+                    dumpActivityStarterLocked(pw);
+                }
             } else if ("recents".equals(cmd) || "r".equals(cmd)) {
                 synchronized (this) {
                     dumpRecentsLocked(fd, pw, args, opti, true, dumpPackage);
@@ -15253,6 +15268,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                 if (dumpAll) {
                     pw.println("-------------------------------------------------------------------------------");
                 }
+                dumpActivityStarterLocked(pw);
+                pw.println();
+                if (dumpAll) {
+                    pw.println("-------------------------------------------------------------------------------");
+                }
                 dumpActivitiesLocked(fd, pw, args, opti, dumpAll, dumpClient, dumpPackage);
                 if (mAssociations.size() > 0) {
                     pw.println();
@@ -15318,6 +15338,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                 if (dumpAll) {
                     pw.println("-------------------------------------------------------------------------------");
                 }
+                dumpActivityStarterLocked(pw);
+                pw.println();
+                if (dumpAll) {
+                    pw.println("-------------------------------------------------------------------------------");
+                }
                 dumpActivitiesLocked(fd, pw, args, opti, dumpAll, dumpClient, dumpPackage);
                 if (mAssociations.size() > 0) {
                     pw.println();
@@ -15337,12 +15362,17 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     private void dumpLastANRLocked(PrintWriter pw) {
+        pw.println("ACTIVITY MANAGER ACTIVITIES (dumpsys activity lastanr)");
         if (mLastANRState == null) {
-            pw.println("ACTIVITY MANAGER ACTIVITIES (dumpsys activity lastanr)");
             pw.println("  <no ANR has occurred since boot>");
         } else {
             pw.println(mLastANRState);
         }
+    }
+
+    private void dumpActivityStarterLocked(PrintWriter pw) {
+        pw.println("ACTIVITY MANAGER ACTIVITIES (dumpsys activity starter)");
+        mActivityStarter.dump(pw, "");
     }
 
     void dumpActivitiesLocked(FileDescriptor fd, PrintWriter pw, String[] args,
@@ -15371,7 +15401,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (needSep) {
                 pw.println();
             }
-            needSep = true;
             printedAnything = true;
             mStackSupervisor.dump(pw, "  ");
         }
@@ -24154,17 +24183,13 @@ public class ActivityManagerService extends IActivityManager.Stub
                 if (reason != null) {
                     pw.println("  Reason: " + reason);
                 }
-                pw.println("  mLastHomeActivityStartResult: "
-                        + mActivityStarter.mLastHomeActivityStartResult);
-                final ActivityRecord r = mActivityStarter.mLastHomeActivityStartRecord[0];
-                if (r != null) {
-                    pw.println("  mLastHomeActivityStartRecord:");
-                    r.dump(pw, "   ");
-                }
                 pw.println();
+                mActivityStarter.dump(pw, "  ");
+                pw.println();
+                pw.println("-------------------------------------------------------------------------------");
                 dumpActivitiesLocked(null /* fd */, pw, null /* args */, 0 /* opti */,
                         true /* dumpAll */, false /* dumpClient */, null /* dumpPackage */,
-                        "ACTIVITY MANAGER ACTIVITIES (dumpsys activity lastanr)");
+                        "" /* header */);
                 pw.println();
                 pw.close();
 
@@ -24415,7 +24440,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             return mActivityStarter.startActivityMayWait(appThread, -1, callingPackage, intent,
                     resolvedType, null, null, null, null, 0, 0, null, null,
-                    null, bOptions, false, callingUser, null, tr);
+                    null, bOptions, false, callingUser, null, tr, "AppTaskImpl");
         }
 
         @Override
