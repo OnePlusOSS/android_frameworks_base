@@ -147,6 +147,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     private boolean mEnableExternal;
     // used inside handler thread
     private boolean mEnable;
+    private boolean mEnableBrEdr = false;
     private int mState;
     private final BluetoothHandler mHandler;
     private int mErrorRecoveryRetryCounter;
@@ -236,11 +237,13 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
                             // disable without persisting the setting
                             Slog.d(TAG, "Calling disable");
                             sendDisableMsg();
+                            mEnableBrEdr = false;
                         }
                     } else if (mEnableExternal) {
                         // enable without persisting the setting
                         Slog.d(TAG, "Calling enable");
                         sendEnableMsg(mQuietEnableExternal);
+                        mEnableBrEdr = true;
                     }
                 }
             }
@@ -276,6 +279,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         if (isBluetoothPersistedStateOn()) {
             if (DBG) Slog.d(TAG, "Startup: Bluetooth persisted state is ON.");
             mEnableExternal = true;
+            mEnableBrEdr = true;
         }
 
         int sysUiUid = -1;
@@ -591,7 +595,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
         if (DBG) Slog.d(TAG,"BluetoothGatt Service is Up");
         try {
             mBluetoothLock.readLock().lock();
-            if ((isBleAppPresent() == false || isBluetoothPersistedStateOnBluetooth()) && mBluetooth != null
+            if ((mEnableBrEdr || isBluetoothPersistedStateOnBluetooth()) && mBluetooth != null
                   && mBluetooth.getState() == BluetoothAdapter.STATE_BLE_ON) {
                 mBluetooth.onLeServiceUp();
 
@@ -666,10 +670,15 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     }
 
     public boolean enable() {
-        if ((Binder.getCallingUid() != Process.SYSTEM_UID) &&
-            (!checkIfCallerIsForegroundUser())) {
-            Slog.w(TAG,"enable(): not allowed for non-active and non system user");
-            return false;
+        if (Binder.getCallingUid() != Process.SYSTEM_UID) {
+            if (!checkIfCallerIsForegroundUser()) {
+                Slog.w(TAG,"enable(): not allowed for non-active and non system user");
+                return false;
+            }
+            if(!isBleAppPresent()) {
+                Slog.w(TAG,"Setting mEnableBrEdr for script command");
+                mEnableBrEdr = true;
+            }
         }
 
         mContext.enforceCallingOrSelfPermission(BLUETOOTH_ADMIN_PERM,
@@ -1926,6 +1935,10 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
     private void sendEnableMsg(boolean quietMode) {
         mHandler.sendMessage(mHandler.obtainMessage(MESSAGE_ENABLE,
                              quietMode ? 1 : 0, 0));
+    }
+
+    public void setBrEdrEnableStatus(boolean status) {
+        mEnableBrEdr = status;
     }
 
     private void recoverBluetoothServiceFromError() {
