@@ -804,10 +804,7 @@ void AssetManager::addSystemOverlays(const char* pathOverlaysList,
             sharedRes->add(oass, oidmap, offset + 1, false);
             const_cast<AssetManager*>(this)->mAssetPaths.add(oap);
             const_cast<AssetManager*>(this)->mZipSet.addOverlay(targetPackagePath, oap);
-
-            oidmap->close();
             delete oidmap;
-            ALOGD("close idmap=%s pid=%d\n", oap.idmap.string(), getpid());
         }
 
         if (oap.path.find(OVERLAY_DIR) != -1) {
