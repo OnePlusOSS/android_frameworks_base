@@ -46,6 +46,8 @@ public class TetherInterfaceStateMachine extends StateMachine {
     private static final int USB_PREFIX_LENGTH = 24;
     private static final String WIFI_HOST_IFACE_ADDR = "192.168.43.1";
     private static final int WIFI_HOST_IFACE_PREFIX_LENGTH = 24;
+    private static final String WIGIG_HOST_IFACE_ADDR = "192.168.50.1";
+    private static final int WIGIG_HOST_IFACE_PREFIX_LENGTH = 24;
 
     private final static String TAG = "TetherInterfaceSM";
     private final static boolean DBG = false;
@@ -94,6 +96,7 @@ public class TetherInterfaceStateMachine extends StateMachine {
 
     private int mLastError;
     private String mMyUpstreamIfaceName;  // may change over time
+    private boolean mV6OnlyTetherEnabled;
 
     public TetherInterfaceStateMachine(
             String ifaceName, Looper looper, int interfaceType, SharedLog log,
@@ -107,6 +110,35 @@ public class TetherInterfaceStateMachine extends StateMachine {
         mIfaceName = ifaceName;
         mInterfaceType = interfaceType;
         mIPv6TetherSvc = ipv6Svc;
+        mV6OnlyTetherEnabled = false;
+        mLastError = ConnectivityManager.TETHER_ERROR_NO_ERROR;
+
+        mInitialState = new InitialState();
+        mLocalHotspotState = new LocalHotspotState();
+        mTetheredState = new TetheredState();
+        mUnavailableState = new UnavailableState();
+        addState(mInitialState);
+        addState(mLocalHotspotState);
+        addState(mTetheredState);
+        addState(mUnavailableState);
+
+        setInitialState(mInitialState);
+    }
+
+    public TetherInterfaceStateMachine(
+            String ifaceName, Looper looper, int interfaceType, SharedLog log,
+            INetworkManagementService nMService, INetworkStatsService statsService,
+            IControlsTethering tetherController, IPv6TetheringInterfaceServices ipv6Svc,
+            boolean  V6OnlyTetherEnabled) {
+        super(ifaceName, looper);
+        mLog = log.forSubComponent(ifaceName);
+        mNMService = nMService;
+        mStatsService = statsService;
+        mTetherController = tetherController;
+        mIfaceName = ifaceName;
+        mInterfaceType = interfaceType;
+        mIPv6TetherSvc = ipv6Svc;
+        mV6OnlyTetherEnabled =   V6OnlyTetherEnabled;
         mLastError = ConnectivityManager.TETHER_ERROR_NO_ERROR;
 
         mInitialState = new InitialState();
@@ -143,6 +175,9 @@ public class TetherInterfaceStateMachine extends StateMachine {
         } else if (mInterfaceType == ConnectivityManager.TETHERING_WIFI) {
             ipAsString = WIFI_HOST_IFACE_ADDR;
             prefixLen = WIFI_HOST_IFACE_PREFIX_LENGTH;
+        } else if (mInterfaceType == ConnectivityManager.TETHERING_WIGIG) {
+            ipAsString = WIGIG_HOST_IFACE_ADDR;
+            prefixLen = WIGIG_HOST_IFACE_PREFIX_LENGTH;
         } else {
             // Nothing to do, BT does this elsewhere.
             return true;
@@ -379,6 +414,14 @@ public class TetherInterfaceStateMachine extends StateMachine {
             }
             try {
                 mNMService.stopInterfaceForwarding(mIfaceName, upstreamIface);
+                if(mV6OnlyTetherEnabled) {
+                    // As per external/android-clat/clatd.c
+                    final String ClatPrefix = "v4-";
+                    if(upstreamIface.startsWith(ClatPrefix, 0)) {
+                        mNMService.stopInterfaceForwarding(mIfaceName,
+                            upstreamIface.substring(ClatPrefix.length()));
+                    }
+                }
             } catch (Exception e) {
                 if (VDBG) Log.e(TAG, "Exception in removeInterfaceForward: " + e.toString());
             }
@@ -413,6 +456,14 @@ public class TetherInterfaceStateMachine extends StateMachine {
                             mNMService.enableNat(mIfaceName, newUpstreamIfaceName);
                             mNMService.startInterfaceForwarding(mIfaceName,
                                     newUpstreamIfaceName);
+                            if(mV6OnlyTetherEnabled) {
+                                // As per external/android-clat/clatd.c
+                                final String ClatPrefix = "v4-";
+                                if(newUpstreamIfaceName.startsWith(ClatPrefix, 0) ) {
+                                    mNMService.startInterfaceForwarding(mIfaceName,
+                                        newUpstreamIfaceName.substring(ClatPrefix.length()));
+                                }
+                            }
                         } catch (Exception e) {
                             mLog.e("Exception enabling NAT: " + e);
                             cleanupUpstreamInterface(newUpstreamIfaceName);

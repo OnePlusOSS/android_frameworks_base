@@ -64,6 +64,7 @@ import android.os.Message;
 import android.os.Parcel;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.telephony.CarrierConfigManager;
@@ -96,6 +97,7 @@ import com.android.server.net.BaseNetworkObserver;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -181,6 +183,7 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
                                          // when RNDIS is enabled
     // True iff WiFi tethering should be started when soft AP is ready.
     private boolean mWifiTetherRequested;
+    private boolean v6OnlyTetherEnabled;
 
     public Tethering(Context context, INetworkManagementService nmService,
             INetworkStatsService statsService, INetworkPolicyManager policyManager,
@@ -196,6 +199,10 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
         mPublicSync = new Object();
 
         mTetherStates = new ArrayMap<>();
+
+        v6OnlyTetherEnabled = (Settings.Global.getInt(mContext.
+                                         getContentResolver(),
+                                         "enable_v6_only_tethering", 0) == 1);
 
         mTetherMasterSM = new TetherMasterSM("TetherMaster", mLooper);
         mTetherMasterSM.start();
@@ -246,7 +253,8 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
             if (up) {
                 maybeTrackNewInterfaceLocked(iface);
             } else {
-                if (ifaceNameToType(iface) == ConnectivityManager.TETHERING_BLUETOOTH) {
+                if (ifaceNameToType(iface) == ConnectivityManager.TETHERING_BLUETOOTH ||
+                    ifaceNameToType(iface) == ConnectivityManager.TETHERING_WIGIG) {
                     stopTrackingInterfaceLocked(iface);
                 } else {
                     // Ignore usb0 down after enabling RNDIS.
@@ -268,6 +276,10 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
         final TetheringConfiguration cfg = mConfig;
 
         if (cfg.isWifi(iface)) {
+            String wigigIface = SystemProperties.get("vendor.wigig.interface", "wigig0");
+            if (wigigIface.equals(iface)) {
+                return ConnectivityManager.TETHERING_WIGIG;
+            }
             return ConnectivityManager.TETHERING_WIFI;
         } else if (cfg.isUsb(iface)) {
             return ConnectivityManager.TETHERING_USB;
@@ -1111,7 +1123,8 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
             addState(mSetDnsForwardersErrorState);
 
             mNotifyList = new ArrayList<>();
-            mIPv6TetheringCoordinator = new IPv6TetheringCoordinator(mNotifyList, mLog);
+            mIPv6TetheringCoordinator = new IPv6TetheringCoordinator
+                (mNotifyList, mLog, v6OnlyTetherEnabled);
             setInitialState(mInitialState);
         }
 
@@ -1283,9 +1296,21 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
                             linkProperties.getAllRoutes(), Inet4Address.ANY);
                         if (ipv4Default != null) {
                             iface = ipv4Default.getInterface();
-                            Log.i(TAG, "Found interface " + ipv4Default.getInterface());
+                            Log.i(TAG, "Found V4 interface " + ipv4Default.getInterface());
                         } else {
-                            Log.i(TAG, "No IPv4 upstream interface, giving up.");
+                            RouteInfo ipv6Default = RouteInfo.selectBestRoute(
+                                linkProperties.getAllRoutes(), Inet6Address.ANY);
+                            if(v6OnlyTetherEnabled) {
+                                if (ipv6Default != null) {
+                                    iface = ipv6Default.getInterface();
+                                    Log.i(TAG, "Found V6 interface " + ipv6Default.getInterface());
+                                } else {
+                                    Log.i(TAG, "No IPv6 upstream interface");
+                                }
+                            }
+                            else {
+                                Log.i(TAG, "No upstream interface, giving up.");
+                            }
                         }
                     }
 
@@ -1891,7 +1916,7 @@ public class Tethering extends BaseNetworkObserver implements IControlsTethering
         final TetherState tetherState = new TetherState(
                 new TetherInterfaceStateMachine(
                     iface, mLooper, interfaceType, mLog, mNMService, mStatsService, this,
-                    new IPv6TetheringInterfaceServices(iface, mNMService, mLog)));
+                    new IPv6TetheringInterfaceServices(iface, mNMService, mLog), v6OnlyTetherEnabled ));
         mTetherStates.put(iface, tetherState);
         tetherState.stateMachine.start();
     }

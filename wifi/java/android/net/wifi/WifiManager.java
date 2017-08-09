@@ -721,6 +721,14 @@ public class WifiManager {
         "android.net.wifi.LINK_CONFIGURATION_CHANGED";
 
     /**
+     * Broadcast intent action indicating that the user initiated Wifi OFF
+     * or APM ON and Wifi disconnection is in progress
+     * Actual Wifi disconnection happens after mDisconnectDelayDuration seconds.
+     * @hide
+     */
+    public static final String  ACTION_WIFI_DISCONNECT_IN_PROGRESS = "wifi_disconnect_in_progress";
+
+    /**
      * The lookup key for a {@link android.net.LinkProperties} object associated with the
      * Wi-Fi network. Retrieve with
      * {@link android.content.Intent#getParcelableExtra(String)}.
@@ -3437,6 +3445,21 @@ public class WifiManager {
             return mService.getAllowScansWithTraffic();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * get concurrency support
+     *
+     * @return true if concurrency is allowed.
+     *
+     * @hide no intent to publish
+     */
+    public boolean getWifiStaSapConcurrency() {
+        try {
+            return mService.getWifiStaSapConcurrency();
+        } catch (RemoteException e) {
+             throw e.rethrowFromSystemServer();
         }
     }
 

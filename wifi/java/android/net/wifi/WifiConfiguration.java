@@ -268,6 +268,12 @@ public class WifiConfiguration implements Parcelable {
     public static final int AP_BAND_5GHZ = 1;
 
     /**
+     * 2GHz + 5GHz Dual band.
+     * @hide
+     */
+    public static final int AP_BAND_DUAL = 2;
+
+    /**
      * The band which AP resides on
      * 0-2G  1-5G
      * By default, 2G is chosen

@@ -58,6 +58,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Objects;
 import java.util.StringJoiner;
+import java.nio.ByteBuffer;
 
 
 /**
@@ -331,6 +332,8 @@ public class IpManager extends StateMachine {
         /* package */ StaticIpConfiguration mStaticIpConfig;
         /* package */ ApfCapabilities mApfCapabilities;
         /* package */ int mProvisioningTimeoutMs = DEFAULT_TIMEOUT_MS;
+        /* package */ public boolean mRapidCommit;
+        /* package */ public boolean mDiscoverSent;
 
         public ProvisioningConfiguration() {}
 
@@ -342,6 +345,8 @@ public class IpManager extends StateMachine {
             mStaticIpConfig = other.mStaticIpConfig;
             mApfCapabilities = other.mApfCapabilities;
             mProvisioningTimeoutMs = other.mProvisioningTimeoutMs;
+            mRapidCommit = other.mRapidCommit;
+            mDiscoverSent = other.mDiscoverSent;
         }
 
         @Override
@@ -1038,7 +1043,12 @@ public class IpManager extends StateMachine {
             // Start DHCPv4.
             mDhcpClient = DhcpClient.makeDhcpClient(mContext, IpManager.this, mInterfaceName);
             mDhcpClient.registerForPreDhcpNotification();
-            mDhcpClient.sendMessage(DhcpClient.CMD_START_DHCP);
+            if (mConfiguration.mRapidCommit || mConfiguration.mDiscoverSent)
+                mDhcpClient.sendMessage(DhcpClient.CMD_START_DHCP_RAPID_COMMIT,
+                    (mConfiguration.mRapidCommit ? 1: 0),
+                    (mConfiguration.mDiscoverSent ? 1: 0));
+            else
+                mDhcpClient.sendMessage(DhcpClient.CMD_START_DHCP);
         }
 
         return true;
@@ -1082,6 +1092,11 @@ public class IpManager extends StateMachine {
         }
 
         return (mIpReachabilityMonitor != null);
+    }
+
+
+    public ByteBuffer buildDiscoverWithRapidCommitPacket() {
+        return mDhcpClient.buildDiscoverWithRapidCommitPacket();
     }
 
     private void stopAllIP() {

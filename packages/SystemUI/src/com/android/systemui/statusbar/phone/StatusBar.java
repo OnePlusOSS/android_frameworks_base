@@ -4633,6 +4633,9 @@ public class StatusBar extends SystemUI implements DemoMode,
 
     // TODO: Figure out way to remove this.
     public NavigationBarView getNavigationBarView() {
+        if (mNavigationBar == null) {
+            return null;
+        }
         return (NavigationBarView) mNavigationBar.getView();
     }
 

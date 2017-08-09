@@ -144,12 +144,9 @@ public class LocalBluetoothProfileManager {
                     BluetoothMap.ACTION_CONNECTION_STATE_CHANGED);
         }
 
-        // enable DUN only if the property is set
-        if (SystemProperties.getBoolean("ro.bluetooth.dun", false) == true) {
-            mDunProfile = new DunServerProfile(context);
-            addProfile(mDunProfile, DunServerProfile.NAME,
-                    BluetoothDun.ACTION_CONNECTION_STATE_CHANGED);
-        }
+        mDunProfile = new DunServerProfile(context);
+        addProfile(mDunProfile, DunServerProfile.NAME,
+                BluetoothDun.ACTION_CONNECTION_STATE_CHANGED);
 
         //Create PBAP server profile
         if(DEBUG) Log.d(TAG, "Adding local PBAP profile");

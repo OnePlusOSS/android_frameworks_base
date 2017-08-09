@@ -567,6 +567,10 @@
     <!-- Operating volatage for wifi radio. 0 by default-->
     <integer translatable="false" name="config_wifi_operating_voltage_mv">0</integer>
 
+    <!-- List of names that represent dual SoftAp interfaces. -->
+    <string-array translatable="false" name="config_wifi_dual_sap_interfaces">
+    </string-array>
+
     <!-- Flag indicating whether the we should enable the automatic brightness in Settings.
          Software implementation will be used if config_hardware_auto_brightness_available is not set -->
     <bool name="config_automatic_brightness_available">false</bool>

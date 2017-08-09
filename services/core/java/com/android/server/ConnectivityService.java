@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,11 +62,13 @@ import android.net.NetworkInfo.DetailedState;
 import android.net.NetworkMisc;
 import android.net.NetworkQuotaInfo;
 import android.net.NetworkRequest;
+import android.net.NetworkSpecifier;
 import android.net.NetworkState;
 import android.net.NetworkUtils;
 import android.net.Proxy;
 import android.net.ProxyInfo;
 import android.net.RouteInfo;
+import android.net.StringNetworkSpecifier;
 import android.net.UidRange;
 import android.net.Uri;
 import android.net.metrics.DefaultNetworkEvent;
@@ -95,6 +97,7 @@ import android.os.UserManager;
 import android.provider.Settings;
 import android.security.Credentials;
 import android.security.KeyStore;
+import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.LocalLog;
@@ -2415,8 +2418,10 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
             // If this Network is already the highest scoring Network for a request, or if
             // there is hope for it to become one if it validated, then it is needed.
-            if (nri.request.isRequest() && nai.satisfies(nri.request) &&
-                    (nai.isSatisfyingRequest(nri.request.requestId) ||
+            if (nri.request.isRequest() && nai.satisfies(nri.request)
+                    && satisfiesMultiNetworkDataCheck(nai.networkCapabilities,
+                       nri.request.networkCapabilities)
+                    && (nai.isSatisfyingRequest(nri.request.requestId) ||
                     // Note that this catches two important cases:
                     // 1. Unvalidated cellular will not be reaped when unvalidated WiFi
                     //    is currently satisfying the request.  This is desirable when
@@ -4807,7 +4812,15 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
             final NetworkAgentInfo currentNetwork = mNetworkForRequestId.get(nri.request.requestId);
             final boolean satisfies = newNetwork.satisfies(nri.request);
-            if (newNetwork == currentNetwork && satisfies) {
+            boolean satisfiesMultiNetworkCheck = false;
+
+            if (satisfies) {
+                satisfiesMultiNetworkCheck = satisfiesMultiNetworkDataCheck(
+                        newNetwork.networkCapabilities,
+                        nri.request.networkCapabilities);
+            }
+
+            if (newNetwork == currentNetwork && satisfiesMultiNetworkCheck) {
                 if (VDBG) {
                     log("Network " + newNetwork.name() + " was already satisfying" +
                             " request " + nri.request.requestId + ". No change.");
@@ -4818,7 +4831,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
             // check if it satisfies the NetworkCapabilities
             if (VDBG) log("  checking if request is satisfied: " + nri.request);
-            if (satisfies) {
+            if (satisfiesMultiNetworkCheck) {
                 // next check if it's better than any current network we're using for
                 // this request
                 if (VDBG) {
@@ -5487,5 +5500,33 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
     private void logNetworkEvent(NetworkAgentInfo nai, int evtype) {
         mMetricsLog.log(new NetworkEvent(nai.network.netId, evtype));
+    }
+
+    private boolean satisfiesMultiNetworkDataCheck(NetworkCapabilities agentNc,
+            NetworkCapabilities requestNc) {
+        if (agentNc != null && requestNc != null
+                && getIntSpecifier(requestNc.getNetworkSpecifier()) < 0) {
+            if (agentNc.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+                    && getIntSpecifier(agentNc.getNetworkSpecifier()) == SubscriptionManager
+                                    .getDefaultDataSubscriptionId()) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private int getIntSpecifier(NetworkSpecifier networkSpecifierObj) {
+        String specifierStr = null;
+        int specifier = -1;
+        if (networkSpecifierObj != null
+                && networkSpecifierObj instanceof StringNetworkSpecifier) {
+            specifierStr = ((StringNetworkSpecifier) networkSpecifierObj).specifier;
+        }
+        if (specifierStr != null &&  specifierStr.isEmpty() == false) {
+            specifier = Integer.parseInt(specifierStr);
+        }
+        return specifier;
     }
 }

@@ -24,6 +24,7 @@ import static android.net.ConnectivityManager.TYPE_MOBILE_HIPRI;
 import android.content.Context;
 import android.content.res.Resources;
 import android.net.ConnectivityManager;
+import android.os.SystemProperties;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
@@ -80,8 +81,15 @@ public class TetheringConfiguration {
         // TODO: Evaluate deleting this altogether now that Wi-Fi always passes
         // us an interface name. Careful consideration needs to be given to
         // implications for Settings and for provisioning checks.
-        tetherableWifiRegexs = ctx.getResources().getStringArray(
+        if (SystemProperties.getInt("persist.vendor.fst.softap.en", 0) == 1) {
+            String defaultFstInterfaceName = "bond0";
+            String fstInterfaceName = SystemProperties.get(
+                "persist.vendor.fst.data.interface", defaultFstInterfaceName);
+            tetherableWifiRegexs = new String[] { fstInterfaceName };
+        } else {
+            tetherableWifiRegexs = ctx.getResources().getStringArray(
                 com.android.internal.R.array.config_tether_wifi_regexs);
+        }
         tetherableBluetoothRegexs = ctx.getResources().getStringArray(
                 com.android.internal.R.array.config_tether_bluetooth_regexs);
 
