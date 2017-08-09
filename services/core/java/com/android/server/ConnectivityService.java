@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2419,7 +2419,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
             // If this Network is already the highest scoring Network for a request, or if
             // there is hope for it to become one if it validated, then it is needed.
             if (nri.request.isRequest() && nai.satisfies(nri.request)
-                    && satisfiesMultiNetworkDataCheck(nai.networkCapabilities,
+                    && satisfiesMobileMultiNetworkDataCheck(nai.networkCapabilities,
                        nri.request.networkCapabilities)
                     && (nai.isSatisfyingRequest(nri.request.requestId) ||
                     // Note that this catches two important cases:
@@ -4812,15 +4812,15 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
             final NetworkAgentInfo currentNetwork = mNetworkForRequestId.get(nri.request.requestId);
             final boolean satisfies = newNetwork.satisfies(nri.request);
-            boolean satisfiesMultiNetworkCheck = false;
+            boolean satisfiesMobileMultiNetworkCheck = false;
 
             if (satisfies) {
-                satisfiesMultiNetworkCheck = satisfiesMultiNetworkDataCheck(
+                satisfiesMobileMultiNetworkCheck = satisfiesMobileMultiNetworkDataCheck(
                         newNetwork.networkCapabilities,
                         nri.request.networkCapabilities);
             }
 
-            if (newNetwork == currentNetwork && satisfiesMultiNetworkCheck) {
+            if (newNetwork == currentNetwork && satisfiesMobileMultiNetworkCheck) {
                 if (VDBG) {
                     log("Network " + newNetwork.name() + " was already satisfying" +
                             " request " + nri.request.requestId + ". No change.");
@@ -4831,7 +4831,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
             // check if it satisfies the NetworkCapabilities
             if (VDBG) log("  checking if request is satisfied: " + nri.request);
-            if (satisfiesMultiNetworkCheck) {
+            if (satisfiesMobileMultiNetworkCheck) {
                 // next check if it's better than any current network we're using for
                 // this request
                 if (VDBG) {
@@ -5502,7 +5502,7 @@ public class ConnectivityService extends IConnectivityManager.Stub
         mMetricsLog.log(new NetworkEvent(nai.network.netId, evtype));
     }
 
-    private boolean satisfiesMultiNetworkDataCheck(NetworkCapabilities agentNc,
+    private boolean satisfiesMobileMultiNetworkDataCheck(NetworkCapabilities agentNc,
             NetworkCapabilities requestNc) {
         if (agentNc != null && requestNc != null
                 && getIntSpecifier(requestNc.getNetworkSpecifier()) < 0) {
@@ -5510,7 +5510,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
                     && getIntSpecifier(agentNc.getNetworkSpecifier()) == SubscriptionManager
                                     .getDefaultDataSubscriptionId()) {
                 return true;
-            } else {
+            } else if (agentNc.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+                    && (getIntSpecifier(agentNc.getNetworkSpecifier()) != SubscriptionManager
+                                    .getDefaultDataSubscriptionId())) {
                 return false;
             }
         }
