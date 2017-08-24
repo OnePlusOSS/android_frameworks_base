@@ -5505,9 +5505,9 @@ public class ConnectivityService extends IConnectivityManager.Stub
     private boolean satisfiesMobileMultiNetworkDataCheck(NetworkCapabilities agentNc,
             NetworkCapabilities requestNc) {
         if (agentNc != null && requestNc != null
+                && agentNc.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
                 && getIntSpecifier(requestNc.getNetworkSpecifier()) < 0) {
-            if (agentNc.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
-                    && getIntSpecifier(agentNc.getNetworkSpecifier()) == SubscriptionManager
+            if (getIntSpecifier(agentNc.getNetworkSpecifier()) == SubscriptionManager
                                     .getDefaultDataSubscriptionId()) {
                 return true;
             } else if (agentNc.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
@@ -5527,7 +5527,11 @@ public class ConnectivityService extends IConnectivityManager.Stub
             specifierStr = ((StringNetworkSpecifier) networkSpecifierObj).specifier;
         }
         if (specifierStr != null &&  specifierStr.isEmpty() == false) {
-            specifier = Integer.parseInt(specifierStr);
+            try {
+                specifier = Integer.parseInt(specifierStr);
+            } catch (NumberFormatException e) {
+                specifier = -1;
+            }
         }
         return specifier;
     }

@@ -257,7 +257,9 @@ public class AppOpsManager {
     /** @hide BLUETOOTH_ADMIN . */
     public static final int OP_BLUETOOTH_ADMIN = 71;
     /** @hide */
-    public static final int _NUM_OP = 72;
+    public static final int OP_AUTO_START = 72;
+    /** @hide */
+    public static final int _NUM_OP = 73;
 
     /** Access to coarse location information. */
     public static final String OPSTR_COARSE_LOCATION = "android:coarse_location";
@@ -377,6 +379,8 @@ public class AppOpsManager {
             = "android:bluetooth_admin";
     // Warning: If an permission is added here it also has to be added to
     // com.android.packageinstaller.permission.utils.EventLogger
+    /** @hide */
+    public static final String OPSTR_AUTO_START = "android:auto_start";
     private static final int[] RUNTIME_AND_APPOP_PERMISSIONS_OPS = {
             // RUNTIME PERMISSIONS
             // Contacts
@@ -503,7 +507,8 @@ public class AppOpsManager {
             OP_INSTANT_APP_START_FOREGROUND,
             OP_ANSWER_PHONE_CALLS,
             OP_CHANGE_WIFI_STATE,
-            OP_BLUETOOTH_ADMIN
+            OP_BLUETOOTH_ADMIN,
+            OP_AUTO_START,
     };
 
     /**
@@ -583,6 +588,7 @@ public class AppOpsManager {
             OPSTR_ANSWER_PHONE_CALLS,
             OPSTR_CHANGE_WIFI_STATE,
             OPSTR_BLUETOOTH_ADMIN,
+            OPSTR_AUTO_START,
     };
 
     /**
@@ -662,6 +668,7 @@ public class AppOpsManager {
             "ANSWER_PHONE_CALLS",
             "CHANGE_WIFI_STATE",
             "BLUETOOTH_ADMIN",
+            "AUTO_START",
     };
 
     /**
@@ -741,6 +748,7 @@ public class AppOpsManager {
             Manifest.permission.ANSWER_PHONE_CALLS,
             android.Manifest.permission.CHANGE_WIFI_STATE,
             android.Manifest.permission.BLUETOOTH_ADMIN,
+            null, // no permission for auto start
     };
 
     /**
@@ -821,6 +829,7 @@ public class AppOpsManager {
             null, // ANSWER_PHONE_CALLS
             null, // OP_CHANGE_WIFI_STATE
             null, // OP_BLUETOOTH_ADMIN
+            null, // OP_AUTO_START
     };
 
     /**
@@ -900,6 +909,7 @@ public class AppOpsManager {
             false, // ANSWER_PHONE_CALLS
             false, // OP_CHANGE_WIFI_STATE
             false, // OP_BLUETOOTH_ADMIN
+            false, // OP_AUTO_START
     };
 
     /**
@@ -978,6 +988,7 @@ public class AppOpsManager {
             AppOpsManager.MODE_ALLOWED, // ANSWER_PHONE_CALLS
             AppOpsManager.MODE_ALLOWED,  //OP_CHANGE_WIFI_STATE
             AppOpsManager.MODE_ALLOWED,  //OP_BLUETOOTH_ADMIN
+            AppOpsManager.MODE_ALLOWED,  //OP_AUTO_START
     };
 
     /**
@@ -1060,6 +1071,7 @@ public class AppOpsManager {
             false, // ANSWER_PHONE_CALLS
             false, //OP_CHANGE_WIFI_STATE
             false, //OP_BLUETOOTH_ADMIN
+            false, //OP_AUTO_START
     };
 
     /**

@@ -156,6 +156,7 @@ public final class PlaybackActivityMonitor
             if (checkConfigurationCaller(piid, apc, binderUid)) {
                 mPlayers.remove(new Integer(piid));
                 mDuckingManager.removeReleased(apc);
+                apc.handleStateEvent(AudioPlaybackConfiguration.PLAYER_STATE_RELEASED);
             }
         }
     }

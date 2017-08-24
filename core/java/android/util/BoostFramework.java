@@ -53,6 +53,8 @@ public class BoostFramework {
     private static Method mPerfHintFunc = null;
     private static Method mReleaseFunc = null;
     private static Method mReleaseHandlerFunc = null;
+    private static Method mIOPStart = null;
+    private static Method mIOPStop  = null;
 
 /** @hide */
     private Object mPerf = null;
@@ -64,7 +66,7 @@ public class BoostFramework {
     public static final int VENDOR_HINT_ANIM_BOOST = 0x00001083;
     public static final int VENDOR_HINT_ACTIVITY_BOOST = 0x00001084;
     public static final int VENDOR_HINT_TOUCH_BOOST = 0x00001085;
-
+    public static final int VENDOR_HINT_MTP_BOOST = 0x00001086;
     public class Scroll {
         public static final int VERTICAL = 1;
         public static final int HORIZONTAL = 2;
@@ -96,6 +98,13 @@ public class BoostFramework {
 
                     argClasses = new Class[] {int.class};
                     mReleaseHandlerFunc =  mPerfClass.getDeclaredMethod("perfLockReleaseHandler", argClasses);
+
+                    argClasses = new Class[] {int.class, String.class};
+                    mIOPStart =  mPerfClass.getDeclaredMethod("perfIOPrefetchStart", argClasses);
+
+                    argClasses = new Class[] {};
+                    mIOPStop =  mPerfClass.getDeclaredMethod("perfIOPrefetchStop", argClasses);
+                    Log.v(TAG,"mIOPStart method = " + mIOPStart);
 
                     mIsLoaded = true;
                 }
@@ -172,4 +181,31 @@ public class BoostFramework {
         }
         return ret;
     }
+
+/** @hide */
+    public int perfIOPrefetchStart(int pid, String pkg_name)
+    {
+        int ret = -1;
+        try {
+            Object retVal = mIOPStart.invoke(mPerf,pid,pkg_name);
+            ret = (int)retVal;
+        } catch(Exception e) {
+            Log.e(TAG,"Exception " + e);
+        }
+        return ret;
+    }
+
+/** @hide */
+    public int perfIOPrefetchStop()
+    {
+        int ret = -1;
+         try {
+             Object retVal = mIOPStop.invoke(mPerf);
+             ret = (int)retVal;
+         } catch(Exception e) {
+             Log.e(TAG,"Exception " + e);
+         }
+         return ret;
+    }
+
 };

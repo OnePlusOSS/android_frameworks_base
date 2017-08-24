@@ -41,6 +41,7 @@ import android.util.Slog;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -478,6 +479,10 @@ public class Watchdog extends Thread {
             // dumped the halfway stacks, we properly re-initialize the trace file.
             final File stack = ActivityManagerService.dumpStackTraces(
                     !waitedHalf, pids, null, null, getInterestingNativePids());
+            //Collect Binder State logs to get status of all the transactions
+            if ("1".equals(SystemProperties.get("ro.debuggable"))) {
+                binderStateRead();
+            }
 
             // Give some extra time to make sure the stack traces get written.
             // The system's been hanging for a minute, another second or two won't hurt much.
@@ -487,10 +492,6 @@ public class Watchdog extends Thread {
             if (RECORD_KERNEL_THREADS) {
                 dumpKernelStackTraces();
             }
-
-            // Trigger the kernel to dump all blocked threads, and backtraces on all CPUs to the kernel log
-            doSysRq('w');
-            doSysRq('l');
 
             String tracesPath = SystemProperties.get("dalvik.vm.stack-trace-file", null);
             String traceFileNameAmendment = "_SystemServer_WDT" + mTraceDateFormat.format(new Date());
@@ -523,6 +524,26 @@ public class Watchdog extends Thread {
             try {
                 dropboxThread.join(2000);  // wait up to 2 seconds for it to return.
             } catch (InterruptedException ignored) {}
+
+
+            // At times, when user space watchdog traces don't give an indication on
+            // which component held a lock, because of which other threads are blocked,
+            // (thereby causing Watchdog), crash the device to analyze RAM dumps
+            boolean crashOnWatchdog = SystemProperties
+                                        .getBoolean("persist.sys.crashOnWatchdog", false);
+            if (crashOnWatchdog) {
+                // Trigger the kernel to dump all blocked threads, and backtraces
+                // on all CPUs to the kernel log
+                Slog.e(TAG, "Triggering SysRq for system_server watchdog");
+                doSysRq('w');
+                doSysRq('l');
+
+                // wait until the above blocked threads be dumped into kernel log
+                SystemClock.sleep(3000);
+
+                // now try to crash the target
+                doSysRq('c');
+            }
 
             IActivityController controller;
             synchronized (this) {
@@ -581,6 +602,22 @@ public class Watchdog extends Thread {
             Slog.w(TAG, "Failed to write to /proc/sysrq-trigger", e);
         }
     }
+
+   private void binderStateRead() {
+       try {
+           Slog.i(TAG,"Collect Binder Transaction Status Information");
+           FileReader binder_state_in = new FileReader("/sys/kernel/debug/binder/state");
+           FileWriter binder_state_out = new FileWriter("/data/anr/BinderTraces.txt");
+           int c;
+           while ((c = binder_state_in.read()) != -1) {
+               binder_state_out.write(c);
+           }
+           binder_state_in.close();
+           binder_state_out.close();
+       } catch (IOException e) {
+           Slog.w(TAG, "Failed to collect state file",e);
+       }
+   }
 
     private File dumpKernelStackTraces() {
         String tracesPath = SystemProperties.get("dalvik.vm.stack-trace-file", null);
