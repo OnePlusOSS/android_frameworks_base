@@ -413,6 +413,9 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
             String name = event.get("NAME");
             int state = 0;
 
+            if (name == null)
+                name = event.get("SWITCH_NAME");
+
             try {
                 if (name.equals(NAME_DP_AUDIO)) {
                     String state_str = event.get("STATE");
