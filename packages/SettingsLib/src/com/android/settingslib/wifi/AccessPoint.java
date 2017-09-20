@@ -444,6 +444,24 @@ public class AccessPoint implements Comparable<AccessPoint> {
         networkId = WifiConfiguration.INVALID_NETWORK_ID;
     }
 
+    public boolean isFils256Supported() {
+            for (ScanResult result : mScanResultCache.values()) {
+                if (result.capabilities.contains("FILS-SHA256")) {
+                    return true;
+                }
+            }
+        return false;
+    }
+
+    public boolean isFils384Supported() {
+            for (ScanResult result : mScanResultCache.values()) {
+                if (result.capabilities.contains("FILS-SHA384")) {
+                    return true;
+                }
+            }
+        return false;
+    }
+
     public WifiInfo getInfo() {
         return mInfo;
     }

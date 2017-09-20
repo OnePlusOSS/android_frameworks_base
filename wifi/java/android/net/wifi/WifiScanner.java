@@ -196,7 +196,14 @@ public class WifiScanner {
          * */
         public HiddenNetwork[] hiddenNetworks;
         /** period of background scan; in millisecond, 0 => single shot scan */
+
         public int periodInMs;
+        /** {@hide} */
+        public int plan1PeriodInSec;
+        /** {@hide} */
+        public int plan1Iterations;
+        /** {@hide} */
+        public int plan2PeriodInSec;
         /** must have a valid REPORT_EVENT value */
         public int reportEvents;
         /** defines number of bssids to cache from each scan */
@@ -233,6 +240,9 @@ public class WifiScanner {
         public void writeToParcel(Parcel dest, int flags) {
             dest.writeInt(band);
             dest.writeInt(periodInMs);
+            dest.writeInt(plan1PeriodInSec);
+            dest.writeInt(plan1Iterations);
+            dest.writeInt(plan2PeriodInSec);
             dest.writeInt(reportEvents);
             dest.writeInt(numBssidsPerScan);
             dest.writeInt(maxScansToCache);
@@ -266,6 +276,9 @@ public class WifiScanner {
                         ScanSettings settings = new ScanSettings();
                         settings.band = in.readInt();
                         settings.periodInMs = in.readInt();
+                        settings.plan1PeriodInSec = in.readInt();
+                        settings.plan1Iterations = in.readInt();
+                        settings.plan2PeriodInSec = in.readInt();
                         settings.reportEvents = in.readInt();
                         settings.numBssidsPerScan = in.readInt();
                         settings.maxScansToCache = in.readInt();

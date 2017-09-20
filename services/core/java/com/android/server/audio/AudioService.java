@@ -5292,7 +5292,7 @@ public class AudioService extends IAudioService.Stub
                         0,
                         null,
                         0);
-                delay = SystemProperties.getInt("audio.noisy.broadcast.delay", 700);
+                delay = SystemProperties.getInt("vendor.audio.noisy.broadcast.delay", 700);
             }
         }
 

@@ -506,6 +506,11 @@
     <!-- Integer indicating wpa_supplicant scan interval in milliseconds -->
     <integer translatable="false" name="config_wifi_supplicant_scan_interval">15000</integer>
 
+    <!-- Integer indicating pno scan interval has to be in seconds -->
+    <integer translatable="false" name="config_disconnected_pno_scan_plan1_interval_sec">20</integer>
+    <integer translatable="false" name="config_disconnected_pno_scan_plan1_interations">6</integer>
+    <integer translatable="false" name="config_disconnected_pno_scan_plan2_interval_sec">60</integer>
+
     <!-- Integer indicating amount of time failed networks areblacklisted for the purpose
          of network switching in milliseconds -->
     <integer translatable="false" name="config_wifi_network_switching_blacklist_time">172800000</integer>
@@ -2931,4 +2936,6 @@
 
     <!-- An array of packages that need to be treated as type service in battery settings -->
     <string-array translatable="false" name="config_batteryPackageTypeService"/>
+
+    <bool name="config_dual_LTE_capability">false</bool>
 </resources>

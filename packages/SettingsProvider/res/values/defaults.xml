@@ -187,4 +187,6 @@
 
     <!--  default setting for Settings.System.END_BUTTON_BEHAVIOR : END_BUTTON_BEHAVIOR_SLEEP -->
     <integer name="def_end_button_behavior">0x2</integer>
+    <!-- Default for Settings.Global.CAPTIVE_PORTAL_DETECTION_ENABLED -->
+    <integer name="def_captive_portal_detection_enabled" translatable="false">1</integer>
 </resources>

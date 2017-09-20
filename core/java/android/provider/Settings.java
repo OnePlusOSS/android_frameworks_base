@@ -4574,6 +4574,7 @@ public final class Settings {
             MOVED_TO_GLOBAL.add(Settings.Global.SYS_STORAGE_FULL_THRESHOLD_BYTES);
             MOVED_TO_GLOBAL.add(Settings.Global.SYNC_MAX_RETRY_DELAY_IN_SECONDS);
             MOVED_TO_GLOBAL.add(Settings.Global.CONNECTIVITY_CHANGE_DELAY);
+            MOVED_TO_GLOBAL.add(Settings.Global.CAPTIVE_PORTAL_MODE);
             MOVED_TO_GLOBAL.add(Settings.Global.CAPTIVE_PORTAL_DETECTION_ENABLED);
             MOVED_TO_GLOBAL.add(Settings.Global.CAPTIVE_PORTAL_SERVER);
             MOVED_TO_GLOBAL.add(Settings.Global.NSD_ON);
