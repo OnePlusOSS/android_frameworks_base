@@ -30,11 +30,16 @@ public interface VolumeDialog extends Plugin {
 
     void init(int windowType, Callback callback);
     void destroy();
+    //+ [START] oneplus feature */
+    void show(int reason);
+    //- [START] oneplus feature */
 
     @ProvidesInterface(version = VERSION)
     public interface Callback {
         int VERSION = 1;
-
+        //+ [START] oneplus feature */
+        void onSettingsClicked();
+        //- [END] oneplus feature */
         void onZenSettingsClicked();
         void onZenPrioritySettingsClicked();
     }

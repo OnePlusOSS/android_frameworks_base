@@ -51,6 +51,9 @@ public class Events {
     public static final int EVENT_SUPPRESSOR_CHANGED = 14;  // (component|string) (name|string)
     public static final int EVENT_MUTE_CHANGED = 15;  // (stream|int) (muted|bool)
     public static final int EVENT_TOUCH_LEVEL_DONE = 16;  // (stream|int) (level|bool)
+    //+ [SystemUI] port log
+    public static final int EVENT_STATUS_BAR_ICON_CHANGED = 17;
+    //- [SystemUI] port log
 
     private static final String[] EVENT_TAGS = {
         "show_dialog",
@@ -70,6 +73,9 @@ public class Events {
         "suppressor_changed",
         "mute_changed",
         "touch_level_done",
+        //+ [SystemUI] port log
+        "status_bar_icon_changed",
+        //- [SystemUI] port log
     };
 
     public static final int DISMISS_REASON_UNKNOWN = 0;
@@ -166,6 +172,11 @@ public class Events {
                 case EVENT_SUPPRESSOR_CHANGED:
                     sb.append(list[0]).append(' ').append(list[1]);
                     break;
+                //+ [SystemUI] port log
+                case EVENT_STATUS_BAR_ICON_CHANGED:
+                    sb.append(list[0]);
+                    break;
+                //- [SystemUI] port log
                 default:
                     sb.append(Arrays.asList(list));
                     break;

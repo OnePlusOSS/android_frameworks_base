@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+
+    <string name="keyguard_plugged_in_dash_charging">Dash Charging</string>
+
+    <!-- OnePlus Notification level option, prevent all notification functions from the app -->
+    <!-- Use Google string in most languages except Chinese -->
+    <string name="block_notification">@string/block</string>
+</resources>

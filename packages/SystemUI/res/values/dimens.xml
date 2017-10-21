@@ -617,14 +617,17 @@
     <dimen name="volume_dialog_padding_end">40dp</dimen>
 
     <dimen name="volume_row_padding_bottom">9.4dp</dimen>
-    <dimen name="volume_row_padding_start">4dp</dimen>
+    <dimen name="volume_dialog_collapsed_padding_top">4.66dp</dimen>
+    <dimen name="volume_row_padding_start">1.33dp</dimen>
     <dimen name="volume_row_header_padding_start">16dp</dimen>
     <dimen name="volume_row_height">64dp</dimen>
     <dimen name="volume_row_slider_height">48dp</dimen>
-    <dimen name="volume_row_slider_padding_start">12dp</dimen>
+    <dimen name="volume_row_slider_padding_start">13.66dp</dimen>
+    <dimen name="volume_zen_footer_padding">2.66dp</dimen>
 
-    <dimen name="volume_expander_margin_end">2dp</dimen>
-    <dimen name="volume_expander_margin_top">6dp</dimen>
+    <!-- OOS-1343 expander button position align volume dialog row -->
+    <dimen name="volume_expander_margin_end">@dimen/volume_row_padding_start</dimen>
+    <dimen name="volume_expander_margin_top">@dimen/volume_dialog_collapsed_padding_top</dimen>
 
     <!-- Padding between icon and text for managed profile toast -->
     <dimen name="managed_profile_toast_padding">4dp</dimen>

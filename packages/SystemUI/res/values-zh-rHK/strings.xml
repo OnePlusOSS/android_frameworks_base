@@ -774,4 +774,10 @@
 
     <string name="running_foreground_services_title" msgid="381024150898615683">"正在背景中執行的應用程式"</string>
     <string name="running_foreground_services_msg" msgid="6326247670075574355">"輕按即可查看電池和數據用量詳情"</string>
+
+    <!-- Volume UI: footer -->
+    <string name="volume_footer_slient">靜音</string>
+    <string name="volume_footer_no_disturb">勿擾</string>
+    <string name="volume_footer_ring">響鈴</string>
+    <string name="volume_footer_vibrate">靜音 (振動)</string>
 </resources>

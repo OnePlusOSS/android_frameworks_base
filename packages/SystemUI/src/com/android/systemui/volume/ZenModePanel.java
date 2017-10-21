@@ -36,6 +36,7 @@ import android.service.notification.ZenModeConfig;
 import android.service.notification.ZenModeConfig.ZenRule;
 import android.text.TextUtils;
 import android.text.format.DateFormat;
+
 import android.text.format.DateUtils;
 import android.util.ArraySet;
 import android.util.AttributeSet;
@@ -77,8 +78,11 @@ public class ZenModePanel extends FrameLayout {
 
     private static final int SECONDS_MS = 1000;
     private static final int MINUTES_MS = 60 * SECONDS_MS;
-
-    private static final int[] MINUTE_BUCKETS = ZenModeConfig.MINUTE_BUCKETS;
+    /* ++[START] oneplus feature */
+    private static final int[] MINUTE_BUCKETS = DEBUG
+            ? new int[] { 0, 1, 2, 5, 15, 30, 45, 60, 120, 180, 240, 480 }
+            : ZenModeConfig.MINUTE_BUCKETS;
+    /*[END] oneplus feature */
     private static final int MIN_BUCKET_MINUTES = MINUTE_BUCKETS[0];
     private static final int MAX_BUCKET_MINUTES = MINUTE_BUCKETS[MINUTE_BUCKETS.length - 1];
     private static final int DEFAULT_BUCKET_INDEX = Arrays.binarySearch(MINUTE_BUCKETS, 60);
@@ -94,6 +98,12 @@ public class ZenModePanel extends FrameLayout {
 
     private static final long TRANSITION_DURATION = 300;
 
+    /* ++[START] oneplus feature */
+    public static final Intent ZEN_SILENT_MODE_SETTINGS
+            = new Intent("android.oneplus.ZEN_SILENT_MODE_SETTINGS");
+    public static final Intent ZEN_RING_MODE_SETTINGS
+            = new Intent("android.oneplus.ZEN_RING_MODE_SETTINGS");
+    /*[END] oneplus feature */
     private final Context mContext;
     protected final LayoutInflater mInflater;
     private final H mHandler = new H();

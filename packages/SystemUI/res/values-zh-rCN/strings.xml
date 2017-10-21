@@ -772,4 +772,10 @@
 
     <string name="running_foreground_services_title" msgid="381024150898615683">"在后台运行的应用"</string>
     <string name="running_foreground_services_msg" msgid="6326247670075574355">"点按即可详细了解电量和流量消耗情况"</string>
+
+    <!-- Volume UI: footer -->
+    <string name="volume_footer_slient">静音</string>
+    <string name="volume_footer_no_disturb">勿扰</string>
+    <string name="volume_footer_ring">响铃</string>
+    <string name="volume_footer_vibrate">静音 (振动)</string>
 </resources>

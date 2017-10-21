@@ -264,4 +264,8 @@ public class KeyguardUpdateMonitorCallback {
      * @param dreaming true if the dream's window has been created and is visible
      */
     public void onDreamingStateChanged(boolean dreaming) { }
+
+    //+ [RAINN-2884]
+    public void onSystemReady() { }
+    //- [RAINN-2884]
 }

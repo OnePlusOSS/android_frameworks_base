@@ -31,11 +31,18 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.Objects;
 
+import com.android.keyguard.KeyguardUpdateMonitor;
+import com.oem.os.ThreeKeyManager;
+
+import android.provider.Settings.Global;
+import android.provider.Settings;
+import android.util.Log;
+
 /**
  * Static helpers for the volume dialog.
  */
-class Util {
-
+public class Util {
+    private static final String TAG = "Volume.Util";
     // Note: currently not shown (only used in the text footer)
     private static final SimpleDateFormat HMMAA = new SimpleDateFormat("h:mm aa", Locale.US);
 
@@ -171,4 +178,42 @@ class Util {
                 (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
         return telephony != null && telephony.isVoiceCapable();
     }
+
+    public static int getCorrectZenMode(int zenMode, int threeKeystatus, int isVibateWhenZen) {
+        //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+	//Since settins doesn't porting. force enable isVibateWhenZen
+        isVibateWhenZen = 1;
+        if (isVibateWhenZen > 0 && threeKeystatus == Global.THREEKEY_MODE_UP && zenMode == Settings.Global.ZEN_MODE_OFF) {
+            return Settings.Global.ZEN_MODE_ALARMS;
+        }
+
+        return zenMode;
+        //- [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+    }
+
+    //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+    public static int getThreeKeyStatus(Context context) {
+        int threeKeyStatus = Global.THREEKEY_MODE_INVAILD;
+        if (context == null) {
+            Log.e(TAG, "getThreeKeyStatus error, context is null");
+            return threeKeyStatus;
+        }
+
+        try {
+            ThreeKeyManager threeKeyManager = (ThreeKeyManager) context.getSystemService(Context.THREEKEY_SERVICE);
+            if (threeKeyManager != null) {
+
+                threeKeyStatus = threeKeyManager.getThreeKeyStatus();
+            }
+        }
+        catch (Exception e) {
+            Log.e(TAG, "Exception occurs, Three Key Service may not ready", e);
+        }
+
+        if (threeKeyStatus ==  Global.THREEKEY_MODE_INVAILD) {
+            threeKeyStatus = Settings.Global.getInt(context.getContentResolver(), Global.THREE_KEY_MODE, Global.THREEKEY_MODE_INVAILD);
+        }
+        return threeKeyStatus;
+    }
+    //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
 }

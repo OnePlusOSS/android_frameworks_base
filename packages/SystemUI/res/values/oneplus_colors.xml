@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <color name="grey_a100">#FFFFFF</color>
+    <color name="qs_tile_icon">#FF527FBE</color>
+
+    <!-- White theme for volume panel -->
+    <color name="white_volume_panel_text_color">#3865A5</color>
+    <color name="white_volume_panel_icon_color">#FF3865A5</color>
+    <color name="white_volume_panel_seekbar_color">#FF55759B</color>
+    <color name="white_volume_panel_seekbar_thumb_color">#FF55759B</color>
+    <color name="white_volume_panel_footer_icon_color">#8A000000</color>
+    <color name="white_volume_panel_footer_text_color">#8A000000</color>
+    <color name="white_volume_panel_expand_btn_color">#FF55759B</color>
+
+    <!-- Black theme for volume panel -->
+    <color name="black_volume_panel_text_color">#FFFFFFFF</color>
+    <color name="black_volume_panel_icon_color">#FFFFFFFF</color>
+    <color name="black_volume_panel_seekbar_color">#FF8399B3</color>
+    <color name="black_volume_panel_seekbar_thumb_color">#FFFFFFFF</color>
+    <color name="black_volume_panel_footer_icon_color">#FFFFFFFF</color>
+    <color name="black_volume_panel_footer_text_color">#FFFFFFFF</color>
+    <color name="black_volume_panel_expand_btn_color">#FFFFFFFF</color>
+
+    <!-- Android theme for volume panel -->
+    <color name="android_volume_panel_text_color">#FFFFFFFF</color>
+    <color name="android_volume_panel_icon_color">#FFFFFFFF</color>
+    <color name="android_volume_panel_seekbar_color">#FF2196F3</color>
+    <color name="android_volume_panel_seekbar_thumb_color">#FF2196F3</color>
+    <color name="android_volume_panel_footer_icon_color">#FFFFFFFF</color>
+    <color name="android_volume_panel_footer_text_color">#FFFFFFFF</color>
+    <color name="android_volume_panel_expand_btn_color">#FFFFFFFF</color>
+
+    <color name="default_volume_panel_seekbar_background_color">#42AAAAAA</color>
+    <color name="white_system_primary_color">#FFFAFAFA</color>
+    <color name="black_system_primary_color">#FF1D1D1D</color>
+    <color name="android_system_primary_color">#FF212121</color>
+
+    <!-- Colors of QuickSettings -->
+    <color name="qs_ripple_color">#FF808080</color>
+
+    <string-array name="qs_theme_colors">
+        <item>array/qs_theme_color_white</item>
+        <item>array/qs_theme_color_black</item>
+        <item>array/qs_theme_color_android</item>
+    </string-array>
+
+	<!-- Switch Thumb/Track color from common control -->
+    <color name="switch_thumb_normal_color_dark">#ffbdbdbd</color>
+    <color name="switch_thumb_normal_color_light">#fff1f1f1</color>
+    <color name="switch_thumb_disable_color_dark">#ff616161</color>
+    <color name="switch_thumb_disable_color_light">#ffbdbdbd</color>
+    <color name="switch_track_normal_color_dark">#4cffffff</color>
+    <color name="switch_track_normal_color_light">#42000000</color>
+    <color name="switch_track_disable_color_dark">#19ffffff</color>
+    <color name="switch_track_disable_color_light">#1E000000</color>
+
+    <color name="oneplus_contorl_icon_color_active_light">#66000000</color>
+    <color name="oneplus_contorl_icon_color_active_dark">#89FFFFFF</color>
+    <color name="oneplus_contorl_icon_color_inactive_light">#1E000000</color>
+    <color name="oneplus_contorl_icon_color_inactive_dark">#33FFFFFF</color>
+
+    <color name="oneplus_contorl_text_color_primary_light">#E5000000</color>
+    <color name="oneplus_contorl_text_color_primary_dark">#FFFFFFFF</color>
+    <color name="oneplus_contorl_text_color_primary_default">@color/oneplus_contorl_text_color_primary_dark</color>
+    <color name="oneplus_contorl_text_color_secondary_light">#66000000</color>
+    <color name="oneplus_contorl_text_color_secondary_dark">#7AFFFFFF</color>
+    <color name="oneplus_contorl_text_color_secondary_default">@color/oneplus_contorl_text_color_secondary_dark</color>
+    <color name="oneplus_contorl_text_color_disable_light">#2D000000</color>
+    <color name="oneplus_contorl_text_color_disable_dark">#3DFFFFFF</color>
+    <color name="oneplus_contorl_text_color_disable_default">@color/oneplus_contorl_text_color_disable_dark</color>
+
+    <color name="button_normal_color_dark">#B2ffffff</color>
+    <color name="button_normal_color_light">#89000000</color>
+
+    <array name="qs_theme_color_white">
+        <item>@color/oneplus_contorl_text_color_primary_light</item>  <!-- Primary Text Color -->
+        <item>@color/oneplus_contorl_text_color_secondary_light</item>  <!-- Secondary Text Color -->
+        <item>@color/oneplus_contorl_text_color_disable_light</item>  <!-- Disable Text Color -->
+
+        <item>#FFAAAAAA</item>  <!--mColorQSTileIconDisable-->
+        <item>#FFFAFAFA</item>  <!--mColorPrimary-->
+        <item>#FFEFF1F3</item>  <!--mColorEditBottom-->
+        <item>#FFAAAAAA</item>  <!--mColorProgressBackground-->
+        <item>#FF000000</item>  <!--mColorEditTileBackground-->
+        <item>#42000000</item>  <!--mColorEditTextBottom-->
+        <item>#FF000000</item>  <!--mColorQSTileIcon-->
+        <item>#FF000000</item>  <!--mColorProgress-->
+        <item>#FFFFFFFF</item>  <!--PopUp Background-->
+        <item>#FFFAFAFA</item>  <!--QS_DIALOG_BACKGROUND-->
+        <item>#DD000000</item>  <!--QS_DIALOG_TEXT-->
+
+        <item>@color/switch_thumb_disable_color_light</item>  <!--Switch thumb disabled-->
+        <item>@color/switch_track_disable_color_light</item>  <!--Switch track disabled-->
+        <item>@color/switch_thumb_normal_color_light</item>  <!--Switch thumb off-->
+        <item>@color/switch_track_normal_color_light</item>  <!--Switch track off-->
+        <item>#DD000000</item>	<!-- QS Label Color -->
+        <item>#89000000</item>	<!-- QS Label Color Light -->
+
+        <item>@color/oneplus_contorl_icon_color_active_light</item> <!-- icon active -->
+        <item>@color/oneplus_contorl_icon_color_inactive_light</item> <!-- icon inactive -->
+        <item>@color/button_normal_color_light</item> <!-- button color -->
+    </array>
+
+    <array name="qs_theme_color_black">
+        <item>@color/oneplus_contorl_text_color_primary_dark</item>  <!-- Primary Text Color -->
+        <item>@color/oneplus_contorl_text_color_secondary_dark</item>  <!-- Secondary Text Color -->
+        <item>@color/oneplus_contorl_text_color_disable_dark</item>  <!-- Disable Text Color -->
+
+        <item>#FFBBBBBB</item>  <!--mColorQSTileIconDisable-->
+        <item>#FF000000</item>  <!--mColorPrimary-->
+        <item>#FF151515</item>  <!--mColorEditBottom-->
+        <item>#FFBBBBBB</item>  <!--mColorProgressBackground-->
+        <item>#FFFFFFFF</item>  <!--mColorEditTileBackground-->
+        <item>#42FFFFFF</item>  <!--mColorEditTextBottom-->
+        <item>#FFFFFFFF</item>  <!--mColorQSTileIcon-->
+        <item>#FFFFFFFF</item>  <!--mColorProgress-->
+        <item>#FF252728</item>  <!--PopUp Background-->
+        <item>#FF1D1D1D</item>  <!--QS_DIALOG_BACKGROUND-->
+        <item>#DDFFFFFF</item>  <!--QS_DIALOG_TEXT-->
+
+        <item>@color/switch_thumb_disable_color_dark</item>  <!--Switch thumb disabled-->
+        <item>@color/switch_track_disable_color_dark</item>  <!--Switch track disabled-->
+        <item>@color/switch_thumb_normal_color_dark</item>  <!--Switch thumb off-->
+        <item>@color/switch_track_normal_color_dark</item>  <!--Switch track off-->
+        <item>#DDFFFFFF</item>	<!-- QS Label Color -->
+        <item>#89FFFFFF</item>	<!-- QS Label Color Light -->
+
+        <item>@color/oneplus_contorl_icon_color_active_dark</item> <!-- icon active -->
+        <item>@color/oneplus_contorl_icon_color_inactive_dark</item> <!-- icon inactive -->
+        <item>@color/button_normal_color_dark</item> <!-- button color -->
+    </array>
+
+    <array name="qs_theme_color_android">
+        <item>@color/oneplus_contorl_text_color_primary_default</item>  <!-- Primary Text Color -->
+        <item>@color/oneplus_contorl_text_color_secondary_default</item>  <!-- Secondary Text Color -->
+        <item>@color/oneplus_contorl_text_color_disable_default</item>  <!-- Disable Text Color -->
+
+        <item>#FFFFFFFF</item>  <!--mColorQSTileIconDisable-->
+        <item>#FF212121</item>  <!--mColorPrimary-->
+        <item>#FF1C1C1C</item>  <!--mColorEditBottom-->
+        <item>#FFFFFFFF</item>  <!--mColorProgressBackground-->
+        <item>#FFFFFFFF</item>  <!--mColorEditTileBackground-->
+        <item>#42FFFFFF</item>  <!--mColorEditTextBottom-->
+        <item>#FFFFFFFF</item>  <!--mColorQSTileIcon-->
+        <item>#FF2196F3</item>  <!--mColorProgress-->
+        <item>#FF354150</item>  <!--PopUp Background-->
+        <item>#FFFAFAFA</item>  <!--QS_DIALOG_BACKGROUND-->
+        <item>#DD000000</item>  <!--QS_DIALOG_TEXT-->
+
+        <item>@color/switch_thumb_disable_color_dark</item>  <!--Switch thumb disabled-->
+        <item>@color/switch_track_disable_color_dark</item>  <!--Switch track disabled-->
+        <item>@color/switch_thumb_normal_color_dark</item>  <!--Switch thumb off-->
+        <item>@color/switch_track_normal_color_dark</item>  <!--Switch track off-->
+        <item>#DDFFFFFF</item>	<!-- QS Label Color -->
+        <item>#89FFFFFF</item>	<!-- QS Label Color Light -->
+
+        <item>@color/oneplus_contorl_icon_color_active_dark</item> <!-- icon active -->
+        <item>@color/oneplus_contorl_icon_color_inactive_dark</item> <!-- icon inactive -->
+        <item>@color/button_normal_color_dark</item> <!-- button color -->
+    </array>
+
+    <color name="highlight_hint_view_chronometer_text_color">#FFFFFFFF</color>
+
+    <!-- OOS-1020 -->
+    <!-- copy from common control primary_default_light -->
+    <color name="op_primary_default_light">#2196F3</color>
+
+    <!-- used in notification guts, this color was removed from 7.1.1, so move to oneplus color -->
+    <color name="notification_guts_slider_color">@color/op_primary_default_light</color>
+    <!-- OOS-1020 -->
+
+</resources>
+

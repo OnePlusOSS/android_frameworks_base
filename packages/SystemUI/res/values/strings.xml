@@ -2033,4 +2033,10 @@
         user what will happen when they tap on that item (which is an application that has
         been identified for them as running). [CHAR LIMIT=NONE] -->
     <string name="running_foreground_services_msg">Tap for details on battery and data usage</string>
+
+    <!-- Volume UI: footer -->
+    <string name="volume_footer_slient">Silent</string>
+    <string name="volume_footer_no_disturb">Do not disturb</string>
+    <string name="volume_footer_ring">Ring</string>
+    <string name="volume_footer_vibrate">Silent (Vibrate)</string>
 </resources>

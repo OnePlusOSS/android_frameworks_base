@@ -75,6 +75,7 @@ import com.android.settingslib.Utils;
 import com.android.systemui.Dependency;
 import com.android.systemui.Interpolators;
 import com.android.systemui.R;
+import com.android.systemui.SystemUI;
 import com.android.systemui.plugins.VolumeDialogController;
 import com.android.systemui.plugins.VolumeDialogController.State;
 import com.android.systemui.plugins.VolumeDialogController.StreamState;
@@ -87,6 +88,8 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 /**
  * Visual presentation of the volume dialog.
  *
@@ -101,6 +104,10 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
 
     private static final long USER_ATTEMPT_GRACE_PERIOD = 1000;
     private static final int UPDATE_ANIMATION_DURATION = 80;
+    /* ++ [START] oneplus feature */
+    private static final int WAIT_FOR_RIPPLE = 200;
+    private static final int MIN_VOLUME_ON_RING = 1;
+    /* [END] oneplus feature */
 
     private final Context mContext;
     private final H mHandler = new H();
@@ -122,8 +129,11 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
     private ZenFooter mZenFooter;
     private final Object mSafetyWarningLock = new Object();
     private final Accessibility mAccessibility = new Accessibility();
-    private final ColorStateList mActiveSliderTint;
-    private final ColorStateList mInactiveSliderTint;
+    private ColorStateList mActiveSliderTint;
+    private ColorStateList mInactiveSliderTint;
+    /* ++ [START] oneplus feature */
+    private ColorStateList mBackgroundSliderTint;
+    /* [END] oneplus feature */
     private VolumeDialogMotion mMotion;
     private int mWindowType;
     private final ZenModeController mZenModeController;
@@ -142,14 +152,37 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
     private boolean mPendingStateChanged;
     private boolean mPendingRecheckAll;
     private long mCollapseTime;
+    /* ++ [START] oneplus feature */
+    private SystemUI mSysui;
+
+//    private int mThemeColorMode = com.android.systemui.util.Utils.THEME_WHITE;
+    private int mWhiteAccentColor = 0;
+    private int mBlackAccentColor = 0;
+    private int mThemeColorPrimary = 0;
+    private int mThemeColorText = 0;
+    private int mThemeColorIcon = 0;
+    private int mThemeColorSeekbar = 0;
+    private int mThemeColorSeekbarThumb = 0;
+    private int mThemeColorSeekbarBackgroundColor = 0;
+    private int mThemeColorFooterIcon = 0;
+    private int mThemeColorFooterText = 0;
+    private int mThemeColorExpandBtn = 0;
+    /* [END] oneplus feature */
     private boolean mHovering = false;
     private int mDensity;
 
     private boolean mShowFullZen;
     private TunerZenModePanel mZenPanel;
 
-    public VolumeDialogImpl(Context context) {
+    //+ [RAINN-3069] For hide unnessary row, Must update Rows after change density or fontscale
+    private float mFontScale = 1.0f;
+    //- [RAINN-3069] For hide unnessary row, Must update Rows after change density or fontscale
+
+    public VolumeDialogImpl(Context context, SystemUI sysui) {
         mContext = context;
+        /* ++ [START] oneplus feature */
+        mSysui = sysui;
+        /* [END] oneplus feature */
         mZenModeController = Dependency.get(ZenModeController.class);
         mController = Dependency.get(VolumeDialogController.class);
         mKeyguard = (KeyguardManager) mContext.getSystemService(Context.KEYGUARD_SERVICE);
@@ -158,6 +191,9 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
                 (AccessibilityManager) mContext.getSystemService(Context.ACCESSIBILITY_SERVICE);
         mActiveSliderTint = ColorStateList.valueOf(Utils.getColorAccent(mContext));
         mInactiveSliderTint = loadColorStateList(R.color.volume_slider_inactive);
+        /* ++ [START] oneplus feature */
+        mBackgroundSliderTint = loadColorStateList(R.color.qs_tile_icon, 0x42FFFFFF);
+        /* [END] oneplus feature */
     }
 
     public void init(int windowType, Callback callback) {
@@ -174,6 +210,9 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
 
         final Configuration currentConfig = mContext.getResources().getConfiguration();
         mDensity = currentConfig.densityDpi;
+        //+ [RAINN-3069] For hide unnessary row, Must update Rows after change density or fontscale
+        mFontScale = currentConfig.fontScale;
+        //- [RAINN-3069] For hide unnessary row, Must update Rows after change density or fontscale
     }
 
     @Override
@@ -210,6 +249,11 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
         mWindow.setAttributes(lp);
         mWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
 
+        /* ++ [START] oneplus feature */
+        mActiveSliderTint = loadColorStateList(R.color.qs_tile_icon);
+        mInactiveSliderTint = loadColorStateList(R.color.qs_tile_icon);
+        mBackgroundSliderTint = loadColorStateList(R.color.qs_tile_icon, 0x42FFFFFF);
+        /* [END] oneplus feature */
         mDialog.setContentView(R.layout.volume_dialog);
         mDialogView = (ViewGroup) mDialog.findViewById(R.id.volume_dialog);
         mDialogView.setOnHoverListener(new View.OnHoverListener() {
@@ -250,11 +294,19 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
                 });
 
         if (mRows.isEmpty()) {
+            //+ Google define TV only have single volume, so first row become music stream, since default focus stream is ring on phone, change first to ring stream when device have multi volume.
+            /*
             addRow(AudioManager.STREAM_MUSIC,
                     R.drawable.ic_volume_media, R.drawable.ic_volume_media_mute, true);
+            */
+            //- Google define TV only have single volume, so first row become music stream, since default focus stream is ring on phone, change first to ring stream when device have multi volume.
             if (!AudioSystem.isSingleVolume(mContext)) {
                 addRow(AudioManager.STREAM_RING,
                         R.drawable.ic_volume_ringer, R.drawable.ic_volume_ringer_mute, true);
+                //+RAINO-78
+                addRow(AudioManager.STREAM_MUSIC,
+                    R.drawable.ic_volume_media, R.drawable.ic_volume_media_mute, true);
+                //-RAINO-78
                 addRow(AudioManager.STREAM_ALARM,
                         R.drawable.ic_volume_alarm, R.drawable.ic_volume_alarm_mute, false);
                 addRow(AudioManager.STREAM_VOICE_CALL,
@@ -266,15 +318,35 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
                 addRow(AudioManager.STREAM_ACCESSIBILITY, R.drawable.ic_volume_accessibility,
                         R.drawable.ic_volume_accessibility, true);
             }
+           //+ Google define TV only have single volume, so first row become music stream, since default focus stream is ring on phone, change first to ring stream when device have multi volume.
+            else {
+                addRow(AudioManager.STREAM_MUSIC,
+                        R.drawable.ic_volume_media, R.drawable.ic_volume_media_mute, true);
+            }
+            //- Google define TV only have single volume, so first row become music stream, since default focus stream is ring on phone, change first to ring stream when device have multi volume.
+
         } else {
             addExistingRows();
         }
         mExpandButtonAnimationDuration = res.getInteger(R.integer.volume_expand_animation_duration);
         mZenFooter = (ZenFooter) mDialog.findViewById(R.id.volume_zen_footer);
-        mZenFooter.init(mZenModeController);
+        //+ [START] oneplus feature */
+        mZenFooter.init(mSysui, this, mZenModeController);
+        //- [START] oneplus feature */
         mZenPanel = (TunerZenModePanel) mDialog.findViewById(R.id.tuner_zen_mode_panel);
         mZenPanel.init(mZenModeController);
         mZenPanel.setCallback(mZenPanelCallback);
+
+//        /* ++ [START] oneplus feature */
+        mAccessibility.init();
+//        mWhiteAccentColor = com.android.systemui.util.Utils.getThemeWhiteAccentColor(mContext, R.color.white_volume_panel_seekbar_color);
+//        mBlackAccentColor = com.android.systemui.util.Utils.getThemeBlackAccentColor(mContext, R.color.black_volume_panel_seekbar_color);
+//        mThemeColorSeekbarBackgroundColor = res.getColor(R.color.default_volume_panel_seekbar_background_color);
+//
+//        mController.addCallback(mControllerCallbackH, mHandler);
+        mController.getState();
+        applyColorTheme();
+//        /* [END] oneplus feature */
     }
 
     @Override
@@ -288,11 +360,24 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
         return ColorStateList.valueOf(mContext.getColor(colorResId));
     }
 
+    /* ++ [START] oneplus feature */
+    private ColorStateList loadColorStateList(int colorResId, int mask) {
+        return ColorStateList.valueOf(mContext.getColor(colorResId) & mask);
+    }
+    /* [END] oneplus feature */
+
     private void updateWindowWidthH() {
         final ViewGroup.LayoutParams lp = mDialogView.getLayoutParams();
+        /* ++ [START] oneplus feature */
+        final ViewGroup.LayoutParams contentViewLp = mDialogContentView.getLayoutParams();
+        /* ++ [START] oneplus feature */
         final DisplayMetrics dm = mContext.getResources().getDisplayMetrics();
         if (D.BUG) Log.d(TAG, "updateWindowWidth dm.w=" + dm.widthPixels);
         int w = dm.widthPixels;
+        /* ++ [START] oneplus feature */
+        lp.width = w;
+        mDialogView.setLayoutParams(lp);
+        /* ++ [START] oneplus feature */
         final int max = mContext.getResources()
                 .getDimensionPixelSize(R.dimen.volume_dialog_panel_width);
         if (w > max) {
@@ -442,6 +527,13 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
                     Events.writeEvent(mContext, Events.EVENT_ICON_CLICK, row.stream, row.iconState);
                     mController.setActiveStream(row.stream);
                     if (row.stream == AudioManager.STREAM_RING) {
+                        final boolean wasMin = row.ss.level == MIN_VOLUME_ON_RING;
+                        mController.setStreamVolume(stream, wasMin ? row.lastAudibleLevel : MIN_VOLUME_ON_RING);
+                    } else {
+                        final boolean vmute = row.ss.level == 0;
+                        mController.setStreamVolume(stream, vmute ? row.lastAudibleLevel : 0);
+                    }
+                    /*
                         final boolean hasVibrator = mController.hasVibrator();
                         if (mState.ringerModeInternal == AudioManager.RINGER_MODE_NORMAL) {
                             if (hasVibrator) {
@@ -462,6 +554,7 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
                         mController.setStreamVolume(stream,
                                 vmute ? row.lastAudibleLevel : row.ss.levelMin);
                     }
+                    */
                     row.userAttempt = 0;  // reset the grace period, slider updates immediately
                 }
             });
@@ -637,7 +730,9 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
             final boolean isActive = row == activeRow;
             final boolean shouldBeVisible = shouldBeVisibleH(row, isActive);
             Util.setVisOrGone(row.view, shouldBeVisible);
-            Util.setVisOrGone(row.header, shouldBeVisible);
+            //+ [OPSystemUI][RNMR-390] Remove header in volume control
+            Util.setVisOrGone(row.header, false);
+//            Util.setVisOrGone(row.header, shouldBeVisible);
             if (row.view.isShown()) {
                 updateVolumeRowSliderTintH(row, isActive);
             }
@@ -670,6 +765,9 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
             final int stream = state.states.keyAt(i);
             final StreamState ss = state.states.valueAt(i);
             if (!ss.dynamic) continue;
+            //+ [RAINN-3069] add log for trace
+            Log.i(TAG, " onStateChangedH stream:" + stream);
+            //- [RAINN-3069] add log for trace
             mDynamic.put(stream, true);
             if (findRow(stream) == null) {
                 addRow(stream, R.drawable.ic_volume_remote, R.drawable.ic_volume_remote_mute, true,
@@ -691,9 +789,9 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
     private void updateFooterH() {
         if (D.BUG) Log.d(TAG, "updateFooterH");
         final boolean wasVisible = mZenFooter.getVisibility() == View.VISIBLE;
-        final boolean visible = mState.zenMode != Global.ZEN_MODE_OFF
+        final boolean visible = true; /*mState.zenMode != Global.ZEN_MODE_OFF
                 && (mAudioManager.isStreamAffectedByRingerMode(mActiveStream) || mExpanded)
-                && !mZenPanel.isEditing();
+                && !mZenPanel.isEditing();*/
 
         if (wasVisible != visible) {
             mZenFooter.update();
@@ -722,7 +820,7 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
         final StreamState ss = mState.states.get(row.stream);
         if (ss == null) return;
         row.ss = ss;
-        if (ss.level > 0) {
+        if (ss.level > 0 && row.stream != AudioManager.STREAM_RING/*oneplus feature*/) {
             row.lastAudibleLevel = ss.level;
         }
         if (ss.level == row.requestedLevel) {
@@ -742,9 +840,14 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
         final boolean zenMuted = isZenAlarms ? (isRingStream || isSystemStream)
                 : isZenNone ? (isRingStream || isSystemStream || isAlarmStream || isMusicStream)
                 : false;
+        /* ++ [START] oneplus feature */
+        if (ss.level > MIN_VOLUME_ON_RING && isRingStream && !zenMuted) {
+            row.lastAudibleLevel = ss.level;
+        }
+        /* [END] oneplus feature */
 
         // update slider max
-        final int max = ss.levelMax * 100;
+        final int max = ss.levelMax/*oneplus feature * 100*/;
         if (max != row.slider.getMax()) {
             row.slider.setMax(max);
         }
@@ -757,7 +860,7 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
         final boolean iconEnabled = (mAutomute || ss.muteSupported) && !zenMuted;
         row.icon.setEnabled(iconEnabled);
         row.icon.setAlpha(iconEnabled ? 1 : 0.5f);
-        final int iconRes =
+        int iconRes =
                 isRingVibrate ? R.drawable.ic_volume_ringer_vibrate
                 : isRingSilent || zenMuted ? row.cachedIconRes
                 : ss.routedToBluetooth ?
@@ -765,6 +868,18 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
                                 : R.drawable.ic_volume_media_bt)
                 : mAutomute && ss.level == 0 ? row.iconMuteRes
                 : (ss.muted ? row.iconMuteRes : row.iconRes);
+
+
+        /* ++ [START] oneplus feature */
+        /**
+         * Set the ring stream icon to ring in silent mode
+         * if the option "Silent vibration prompt" in silent settings is disabled
+         */
+        if (isRingStream && isRingSilent) {
+            iconRes = R.drawable.ic_volume_ringer;
+        }
+        /* [END] oneplus feature */
+
         if (iconRes != row.cachedIconRes) {
             if (row.cachedIconRes != 0 && isRingVibrate) {
                 mController.vibrate();
@@ -821,8 +936,20 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
 
         // update slider
         final boolean enableSlider = !zenMuted;
-        final int vlevel = row.ss.muted && (!isRingStream && !zenMuted) ? 0
+        int vlevel = row.ss.muted && (!isRingStream && !zenMuted) ? 0
                 : row.ss.level;
+
+
+        /* ++ [START] oneplus feature */
+        if (isRingStream && (row.ss.muted
+                //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+                || isZenAlarms)) {
+            //- [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+            vlevel = 0;
+        }
+        if (D.BUG) Log.d(TAG, "updateVolumeRowSliderH zenMuted:" +zenMuted + " isZenAlarms:" + isZenAlarms
+                + " isRingStream:" + isRingStream + " isSystemStream" + isSystemStream);
+        /* [END] oneplus feature */
         updateVolumeRowSliderH(row, enableSlider, vlevel);
     }
 
@@ -836,6 +963,9 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
         row.cachedSliderTint = tint;
         row.slider.setProgressTintList(tint);
         row.slider.setThumbTintList(tint);
+        /* ++ [START] oneplus feature */
+        row.slider.setProgressBackgroundTintList(mBackgroundSliderTint);
+        /* [END] oneplus feature */
     }
 
     private void updateVolumeRowSliderH(VolumeRow row, boolean enable, int vlevel) {
@@ -856,12 +986,12 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
                     row.userAttempt + USER_ATTEMPT_GRACE_PERIOD);
             return;  // don't update if visible and in grace period
         }
-        if (vlevel == level) {
+        if (vlevel == progress/*oneplus feature level*/) {
             if (mShowing && rowVisible) {
                 return;  // don't clamp if visible
             }
         }
-        final int newProgress = vlevel * 100;
+        final int newProgress = vlevel/*oneplus feature * 100*/;
         if (progress != newProgress) {
             if (mShowing && rowVisible) {
                 // animate!
@@ -906,6 +1036,9 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
     private void setStreamImportantH(int stream, boolean important) {
         for (VolumeRow row : mRows) {
             if (row.stream == stream) {
+                //+ [RAINN-3069] add log for trace
+                Log.i(TAG, " setStreamImportantH stream:" + row.stream + " important:" + important);
+                //- [RAINN-3069] add log for trace
                 row.important = important;
                 return;
             }
@@ -1015,15 +1148,28 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
         public void onConfigurationChanged() {
             Configuration newConfig = mContext.getResources().getConfiguration();
             final int density = newConfig.densityDpi;
-            if (density != mDensity) {
+            //+ [RAINN-3069] For hide unnessary row, Must update Rows after change density or fontscale
+            boolean forceUpdateTheme = false;
+            final float fontScale = newConfig.fontScale;
+            if (density != mDensity || fontScale != mFontScale) {
+                mDensity = density;
+                mFontScale = fontScale;
+                //- [RAINN-3069] For hide unnessary row, Must update Rows after change density or fontscale
                 mDialog.dismiss();
                 mZenFooter.cleanup();
                 initDialog();
-                mDensity = density;
+                //+ [RAINN-3069] For hide unnessary row and Theme, Must update Rows after change density or fontscale
+                updateFooterH();
+                updateRowsH(getActiveRow());
+                forceUpdateTheme = true;
+                //- [RAINN-3069] For hide unnessary row and Theme, Must update Rows after change density or fontscale
             }
             updateWindowWidthH();
             mConfigurableTexts.update();
             mZenFooter.onConfigurationChanged();
+            //+ [RAINN-3069] For hide unnessary row and Theme, Must update Rows after change density or fontscale
+            applyColorTheme();
+            //- [RAINN-3069] For hide unnessary row and Theme, Must update Rows after change density or fontscale
         }
 
         @Override
@@ -1181,14 +1327,22 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
             if (D.BUG) Log.d(TAG, AudioSystem.streamToString(mRow.stream)
                     + " onProgressChanged " + progress + " fromUser=" + fromUser);
             if (!fromUser) return;
+            /* ++ [START] oneplus feature */
+            // Set min volume for ring in normal/do not disturb mode
+            if (mRow.stream == AudioManager.STREAM_RING && progress < MIN_VOLUME_ON_RING) {
+                progress = MIN_VOLUME_ON_RING;
+                seekBar.setProgress(progress);
+            }
+            /* [ROX] oneplus feature */
+
             if (mRow.ss.levelMin > 0) {
-                final int minProgress = mRow.ss.levelMin * 100;
+                final int minProgress = mRow.ss.levelMin/*oneplus feature * 100*/;
                 if (progress < minProgress) {
                     seekBar.setProgress(minProgress);
                     progress = minProgress;
                 }
             }
-            final int userLevel = getImpliedLevel(seekBar, progress);
+            final int userLevel = progress/*oneplus feature getImpliedLevel(seekBar, progress)*/;
             if (mRow.ss.level != userLevel || mRow.ss.muted && userLevel > 0) {
                 mRow.userAttempt = SystemClock.uptimeMillis();
                 if (mRow.requestedLevel != userLevel) {
@@ -1212,7 +1366,7 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
             if (D.BUG) Log.d(TAG, "onStopTrackingTouch"+ " " + mRow.stream);
             mRow.tracking = false;
             mRow.userAttempt = SystemClock.uptimeMillis();
-            final int userLevel = getImpliedLevel(seekBar, seekBar.getProgress());
+            final int userLevel = seekBar.getProgress();/*oneplus feature getImpliedLevel(seekBar, seekBar.getProgress());*/
             Events.writeEvent(mContext, Events.EVENT_TOUCH_LEVEL_DONE, mRow.stream, userLevel);
             if (mRow.ss.level != userLevel) {
                 mHandler.sendMessageDelayed(mHandler.obtainMessage(H.RECHECK, mRow),
@@ -1274,9 +1428,15 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
 
     private static class VolumeRow {
         private View view;
+        /* ++ [START] oneplus feature */
+        private View space;
+        /* ++ [START] oneplus feature */
         private TextView header;
         private ImageButton icon;
         private SeekBar slider;
+        /* ++ [START] oneplus feature */
+        private ImageButton settingsButton;
+        /* ++ [START] oneplus feature */
         private int stream;
         private StreamState ss;
         private long userAttempt;  // last user-driven slider change
@@ -1292,4 +1452,130 @@ public class VolumeDialogImpl implements VolumeDialog, TunerService.Tunable {
         private int animTargetProgress;
         private int lastAudibleLevel = 1;
     }
+
+    /* ++ [START] oneplus feature */
+    public void dismissWaitForRipple(final int reason) {
+        mHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                mHandler.obtainMessage(H.DISMISS, reason, 0).sendToTarget();
+            }
+        }, WAIT_FOR_RIPPLE);
+    }
+
+//    private boolean isAccentColorChanged() {
+//        final int whiteAccentColor = com.android.systemui.util.Utils.getThemeWhiteAccentColor(mContext, R.color.white_volume_panel_seekbar_color);
+//        final int blackAccentColor = com.android.systemui.util.Utils.getThemeBlackAccentColor(mContext, R.color.black_volume_panel_seekbar_color);
+//
+//        if (mThemeColorMode == com.android.systemui.util.Utils.THEME_WHITE && mWhiteAccentColor != whiteAccentColor) {
+//            mWhiteAccentColor = whiteAccentColor;
+//            return true;
+//        }
+//
+//        if (mThemeColorMode == com.android.systemui.util.Utils.THEME_BLACK && mBlackAccentColor != blackAccentColor) {
+//            mBlackAccentColor = blackAccentColor;
+//            return true;
+//        }
+//
+//        return false;
+//    }
+
+
+    private void applyColorTheme() {
+//        applyColorTheme(false);
+	    applyBlackTheme();
+            applyColors();
+    }
+//    //+ [RAINN-3069] For update theme, Must force update theme after change density or fontscale
+//    private void applyColorTheme(boolean forceupdate) {
+//        //- [RAINN-3069] For update theme , Must force update theme after change density or fontscale
+//        final int theme = com.android.systemui.util.Utils.getThemeColor(mContext);
+//        boolean accentColorChanged = isAccentColorChanged();
+//
+//        if (mThemeColorMode == theme && !accentColorChanged && !forceupdate) {
+//            return;
+//        }
+//
+//        mThemeColorMode = theme;
+//        switch(theme) {
+//            case com.android.systemui.util.Utils.THEME_WHITE:
+//                applyWhiteTheme();
+//                break;
+//            case com.android.systemui.util.Utils.THEME_BLACK:
+//                applyBlackTheme();
+//                break;
+//            case com.android.systemui.util.Utils.THEME_ANDROID:
+//                applyAndroidTheme();
+//                break;
+//            default:
+//                applyWhiteTheme();
+//                break;
+//
+//        }
+//
+//        applyColors();
+//    }
+//
+//    private void applyWhiteTheme() {
+//        final Resources res = mContext.getResources();
+//        mThemeColorPrimary = res.getColor(R.color.white_system_primary_color);
+//        mThemeColorText = res.getColor(R.color.white_volume_panel_text_color);
+//        mThemeColorFooterIcon = res.getColor(R.color.white_volume_panel_footer_icon_color);
+//        mThemeColorFooterText = res.getColor(R.color.white_volume_panel_footer_text_color);
+//
+//        mThemeColorIcon = mWhiteAccentColor;
+//        mThemeColorSeekbar = mWhiteAccentColor;
+//        mThemeColorSeekbarThumb = mWhiteAccentColor;
+//        mThemeColorExpandBtn = mWhiteAccentColor;
+//    }
+//
+    private void applyBlackTheme() {
+        final Resources res = mContext.getResources();
+        mThemeColorPrimary = res.getColor(R.color.black_system_primary_color);
+        mThemeColorText = res.getColor(R.color.black_volume_panel_text_color);
+        mThemeColorIcon = res.getColor(R.color.black_volume_panel_icon_color);
+        mThemeColorSeekbarThumb = res.getColor(R.color.black_volume_panel_seekbar_thumb_color);
+        mThemeColorFooterIcon = res.getColor(R.color.black_volume_panel_footer_icon_color);
+        mThemeColorFooterText = res.getColor(R.color.black_volume_panel_footer_text_color);
+        mThemeColorExpandBtn = res.getColor(R.color.black_volume_panel_expand_btn_color);
+
+        //mThemeColorIcon = mBlackAccentColor;
+        mThemeColorSeekbar = mThemeColorIcon;
+        mThemeColorSeekbarThumb = mThemeColorIcon;
+        mThemeColorExpandBtn = mThemeColorIcon;
+
+    }
+//
+//    private void applyAndroidTheme() {
+//        final Resources res = mContext.getResources();
+//        mThemeColorPrimary = res.getColor(R.color.android_system_primary_color);
+//        mThemeColorText = res.getColor(R.color.android_volume_panel_text_color);
+//        mThemeColorIcon = res.getColor(R.color.android_volume_panel_icon_color);
+//        mThemeColorSeekbar = res.getColor(R.color.android_volume_panel_seekbar_color);
+//        mThemeColorSeekbarThumb = res.getColor(R.color.android_volume_panel_seekbar_color);
+//        mThemeColorFooterIcon = res.getColor(R.color.android_volume_panel_footer_icon_color);
+//        mThemeColorFooterText = res.getColor(R.color.android_volume_panel_footer_text_color);
+//        mThemeColorExpandBtn = res.getColor(R.color.android_volume_panel_expand_btn_color);
+//    }
+//
+    private void applyColors() {
+        mDialogView.setBackgroundColor(mThemeColorPrimary);
+        mExpandButton.setColorFilter(mThemeColorExpandBtn);
+
+        for(VolumeRow row : mRows) {
+            row.header.setTextColor(mThemeColorText);
+            row.icon.setColorFilter(mThemeColorIcon);
+            row.slider.setThumbTintList(ColorStateList.valueOf(mThemeColorSeekbarThumb));
+            row.slider.setProgressTintList(ColorStateList.valueOf(mThemeColorSeekbar));
+          row.slider.setProgressBackgroundTintList(ColorStateList.valueOf(mThemeColorSeekbarBackgroundColor));
+
+        }
+
+        // set colors on footer
+        ((ImageView)mDialog.findViewById(R.id.volume_zen_icon)).setColorFilter(mThemeColorFooterIcon);
+        ((TextView)mDialog.findViewById(R.id.volume_zen_summary_line_1)).setTextColor(mThemeColorFooterText);
+        ((ImageView)mDialog.findViewById(R.id.volume_zen_settings)).setColorFilter(mThemeColorFooterIcon);
+    }
+
+    /* ++ [END] oneplus feature */
 }

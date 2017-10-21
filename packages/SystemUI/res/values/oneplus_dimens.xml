@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources>
+    <!-- dismiss all button -->
+    <dimen name="dismiss_all_button_margin_bottom">18dp</dimen>
+    <dimen name="dismiss_all_button_height">56dp</dimen>
+    <dimen name="dismiss_all_button_width">56dp</dimen>
+
+    <dimen name="prevent_view_title_size">16sp</dimen>
+    <dimen name="prevent_view_title_cancel_size">14sp</dimen>
+    <dimen name="prevent_view_top_tag_cancel_size">11sp</dimen>
+    <dimen name="prevent_view_top_tag_cancel2_size">11sp</dimen>
+
+    <dimen name="volume_dialog_background_mask_height">426.7dp</dimen>
+
+    <dimen name="recents_deep_clean_button_margin_top">12dp</dimen>
+    <dimen name="recents_deep_clean_button_text_size">14dp</dimen>
+    <dimen name="recents_deep_clean_y_offset">36dp</dimen>
+    <dimen name="recents_dismiss_all_button_size">56dp</dimen>
+
+    <dimen name="qs_date_anim_translation_x">42dp</dimen>
+    <dimen name="qs_date_anim_translation_y">20dp</dimen>
+    <dimen name="qs_noalarm_offset">8dp</dimen>
+
+    <dimen name="qs_editor_side_padding">8dp</dimen>
+    <dimen name="overlay_start_padding_qs">4dp</dimen>
+    <dimen name="qs_tile_item_margin">10dp</dimen>
+    <dimen name="qs_detail_item_height_2lines">56dp</dimen>
+    <dimen name="qs_edit_text">12sp</dimen>
+    <dimen name="qs_edit_title">17sp</dimen>
+    <dimen name="qs_detail_item_user_text_size">14sp</dimen>
+
+    <!-- volume_button_size + volume_expander_margin_end -->
+    <dimen name="op_volume_dialog_row_padding_end">36.3dp</dimen>
+
+    <dimen name="highlight_hint_width">18dp</dimen>
+    <dimen name="highlight_hint_height">18dp</dimen>
+
+    <!--use for network speed-->
+    <dimen name="speed_view_font_size">14dp</dimen>
+    <dimen name="unit_view_font_size">12dp</dimen>
+
+    <dimen name="dash_view_margin_bottom">16dp</dimen>
+
+    <dimen name="system_icon_container_padding">10dip</dimen>
+    <dimen name="highlighthint_chronometer_padding">15dip</dimen>
+</resources>

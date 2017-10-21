@@ -144,4 +144,35 @@
 
     <color name="instant_apps_color">#ff4d5a64</color>
 
+    <!-- White theme for volume panel -->
+    <color name="white_volume_panel_text_color">#3865A5</color>
+    <color name="white_volume_panel_icon_color">#FF3865A5</color>
+    <color name="white_volume_panel_seekbar_color">#FF55759B</color>
+    <color name="white_volume_panel_seekbar_thumb_color">#FF55759B</color>
+    <color name="white_volume_panel_footer_icon_color">#8A000000</color>
+    <color name="white_volume_panel_footer_text_color">#8A000000</color>
+    <color name="white_volume_panel_expand_btn_color">#FF55759B</color>
+
+    <!-- Black theme for volume panel -->
+    <color name="black_volume_panel_text_color">#FFFFFFFF</color>
+    <color name="black_volume_panel_icon_color">#FFFFFFFF</color>
+    <color name="black_volume_panel_seekbar_color">#FF8399B3</color>
+    <color name="black_volume_panel_seekbar_thumb_color">#FFFFFFFF</color>
+    <color name="black_volume_panel_footer_icon_color">#FFFFFFFF</color>
+    <color name="black_volume_panel_footer_text_color">#FFFFFFFF</color>
+    <color name="black_volume_panel_expand_btn_color">#FFFFFFFF</color>
+
+    <!-- Android theme for volume panel -->
+    <color name="android_volume_panel_text_color">#FFFFFFFF</color>
+    <color name="android_volume_panel_icon_color">#FFFFFFFF</color>
+    <color name="android_volume_panel_seekbar_color">#FF2196F3</color>
+    <color name="android_volume_panel_seekbar_thumb_color">#FF2196F3</color>
+    <color name="android_volume_panel_footer_icon_color">#FFFFFFFF</color>
+    <color name="android_volume_panel_footer_text_color">#FFFFFFFF</color>
+    <color name="android_volume_panel_expand_btn_color">#FFFFFFFF</color>
+
+    <color name="default_volume_panel_seekbar_background_color">#42AAAAAA</color>
+    <color name="white_system_primary_color">#FFFAFAFA</color>
+    <color name="black_system_primary_color">#FF1D1D1D</color>
+    <color name="android_system_primary_color">#FF212121</color>
 </resources>

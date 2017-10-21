@@ -36,6 +36,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
 import android.content.pm.UserInfo;
+import android.database.ContentObserver;
 import android.graphics.drawable.Icon;
 import android.media.AudioManager;
 import android.net.Uri;
@@ -54,6 +55,7 @@ import android.util.Pair;
 import com.android.internal.messages.nano.SystemMessageProto.SystemMessage;
 import com.android.internal.telephony.IccCardConstants;
 import com.android.internal.telephony.TelephonyIntents;
+import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.systemui.Dependency;
 import com.android.systemui.DockedStackExistsListener;
 import com.android.systemui.R;
@@ -83,6 +85,7 @@ import com.android.systemui.statusbar.policy.RotationLockController.RotationLock
 import com.android.systemui.statusbar.policy.UserInfoController;
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.util.NotificationChannels;
+import com.android.systemui.volume.Events;
 
 import java.util.List;
 
@@ -112,6 +115,10 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
     private final String mSlotHeadset;
     private final String mSlotDataSaver;
     private final String mSlotLocation;
+    //+ MOOS-883
+    private final SettingObserver mSettingObserver = new SettingObserver();
+    private int mVibrateWhenMute = 0;
+    //- MOOS-883
 
     private final Context mContext;
     private final Handler mHandler = new Handler();
@@ -187,7 +194,10 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
         filter.addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE);
         filter.addAction(Intent.ACTION_MANAGED_PROFILE_REMOVED);
         mContext.registerReceiver(mIntentReceiver, filter, null, mHandler);
-
+        //+ MOOS-883
+        mContext.getContentResolver().registerContentObserver(
+                Settings.System.getUriFor(Settings.System.VIBRATE_WHEN_MUTE), false, mSettingObserver, UserHandle.USER_ALL);
+        //- MOOS-883
         // listen for user / profile change.
         try {
             ActivityManager.getService().registerUserSwitchObserver(mUserSwitchListener, TAG);
@@ -346,7 +356,10 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
         int volumeIconId = 0;
         String volumeDescription = null;
         int zen = mZenController.getZen();
-
+        //+ MOOS-883
+        mVibrateWhenMute = Settings.System.getIntForUser(mContext.getContentResolver(), Settings.System.VIBRATE_WHEN_MUTE, 0, KeyguardUpdateMonitor.getCurrentUser());
+        //- MOOS-883
+        /*
         if (DndTile.isVisible(mContext) || DndTile.isCombinedIcon(mContext)) {
             zenVisible = zen != Global.ZEN_MODE_OFF;
             zenIconId = zen == Global.ZEN_MODE_NO_INTERRUPTIONS
@@ -361,18 +374,56 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
             zenIconId = R.drawable.stat_sys_zen_important;
             zenDescription = mContext.getString(R.string.interruption_level_priority);
         }
+        */
+
+        //+porting oneplus zen mode
+        switch (zen) {
+            case Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS:
+                zenVisible = true;
+                zenIconId = R.drawable.stat_sys_three_key_no_disturb;
+                zenDescription = mContext.getString(R.string.interruption_level_none);
+
+                Events.writeEvent(mContext, Events.EVENT_STATUS_BAR_ICON_CHANGED, "show no disturb icon on status bar");
+                break;
+            case Global.ZEN_MODE_ALARMS:
+                zenVisible = true;
+                //+ [RAINN-3310] prevent icon flick, add vibrate to zen icon
+                if ((mVibrateWhenMute == 1)) {
+                    zenIconId = R.drawable.stat_sys_ringer_vibrate;
+                } else  {
+                    zenIconId = R.drawable.stat_sys_three_key_silent;
+                }
+                //- [RAINN-3310] prevent icon flick, add vibrate to zen icon
+                zenDescription = mContext.getString(R.string.interruption_level_priority);
+
+                Events.writeEvent(mContext, Events.EVENT_STATUS_BAR_ICON_CHANGED, "show silent icon on status bar");
+                break;
+            default:
+                zenVisible = false;
+                zenIconId = R.drawable.stat_sys_three_key_normal;
+                zenDescription = mContext.getString(R.string.quick_settings_dnd_label);
+
+                Events.writeEvent(mContext, Events.EVENT_STATUS_BAR_ICON_CHANGED, "three key in normal state, no icon shows on status bar");
+                break;
+        }
+        //-porting oneplus zen mode
 
         if (DndTile.isVisible(mContext) && !DndTile.isCombinedIcon(mContext)
                 && audioManager.getRingerModeInternal() == AudioManager.RINGER_MODE_SILENT) {
             volumeVisible = true;
             volumeIconId = R.drawable.stat_sys_ringer_silent;
             volumeDescription = mContext.getString(R.string.accessibility_ringer_silent);
-        } else if (zen != Global.ZEN_MODE_NO_INTERRUPTIONS && zen != Global.ZEN_MODE_ALARMS &&
+        }
+        //+ [RAINN-3310] Since by oneplus design, vibrate icon only show when zenmode is ZEN_MODE_ALARMS,
+        //skip google design.
+        /*
+        else if (zen != Global.ZEN_MODE_NO_INTERRUPTIONS && zen != Global.ZEN_MODE_ALARMS &&
                 audioManager.getRingerModeInternal() == AudioManager.RINGER_MODE_VIBRATE) {
             volumeVisible = true;
             volumeIconId = R.drawable.stat_sys_ringer_vibrate;
             volumeDescription = mContext.getString(R.string.accessibility_ringer_vibrate);
         }
+        */
 
         if (zenVisible) {
             mIconController.setIcon(mSlotZen, zenIconId, zenDescription);
@@ -773,4 +824,19 @@ public class PhoneStatusBarPolicy implements Callback, Callbacks,
             mIconController.setIconVisibility(mSlotCast, false);
         }
     };
+
+
+    //+ MOOS-883
+    private final class SettingObserver extends ContentObserver {
+        public SettingObserver() {
+            super(new Handler());
+        }
+
+        @Override
+        public void onChange(boolean selfChange, Uri uri) {
+            super.onChange(selfChange, uri);
+            updateVolumeZen();
+        }
+    }
+    //- MOOS-883
 }

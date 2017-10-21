@@ -42,8 +42,10 @@ import android.os.Vibrator;
 import android.provider.Settings;
 import android.service.notification.Condition;
 import android.util.ArrayMap;
+import android.service.notification.ZenModeConfig;
 import android.util.Log;
 
+import com.android.keyguard.KeyguardUpdateMonitorCallback;
 import com.android.internal.annotations.GuardedBy;
 import com.android.systemui.Dumpable;
 import com.android.systemui.R;
@@ -55,6 +57,20 @@ import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+
+ //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+import com.android.keyguard.KeyguardUpdateMonitor;
+import android.database.ContentObserver;
+import android.net.Uri;
+import android.os.UserHandle;
+import android.provider.Settings.Global;
+import android.provider.Settings;
+
+import com.android.systemui.qs.tiles.IntentTile;
+import com.android.systemui.statusbar.policy.ZenModeControllerImpl;
+import com.android.systemui.util.Utils;
+import com.android.systemui.volume.Util;
+ //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
 
 /**
  *  Source of truth for all state / events related to the volume dialog.  No presentation.
@@ -106,6 +122,22 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
     private UserActivityListener mUserActivityListener;
 
     protected final VC mVolumeController = new VC();
+    //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+    private int mVibrateWhenMute = 0;
+    private int mZenMode = 0;
+    private int mThreeKeySatus = Global.THREEKEY_MODE_INVAILD;
+    private KeyguardUpdateMonitorCallback mMonitorCallback = new KeyguardUpdateMonitorCallback() {
+        @Override
+        public void onSystemReady() {
+            boolean change = false;
+            mVibrateWhenMute = Settings.System.getIntForUser(mContext.getContentResolver(), Settings.System.VIBRATE_WHEN_MUTE, 0, KeyguardUpdateMonitor.getCurrentUser());
+            change = updateZenModeW();
+            if (change) {
+                mCallbacks.onStateChanged(mState);
+            }
+        }
+    };
+    //- [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
 
     public VolumeDialogControllerImpl(Context context) {
         mContext = context.getApplicationContext();
@@ -127,6 +159,12 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
     public AudioManager getAudioManager() {
         return mAudio;
     }
+
+    /* ++ [START] oneplus feature */
+    public ZenModeConfig getZenModeConfig() {
+        return mNoMan.getZenModeConfig();
+    }
+    /* ++ [START] oneplus feature */
 
     public void dismiss() {
         mCallbacks.onDismissRequested(Events.DISMISS_REASON_VOLUME_CONTROLLER);
@@ -192,6 +230,9 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
         mObserver.destroy();
         mReceiver.destroy();
         mWorkerThread.quitSafely();
+        //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+        KeyguardUpdateMonitor.getInstance(mContext).removeCallback(mMonitorCallback);
+        //- [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
     }
 
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
@@ -210,6 +251,11 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
 
     public void addCallback(Callbacks callback, Handler handler) {
         mCallbacks.add(callback, handler);
+         //+ [RNMR-1906] must update first time after callback
+        if (callback != null) {
+            callback.onStateChanged(mState);
+        }
+         //- [RNMR-1906] must update first time after callback
     }
 
     public void setUserActivityListener(UserActivityListener listener) {
@@ -382,6 +428,9 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
         updateRingerModeExternalW(mAudio.getRingerMode());
         updateZenModeW();
         updateEffectsSuppressorW(mNoMan.getEffectsSuppressor());
+        /* ++ [START] oneplus feature */
+        updateZenModeConfigW();
+        /* ++ [START] oneplus feature */
         mCallbacks.onStateChanged(mState);
     }
 
@@ -434,6 +483,15 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
         return stream == AudioManager.STREAM_RING || stream == AudioManager.STREAM_NOTIFICATION;
     }
 
+    /* ++ [START] oneplus feature */
+    private boolean updateZenModeConfigW() {
+        final ZenModeConfig zenModeConfig = getZenModeConfig();
+        if (Objects.equals(mState.zenModeConfig, zenModeConfig)) return false;
+        mState.zenModeConfig = zenModeConfig;
+        return true;
+    }
+    /* ++ [START] oneplus feature */
+
     private boolean updateEffectsSuppressorW(ComponentName effectsSuppressor) {
         if (Objects.equals(mState.effectsSuppressor, effectsSuppressor)) return false;
         mState.effectsSuppressor = effectsSuppressor;
@@ -458,8 +516,16 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
     }
 
     private boolean updateZenModeW() {
-        final int zen = Settings.Global.getInt(mContext.getContentResolver(),
+        //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+        mThreeKeySatus = Util.getThreeKeyStatus(mContext);
+        //- [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+        int zen = Settings.Global.getInt(mContext.getContentResolver(),
                 Settings.Global.ZEN_MODE, Settings.Global.ZEN_MODE_OFF);
+        Log.i(TAG, "s updateZenModeW zen:" + zen + " threeKeySatus:" + mThreeKeySatus + " mVibrateWhenMute:" + mVibrateWhenMute);
+        //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+        zen = Util.getCorrectZenMode(zen, mThreeKeySatus, mVibrateWhenMute);
+        //- [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+        Log.i(TAG, "e updateZenModeW zen:" + zen);
         if (mState.zenMode == zen) return false;
         mState.zenMode = zen;
         Events.writeEvent(mContext, Events.EVENT_ZEN_MODE_CHANGED, zen);
@@ -773,6 +839,14 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
                 Settings.Global.getUriFor(Settings.Global.ZEN_MODE);
         private final Uri ZEN_MODE_CONFIG_URI =
                 Settings.Global.getUriFor(Settings.Global.ZEN_MODE_CONFIG_ETAG);
+        //+ [RAINN-4721] since zenmode design change after androidN, sync zenmode to threeKeyStatus
+        private final Uri THREEKEY_MODE_URI =
+                Settings.Global.getUriFor(Settings.Global.THREE_KEY_MODE);
+        //- [RAINN-4721] since zenmode design change after androidN, sync zenmode to threeKeyStatus
+        //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+        private final Uri VIBRATE_WHEN_MUTE =
+                Settings.Global.getUriFor(Settings.System.VIBRATE_WHEN_MUTE);
+        //- [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
 
         public SettingObserver(Handler handler) {
             super(handler);
@@ -781,6 +855,13 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
         public void init() {
             mContext.getContentResolver().registerContentObserver(ZEN_MODE_URI, false, this);
             mContext.getContentResolver().registerContentObserver(ZEN_MODE_CONFIG_URI, false, this);
+            //+ [RAINN-4721] since zenmode design change after androidN, sync zenmode to threeKeyStatus
+            mContext.getContentResolver().registerContentObserver(THREEKEY_MODE_URI, false, this);
+            //- [RAINN-4721] since zenmode design change after androidN, sync zenmode to threeKeyStatus
+            //+ [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
+            mContext.getContentResolver().registerContentObserver(VIBRATE_WHEN_MUTE, false, this);
+            KeyguardUpdateMonitor.getInstance(mContext).registerCallback(mMonitorCallback);
+            //- [RAINN-2884] 三段式按键切换到静音模式后调节音量显示的还是响铃模式界面
         }
 
         public void destroy() {
@@ -793,6 +874,17 @@ public class VolumeDialogControllerImpl implements VolumeDialogController, Dumpa
             if (ZEN_MODE_URI.equals(uri)) {
                 changed = updateZenModeW();
             }
+            /* ++ [START] oneplus feature */
+            if (ZEN_MODE_URI.equals(uri) || VIBRATE_WHEN_MUTE.equals(uri) || THREEKEY_MODE_URI.equals(uri)) {
+//                if (VIBRATE_WHEN_MUTE.equals(uri)) {
+                    mVibrateWhenMute = Settings.System.getIntForUser(mContext.getContentResolver(), Settings.System.VIBRATE_WHEN_MUTE, 0, KeyguardUpdateMonitor.getCurrentUser());
+//                }
+                changed = updateZenModeW();
+            }
+            if (ZEN_MODE_CONFIG_URI.equals(uri)) {
+                changed = updateZenModeConfigW();
+            }
+            /* ++ [START] oneplus feature */
             if (changed) {
                 mCallbacks.onStateChanged(mState);
             }

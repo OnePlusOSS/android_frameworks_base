@@ -19,6 +19,8 @@ import android.content.ComponentName;
 import android.media.AudioManager;
 import android.media.AudioSystem;
 import android.os.Handler;
+import android.service.notification.Condition;
+import android.service.notification.ZenModeConfig;
 import android.util.SparseArray;
 
 import com.android.systemui.plugins.VolumeDialogController.Callbacks;
@@ -99,6 +101,9 @@ public interface VolumeDialogController {
         public ComponentName effectsSuppressor;
         public String effectsSuppressorName;
         public int activeStream = NO_ACTIVE_STREAM;
+        /* ++ [START] oneplus feature */
+        public ZenModeConfig zenModeConfig;
+        /* ++ [START] oneplus feature */
 
         public State copy() {
             final State rt = new State();
@@ -112,6 +117,9 @@ public interface VolumeDialogController {
                 rt.effectsSuppressor = effectsSuppressor.clone();
             }
             rt.effectsSuppressorName = effectsSuppressorName;
+            /* ++ [START] oneplus feature */
+            if (zenModeConfig != null) rt.zenModeConfig = zenModeConfig.copy();
+            /* ++ [START] oneplus feature */
             rt.activeStream = activeStream;
             return rt;
         }
@@ -141,6 +149,9 @@ public interface VolumeDialogController {
             sep(sb, indent); sb.append("zenMode:").append(zenMode);
             sep(sb, indent); sb.append("effectsSuppressor:").append(effectsSuppressor);
             sep(sb, indent); sb.append("effectsSuppressorName:").append(effectsSuppressorName);
+            /* ++ [START] oneplus feature */
+            sep(sb, indent); sb.append("zenModeConfig:").append(zenModeConfig);
+            /* ++ [START] oneplus feature */
             sep(sb, indent); sb.append("activeStream:").append(activeStream);
             if (indent > 0) sep(sb, indent);
             return sb.append('}').toString();
@@ -156,6 +167,13 @@ public interface VolumeDialogController {
                 sb.append(',');
             }
         }
+
+        /* ++ [START] oneplus feature */
+        public Condition getManualExitCondition() {
+            return zenModeConfig != null && zenModeConfig.manualRule != null
+                    ? zenModeConfig.manualRule.condition : null;
+        }
+        /* ++ [START] oneplus feature */
     }
 
     @ProvidesInterface(version = Callbacks.VERSION)
