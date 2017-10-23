@@ -108,7 +108,7 @@ public final class NfcFCardEmulation {
      * the System Code contained in the Manifest file is returned. After calling
      * {@link #registerSystemCodeForService(ComponentName, String)}, the System Code
      * registered there is returned. After calling
-     * {@link #unregisterSystemCodeForService(ComponentName)}, "null" is returned.
+     * {@link #removeSystemCodeForService(ComponentName)}, "null" is returned.
      *
      * @param service The component name of the service
      * @return the current System Code
@@ -299,12 +299,12 @@ public final class NfcFCardEmulation {
      *
      * <p>The specified HCE-F service is only enabled when the corresponding application is
      * in the foreground and this method has been called. When the application is moved to
-     * the background, {@link #disableService(Activity)} is called, or
+     * the background, {@link #disableNfcFForegroundService(Activity)} is called, or
      * NFCID2 or System Code is replaced, the HCE-F service is disabled.
      *
      * <p>The specified Activity must currently be in resumed state. A good
      * paradigm is to call this method in your {@link Activity#onResume}, and to call
-     * {@link #disableService(Activity)} in your {@link Activity#onPause}.
+     * {@link #disableNfcFForegroundService(Activity)} in your {@link Activity#onPause}.
      *
      * <p>Note that this preference is not persisted by the OS, and hence must be
      * called every time the Activity is resumed.
@@ -437,7 +437,7 @@ public final class NfcFCardEmulation {
             return false;
         }
         try {
-            Integer.parseInt(systemCode, 16);
+            Integer.valueOf(systemCode, 16);
         } catch (NumberFormatException e) {
             Log.e(TAG, "System Code " + systemCode + " is not a valid System Code.");
             return false;

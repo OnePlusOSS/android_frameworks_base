@@ -72,4 +72,9 @@ interface INfcAdapter
     void removeNfcUnlockHandler(INfcUnlockHandler unlockHandler);
 
     void verifyNfcPermission();
+
+    /* @hide */
+    void setAidRoute(int route);
+    String getCplc();
+    String getDieId();
 }

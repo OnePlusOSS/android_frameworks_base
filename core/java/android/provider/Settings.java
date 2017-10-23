@@ -3045,6 +3045,17 @@ public final class Settings {
 
         private static final Validator SCREEN_BRIGHTNESS_MODE_VALIDATOR = sBooleanValidator;
 
+        // #ifdef VENDOR_EDIT
+        /**
+         * Whether  vibrates when it is mute. This will
+         * be used by Setting app;
+         * The value is boolean (1 or 0).
+         *
+         * @hide
+         */
+        public static final String VIBRATE_WHEN_MUTE = "oem_vibrate_under_silent";
+        // #endif
+
         /**
          * Adjustment to auto-brightness to make it generally more (>0.0 <1.0)
          * or less (<0.0 >-1.0) bright.
@@ -9692,12 +9703,31 @@ public final class Settings {
         /** @hide */ public static final int ZEN_MODE_NO_INTERRUPTIONS = 2;
         /** @hide */ public static final int ZEN_MODE_ALARMS = 3;
 
+        // #ifdef VENDOR_EDIT
+        // lifei@OnePlus.MultiMediaService, 2016/12/01,new api for ThreeKey
+        /**
+         * Defines global three_key mode.  THREEKEY_MODE_UP, THREEKEY_MODE_Middle,THREEKEY_MODE_DOWN
+         * or THREEKEY_MODE_INVAILD.
+         *
+         * @hide
+         */
+
+        public static final String THREE_KEY_MODE = "three_Key_mode";
+
+        /** @hide */ public static final int THREEKEY_MODE_UP = 1;
+        /** @hide */ public static final int THREEKEY_MODE_MIDDLE = 2;
+        /** @hide */ public static final int THREEKEY_MODE_DOWN = 3;
+        /** @hide */ public static final int THREEKEY_MODE_INVAILD = -1;
+
+        // endif
+
         /** @hide */ public static String zenModeToString(int mode) {
             if (mode == ZEN_MODE_IMPORTANT_INTERRUPTIONS) return "ZEN_MODE_IMPORTANT_INTERRUPTIONS";
             if (mode == ZEN_MODE_ALARMS) return "ZEN_MODE_ALARMS";
             if (mode == ZEN_MODE_NO_INTERRUPTIONS) return "ZEN_MODE_NO_INTERRUPTIONS";
             return "ZEN_MODE_OFF";
         }
+
 
         /** @hide */ public static boolean isValidZenMode(int value) {
             switch (value) {

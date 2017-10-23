@@ -667,6 +667,41 @@ public final class NfcAdapter {
     }
 
     /**
+     * @hide
+     */
+    public void setAidRoute(int route) {
+        try {
+            sService.setAidRoute(route);
+        } catch (RemoteException e) {
+            attemptDeadServiceRecovery(e);
+        }
+    }
+
+    /**
+     * @hide
+     */
+    public String getCplc() {
+        try {
+            return sService.getCplc();
+        } catch (RemoteException e) {
+            attemptDeadServiceRecovery(e);
+        }
+        return null;
+    }
+
+    /**
+     * @hide
+     */
+    public String getDieId() {
+        try {
+            return sService.getDieId();
+        } catch (RemoteException e) {
+           attemptDeadServiceRecovery(e);
+        }
+        return null;
+    }
+
+    /**
      * Return true if this NFC Adapter has any features enabled.
      *
      * <p>If this method returns false, the NFC hardware is guaranteed not to

@@ -147,6 +147,7 @@ import com.android.internal.os.IDropBoxManagerService;
 import com.android.internal.policy.PhoneLayoutInflater;
 
 import java.util.HashMap;
+import com.oem.os.ThreeKeyManager;
 
 /**
  * Manages all of the system services that can be returned by {@link Context#getSystemService}.
@@ -797,6 +798,12 @@ final class SystemServiceRegistry {
                 return new RadioManager(ctx);
             }});
 
+        registerService(Context.THREEKEY_SERVICE,ThreeKeyManager.class,
+                new CachedServiceFetcher<ThreeKeyManager>() {
+            @Override
+            public ThreeKeyManager createService(ContextImpl ctx) {
+                return new ThreeKeyManager(ctx);
+            }});
         registerService(Context.HARDWARE_PROPERTIES_SERVICE, HardwarePropertiesManager.class,
                 new CachedServiceFetcher<HardwarePropertiesManager>() {
             @Override
