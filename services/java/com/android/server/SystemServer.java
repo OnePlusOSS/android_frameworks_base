@@ -699,6 +699,7 @@ public final class SystemServer {
         ConsumerIrService consumerIr = null;
         MmsServiceBroker mmsService = null;
         HardwarePropertiesManagerService hardwarePropertiesService = null;
+        OemExService mOemExService = null;
         Object wigigP2pService = null;
         Object wigigService = null;
 
@@ -1440,6 +1441,10 @@ public final class SystemServer {
                 traceEnd();
             }
 
+            traceBeginAndSlog("AddOemExService");
+            mOemExService = new OemExService(context);
+            ServiceManager.addService("OEMExService", mOemExService);
+            traceEnd();
             if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_PRINTING)) {
                 traceBeginAndSlog("StartPrintManager");
                 mSystemServiceManager.startService(PRINT_MANAGER_SERVICE_CLASS);
@@ -1697,6 +1702,7 @@ public final class SystemServer {
         final MmsServiceBroker mmsServiceF = mmsService;
         final WindowManagerService windowManagerF = wm;
 
+        final OemExService mOemExServiceF = mOemExService;
         // We now tell the activity manager it is okay to run third party
         // code.  It will call back into us once it has gotten to the state
         // where third party code can really run (but before it has actually
@@ -1877,6 +1883,14 @@ public final class SystemServer {
                 if (incident != null) incident.systemRunning();
             } catch (Throwable e) {
                 reportWtf("Notifying incident daemon running", e);
+            }
+            traceEnd();
+            traceBeginAndSlog("OemExServiceReady");
+            try {
+                if (mOemExServiceF != null)
+                    mOemExServiceF.systemRunning();
+            } catch (Throwable e) {
+                reportWtf("Notifying OemExService running", e);
             }
             traceEnd();
         }, BOOT_TIMINGS_TRACE_LOG);

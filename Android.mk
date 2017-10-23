@@ -544,6 +544,13 @@ LOCAL_SRC_FILES += \
 	../../system/netd/server/binder/android/net/INetd.aidl \
 	../native/cmds/installd/binder/android/os/IInstalld.aidl \
 
+LOCAL_SRC_FILES += \
+	core/java/com/oem/os/IOemExInputCallBack.aidl \
+	core/java/com/oem/os/IOemUeventCallback.aidl \
+	core/java/com/oem/os/IOemExService.aidl \
+	core/java/com/oem/os/IOemService.aidl \
+        core/java/com/oem/os/IThreeKeyPolicy.aidl \
+
 LOCAL_AIDL_INCLUDES += system/update_engine/binder_bindings
 
 # FRAMEWORKS_BASE_JAVA_SRC_DIRS comes from build/core/pathmap.mk
