@@ -18,9 +18,9 @@ package android.nfc.cardemulation;
 
 import android.content.ComponentName;
 import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.content.res.XmlResourceParser;
@@ -45,7 +45,6 @@ public final class NfcFServiceInfo implements Parcelable {
     static final String TAG = "NfcFServiceInfo";
 
     private static final String DEFAULT_T3T_PMM = "FFFFFFFFFFFFFFFF";
-
     /**
      * The service that implements this
      */
@@ -91,7 +90,7 @@ public final class NfcFServiceInfo implements Parcelable {
      */
     public NfcFServiceInfo(ResolveInfo info, String description,
             String systemCode, String dynamicSystemCode, String nfcid2, String dynamicNfcid2,
-            int uid, String t3tPmm) {
+            int uid,String t3tPmm) {
         this.mService = info;
         this.mDescription = description;
         this.mSystemCode = systemCode;
@@ -150,6 +149,7 @@ public final class NfcFServiceInfo implements Parcelable {
                             com.android.internal.R.styleable.SystemCodeFilter);
                     systemCode = a.getString(
                             com.android.internal.R.styleable.SystemCodeFilter_name).toUpperCase();
+                    Log.d(TAG, "systemCode: " + systemCode);
                     if (!NfcFCardEmulation.isValidSystemCode(systemCode) &&
                             !systemCode.equalsIgnoreCase("NULL")) {
                         Log.e(TAG, "Invalid System Code: " + systemCode);
@@ -169,15 +169,17 @@ public final class NfcFServiceInfo implements Parcelable {
                         nfcid2 = null;
                     }
                     a.recycle();
-                } else if (eventType == XmlPullParser.START_TAG && tagName.equals("t3tPmm-filter")
-                        && t3tPmm == null) {
+                }
+                else if (eventType == XmlPullParser.START_TAG &&
+                        "t3tPmm-filter".equals(tagName) && t3tPmm == null) {
                     final TypedArray a = res.obtainAttributes(attrs,
                             com.android.internal.R.styleable.T3tPmmFilter);
                     t3tPmm = a.getString(
                             com.android.internal.R.styleable.T3tPmmFilter_name).toUpperCase();
+                    Log.e(TAG, "T3T PMM " + t3tPmm);
                     a.recycle();
                 }
-            }
+             }
             mSystemCode = (systemCode == null ? "NULL" : systemCode);
             mNfcid2 = (nfcid2 == null ? "NULL" : nfcid2);
             mT3tPmm = (t3tPmm == null ? DEFAULT_T3T_PMM : t3tPmm);

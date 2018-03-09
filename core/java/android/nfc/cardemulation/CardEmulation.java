@@ -606,7 +606,7 @@ public final class CardEmulation {
      * <li>Consist of only hex characters
      * <li>Additionally, we allow an asterisk at the end, to indicate
      *     a prefix
-     * <li>Additinally we allow an (#) at symbol at the end, to indicate
+     * <li>Additinally we allow an # at symbol at the end, to indicate
      *     a subset
      * </ul>
      *
@@ -617,13 +617,13 @@ public final class CardEmulation {
             return false;
 
         // If a prefix/subset AID, the total length must be odd (even # of AID chars + '*')
-        if ((aid.endsWith("*") || aid.endsWith("#")) && ((aid.length() % 2) == 0)) {
+        if ((aid.endsWith("*") || aid.endsWith("#"))&& ((aid.length() % 2) == 0)) {
             Log.e(TAG, "AID " + aid + " is not a valid AID.");
             return false;
         }
 
         // If not a prefix/subset AID, the total length must be even (even # of AID chars)
-        if ((!(aid.endsWith("*") || aid.endsWith("#"))) && ((aid.length() % 2) != 0)) {
+        if ((!(aid.endsWith("*")||aid.endsWith("#"))) && ((aid.length() % 2) != 0)) {
             Log.e(TAG, "AID " + aid + " is not a valid AID.");
             return false;
         }
@@ -631,6 +631,33 @@ public final class CardEmulation {
         // Verify hex characters
         if (!aid.matches("[0-9A-Fa-f]{10,32}\\*?\\#?")) {
             Log.e(TAG, "AID " + aid + " is not a valid AID.");
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * A valid APDU pattern according to ISO/IEC 7816-4:
+     * <ul>
+     * <li>Has >= 1 bytes and <=124 bytes (>=2 hex chars and <= 248 hex chars)
+     * <li>Consist of only hex characters
+     * </ul>
+     *
+     * @hide
+     */
+    public static boolean isValidApduString(String apdu) {
+        if (apdu == null)
+            return false;
+
+        if (apdu.length() < 2 || apdu.length() > 248 || ((apdu.length() % 2) != 0)) {
+            Log.e(TAG, "APDU " + apdu + " is not a valid apdu pattern.");
+            return false;
+        }
+
+        // Verify hex characters
+        if (!apdu.matches("[0-9A-Fa-f]{10,32}")) {
+            Log.e(TAG, "APDU " + apdu + " is not a valid apdu pattern.");
             return false;
         }
 

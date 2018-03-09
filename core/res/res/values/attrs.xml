@@ -3615,6 +3615,25 @@
         <attr name="name" />
     </declare-styleable>
 
+    <!-- Specify one or more <code>apdu-pattern-group</code> elements inside a
+         <code>offhost-apdu-service</code>
+         element to define a group of APDU Pattern that
+         your service can handle.-->
+    <declare-styleable name="ApduPatternGroup">
+        <!-- Short description of what the ApduPatternGroup implements. This attribute is mandatory.-->
+        <attr name="description" />
+    </declare-styleable>
+
+    <!-- Specify one or more <code>apdu-pattern-filter</code> elements inside a
+         <code>apdu-pattern-group</code> element to specify an APDU Pattern
+         your service can handle. -->
+    <declare-styleable name="ApduPatternFilter">
+        <!-- The APDU Pattern Group. This attribute is mandatory. -->
+        <attr name="reference_data" format="string" />
+        <attr name="apdupattern_mask" format="string" />
+        <attr name="description" />
+    </declare-styleable>
+
     <!-- Use <code>host-nfcf-service</code> as the root tag of the XML resource that
          describes an {@link android.nfc.cardemulation.HostNfcFService} service, which
          is referenced from its {@link android.nfc.cardemulation.HostNfcFService#SERVICE_META_DATA}

@@ -248,7 +248,6 @@ LOCAL_SRC_FILES += \
 	core/java/android/nfc/INfcCardEmulation.aidl \
 	core/java/android/nfc/INfcFCardEmulation.aidl \
 	core/java/android/nfc/INfcUnlockHandler.aidl \
-	core/java/android/nfc/INfcDta.aidl \
 	core/java/android/nfc/ITagRemovedCallback.aidl \
 	core/java/android/os/IBatteryPropertiesListener.aidl \
 	core/java/android/os/IBatteryPropertiesRegistrar.aidl \
@@ -570,6 +569,12 @@ LOCAL_SRC_FILES += \
 LOCAL_SRC_FILES += \
 	../../system/netd/server/binder/android/net/INetd.aidl \
 	../native/cmds/installd/binder/android/os/IInstalld.aidl \
+LOCAL_SRC_FILES += \
+	core/java/com/oem/os/IOemExInputCallBack.aidl \
+	core/java/com/oem/os/IOemUeventCallback.aidl \
+	core/java/com/oem/os/IOemExService.aidl \
+	core/java/com/oem/os/IOemService.aidl \
+        core/java/com/oem/os/IThreeKeyPolicy.aidl \
 
 LOCAL_AIDL_INCLUDES += system/update_engine/binder_bindings
 
